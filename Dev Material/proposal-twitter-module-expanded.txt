@@ -1,0 +1,919 @@
+I think lets change get_pumpfun_tokens to a name more fitting across the whole app. It fetches from pumpfun, Bonkfun and Moonshot so this is kinda misleading.
+
+Then for twitter searches we are not using all available features, we can make it powerful:
+- Search tweets from Crypto influencers i have some defaults line 1004 in twitter.js.txt crypto Gen-Z love this
+- Search for tweets from a Specific Handle e.g @elon_musk or @donald_trump Gen-z wants to also be able to be specific.
+- Search for Trenches tweets. Trenches are the twitter streets of crypto where Gen-z battle to discover new tokens, they do this daily and its a cool feature to search using keywords like "ticker", "pumping", "memecoin", "mooner", "trenches", etc
+if a user does not provide any keywords we will use our defaults. THE AI model should have instructions to prompt is any keyworks are to be used if none provided then we fire our defaults.
+
+- Allow users to add handles in settings of the KOL List they want to monitor. Its a list of influencers.
+We need a cool way to open up a Modal so users can manage their KOL list and save. So that when a user says to the AI Model "check my KOL list", the AI model will use that list.
+
+- Lets allow a KOL List, cashtag list, hashtag list!!!
+
+THIS IS A NEW FEATURE - LETS EXPAND THE TWITTER TOOLS!! & ALLOW USERS TO ALSO MANUALLY CONFIGURE THROUGH A COO INTERACTIVE MODAL WHAT THEY MONITOR FROM TWITTER - BUT TAKE CARE TO ANALYZE EVERYTHING FIRST, THERE IS A LOT OF DATA TO CONSIDER IN REGARDS HOW YOU CAN USE THE APIFY TOOLS AVAILABLE IN CLEVER WAYS AND ALLOW ALL THE FEATURES WE NEED. FOR THAT HERE ARE SOME LEADS AND MORE INFO ALSO FROM THE APIFY AGENT DOCS AT THE BOTTOM::
+
+Line 1061 in twitter.js.txt shows we can use "apidojo/tweet-scraper" with search terms this will help for #hashtags lists search!!
+
+Line 861 shows we can get the KOL list using all their @handles in one go here using apifyClient.actor("fastcrawler/Tweet-Fast-Scraper")
+
+Line 821 shows we can use apifyClient.actor("fastcrawler/monitor-stock-crypto-market-sentiment-on-twitter-x") to search with $CASHTAG but it only takes 1 which is tricky for a list but useful for 1 cashtag.
+
+
+
+>>>>>>
+
+MORE DOCS ON THE APIFY AGENTS _
+
+1. fastcrawler/monitor-stock-crypto-market-sentiment-on-twitter-x
+
+Input Parameters
+Field	Type	Description
+Cashtag	string	a cashtag,like $pepe
+Start Time	string	Specify the datetime (yyyy-MM-dd_HH:mm:ss_UTC),Returns tweets sent after the given date.
+End Time	string	Specify the datetime (yyyy-MM-dd_HH:mm:ss_UTC),Returns tweets sent before the given date.
+Sort By	string	Sorts search results by the given option.
+Maximum number of items on output	int	Maximum number of items that you want as output.
+Minimum retweets	int	Returns tweets with at least the given number of retweets.
+Minimum Likes	int	Returns tweets with at least the given number of Likes.
+Minimum Replies	int	Returns tweets with at least the given number of replies.
+sentimentAnalysis	boolean	Sentiment analysis of tweets will be done if checked，but it will also take longer. [BULLISH, BEARISH, or NEUTRAL]
+Only verified users	boolean	If checked then returns tweets by users who are verified.
+Only Twitter Blue	boolean	If checked then returns tweets by users who are Twitter Blue subscribers.
+lang	string	lang , eg： en
+
+Output Example:
+{
+"type": "tweet",
+"id": "1728108619189874825",
+"url": "https://x.com/elonmusk/status/1728108619189874825",
+"twitterUrl": "https://twitter.com/elonmusk/status/1728108619189874825",
+"text": "More than 10 per human on average",
+"sentiment": "\nBULLISH\n",
+"retweetCount": 11311,
+"replyCount": 6526,
+"likeCount": 104121,
+"quoteCount": 2915,
+"viewCount": 291500,
+"createdAt": "Fri Nov 24 17:49:36 +0000 2023",
+"lang": "en",
+"quoteId": "1728107610631729415",
+"bookmarkCount": 702,
+"isReply": false,
+"card": {},
+"place": {},
+"source:": "Twitter for Android",
+"author": {
+	"type": "user",
+	"userName": "elonmusk",
+	"url": "https://x.com/elonmusk",
+	"twitterUrl": "https://twitter.com/elonmusk",
+	"id": "44196397",
+	"name": "Elon Musk",
+	"isVerified": true,
+    "isBlueVerified": true,
+    "verifiedType": "business",
+	"hasNftAvatar": false,
+	"profilePicture": "https://pbs.twimg.com/profile_images/1683325380441128960/yRsRRjGO_normal.jpg",
+	"coverPicture": "https://pbs.twimg.com/profile_banners/44196397/1690621312",
+	"description": "",
+	"location": "",
+	"followers": 172669889,
+	"following": 538,
+	"protected": false,
+	"status": "",
+	"canDm": false,
+	"canMediaTag": false,
+	"advertiserAccountType": "promotable_user",
+	"analyticsType": "enabled",
+	"createdAt": "Tue Jun 02 20:12:29 +0000 2009",
+	"entities": {
+		"description": {
+			"hashtags": [],
+			"symbols": [],
+			"urls": [],
+			"user_mentions": []
+		}
+	},
+	"fastFollowersCount": 0,
+	"favouritesCount": 42455,
+	"geoEnabled": false,
+	"hasCustomTimelines": true,
+	"hasExtendedProfile": true,
+	"isTranslator": false,
+	"mediaCount": 2002,
+	"profileBackgroundColor": "C0DEED",
+	"statusesCount": 37933,
+	"translatorTypeEnum": "None",
+	"withheldInCountries": [],
+	"affiliatesHighlightedLabel": {
+		"label": {
+			"url": {
+				"urlType": "DeepLink",
+				"url": "https://twitter.com/X"
+			},
+			"badge": {
+				"url": "https://pbs.twimg.com/profile_images/1683899100922511378/5lY42eHs_bigger.jpg"
+			},
+			"userLabelType": "BusinessLabel",
+			"userLabelDisplayType": "Badge",
+			"description": "X"
+		}
+	}
+},
+"extendedEntities": {},
+"isRetweet": false,
+"isQuote": true,
+"quote": {
+	"type": "tweet",
+	"id": "1728107610631729415",
+	"text": "The posts on 𝕏 gets ~ 100 billion impressions every day.\n\n https://t.co/AuF1KStCFf",
+	"retweetCount": 646,
+	"replyCount": 789,
+	"likeCount": 3983,
+	"quoteCount": 2493,
+	"createdAt": "Fri Nov 24 17:45:35 +0000 2023",
+	"lang": "en",
+	"bookmarkCount": 127,
+	"author": {
+		"type": "user",
+		"userName": "cb_doge",
+		"url": "https://x.com/cb_doge",
+		"twitterUrl": "https://twitter.com/cb_doge",
+		"id": "1389913567671975937",
+		"name": "DogeDesigner",
+		"isVerified": true,
+        "isBlueVerified": true,
+        "verifiedType": "business",
+		"hasNftAvatar": false,
+		"profilePicture": "https://pbs.twimg.com/profile_images/1498070100393754625/C2V-fbll_normal.jpg",
+		"coverPicture": "https://pbs.twimg.com/profile_banners/1389913567671975937/1707664307",
+		"description": "UX/UI & Graphic Designer at Dogecoin & MyDoge Inc./ 𝕏 Creator",
+		"location": "Dogecoin.com",
+		"followers": 441904,
+		"following": 867,
+		"protected": false,
+		"status": "",
+		"canDm": true,
+		"canMediaTag": false,
+		"advertiserAccountType": "promotable_user",
+		"analyticsType": "disabled",
+		"createdAt": "Wed May 05 12:03:43 +0000 2021",
+		"entities": {
+			"url": {
+				"urls": [
+					{
+						"display_url": "MyDoge.com",
+						"expanded_url": "http://MyDoge.com",
+						"indices": [
+							0,
+							23
+						],
+						"url": "https://t.co/E0fsFaNdeI"
+					}
+				]
+			},
+			"description": {
+				"hashtags": [],
+				"symbols": [],
+				"urls": [],
+				"user_mentions": []
+			}
+		},
+		"fastFollowersCount": 0,
+		"favouritesCount": 70660,
+		"geoEnabled": true,
+		"hasCustomTimelines": true,
+		"hasExtendedProfile": true,
+		"isTranslator": false,
+		"mediaCount": 10987,
+		"profileBackgroundColor": "F5F8FA",
+		"statusesCount": 24918,
+		"translatorTypeEnum": "None",
+		"withheldInCountries": [],
+		"affiliatesHighlightedLabel": {
+			"label": {
+				"url": {
+					"urlType": "DeepLink",
+					"url": "https://twitter.com/MyDogeOfficial"
+				},
+				"badge": {
+					"url": "https://pbs.twimg.com/profile_images/1656530956801523719/SC7nEKMa_bigger.png"
+				},
+				"userLabelType": "BusinessLabel",
+				"userLabelDisplayType": "Badge",
+				"description": "MyDoge Wallet"
+			}
+		}
+	},
+	"extendedEntities": {
+		"media": [
+			{
+				"additional_media_info": {
+					"monetizable": false,
+					"graphql_source_user": {
+						"user": {
+							"legacy": {
+								"id_str": "1389913567671975937",
+								"screen_name": "cb_doge",
+								"name": "DogeDesigner",
+								"profile_image_url_https": "https://pbs.twimg.com/profile_images/1498070100393754625/C2V-fbll_normal.jpg",
+								"verified": false,
+								"protected": false,
+								"can_dm": true,
+								"can_media_tag": false
+							}
+						}
+					}
+				},
+				"display_url": "pic.twitter.com/AuF1KStCFf",
+				"expanded_url": "https://twitter.com/cb_doge/status/1727821969343533149/video/1",
+				"ext_media_availability": {
+					"status": "Available"
+				},
+				"id_str": "1727821919171313664",
+				"indices": [
+					59,
+					82
+				],
+				"media_key": "13_1727821919171313664",
+				"media_url_https": "https://pbs.twimg.com/amplify_video_thumb/1727821919171313664/img/t2oLSNoW4igyatu6.jpg",
+				"original_info": {
+					"width": 1920,
+					"height": 1080,
+					"focus_rects": []
+				},
+				"sizes": {
+					"large": {
+						"w": 1920,
+						"h": 1080
+					}
+				},
+				"source_status_id_str": "1727821969343533149",
+				"source_user_id_str": "1389913567671975937",
+				"type": "video",
+				"url": "https://t.co/AuF1KStCFf",
+				"video_info": {
+					"aspect_ratio": [
+						16,
+						9
+					],
+					"duration_millis": 3566,
+					"variants": [
+						{
+							"url": "https://video.twimg.com/amplify_video/1727821919171313664/pl/aGHTtMOSK_JQx9Q1.m3u8?tag=14&container=cmaf",
+							"content_type": "application/x-mpegURL"
+						},
+						{
+							"url": "https://video.twimg.com/amplify_video/1727821919171313664/vid/avc1/480x270/EkwZuvHPaMbH7O1a.mp4?tag=14",
+							"content_type": "video/mp4",
+							"bitrate": 288000
+						},
+						{
+							"url": "https://video.twimg.com/amplify_video/1727821919171313664/vid/avc1/640x360/0XXJiF8kImc0SNUN.mp4?tag=14",
+							"content_type": "video/mp4",
+							"bitrate": 832000
+						},
+						{
+							"url": "https://video.twimg.com/amplify_video/1727821919171313664/vid/avc1/1280x720/VvbDj9laYWdX1dfX.mp4?tag=14",
+							"content_type": "video/mp4",
+							"bitrate": 2176000
+						}
+					]
+				},
+				"allow_download_status": {
+					"allow_download": true
+				}
+			}
+		]
+	}
+},
+"media": []
+}
+
+
+MAKE SURE WE HANDLES THE OUTPUT CORRECTLY AND ALWAYS USE THIS FOR SENTIMENT CHECKING ON ANY CASHTAG FROM USER.....
+
+
+2. fastcrawler/Tweet-Fast-Scraper
+
+Input Example:
+
+{
+    "cookies": [
+        "auth_token=6f80c85f834f0a4950da5406a126d06bd4c7fad1;guest_id=v1%3A174000976114640872;ads_prefs=\"HBERAAA=\";twid=u%3D320203778;_twitter_sess=BAh7ECIKZmxhc2hJQzonQWN0aW9uQ29udHJvbGxlcjo6Rmxhc2g6OkZsYXNo%250ASGFzaHsABjoKQHVzZWR7ADoPY3JlYXRlZF9hdGwrCDVM3oqVAToMY3NyZl9p%250AZCIlZjVlZjg0MWY5ODUwMmJjM2RmYzAxZTRlZTE2NDk3ZTU6B2lkIiVkODIw%250AOWE0NDMwMThjNjYxNDI1MTM4YjNlZmJhMDE4NCIJcHJjcCIHYnI6CXVzZXJp%250ABALsFRMiCXBycnAiADoIcHJzaQs6CHBydWkEAuwVEzoIcHJsIituanU1WGpP%250AR0VFbHBDc0NJTHB4NjNDV1JnQXFqMElUTkxLYyUyQjoIcHJjaQY%253D--b090ffc75e660735215fcdd6bc62386a0aed3d5e;auth_multi=\"1884341268882268160:40c4e8d0e7daf31a9f72d6970ac5734527f04d2c\";night_mode=2;__cf_bm=TAmdM.vBVKHzPr5luklnXqhtPtXVluk82uD920R2a2I-1741791578-1.0.1.1-25rGcNckZkDOsgNbLWYCDgmbKqB0kC4vZZhlY5FIQXWY9fGNAV5UgWyD0T6XARdwttsrTR5LkLBljdv9EgbMTaaqPfhKdWY_u6tlY6Tb1Lw;att=1-LuJQlrtLY7IW2Ks3suafEUIzjE9FApvyu5dghM4o;ct0=9f2559b91cd99f7f4c4c22e841b47e0bddaac578745717d70ee991a0a35e0295fd5b1af2ccf52f57c1d4052d1875971add443178b04d77aa96dd54d11fe86d9540b70050a0a68d1a54f562b482210ff0;guest_id_ads=v1%3A174000976114640872;guest_id_marketing=v1%3A174000976114640872;kdt=TGfKTK0gRUiRsJYC3jbfF3xCyR59N25sfJIzuiKk;personalization_id=\"v1_w29lG/qXGnqSQVqpAQ8ffg==\""
+    ],
+    "onlyBuleVerifiedUsers": false,
+    "onlyImage": false,
+    "onlyQuote": false,
+    "onlyReply": false,
+    "onlyVerifiedUsers": false,
+    "onlyVideo": false,
+    "searchTerms": [
+        "from:elonmusk"
+    ],
+    "sortBy": "Latest"
+}
+
+Input Parameters
+Field	Type	Description
+Start URLs	array	Twitter (X) URLs. Paste the URLs and get the results immediately.
+Start Time	string	Specify the datetime (yyyy-MM-dd_HH:mm:ss_UTC),Returns tweets sent after the given date.
+End Time	string	Specify the datetime (yyyy-MM-dd_HH:mm:ss_UTC),Returns tweets sent before the given date.
+searchTerms	array	Search terms you want to search from Twitter (X). You can refer to this documentation. eg: from:nasa until:2024-10-08_23:59:59_UTC since:2024-10-08_00:00:00_UTC -filter:replies
+cookies	array	Cookies are used to authorize the actor with twitter. You can input multiple cookies, and when one cookie rate limit is set, it will automatically switch to another cookie to continue to capture data.
+Conversation IDs	array	Conversation IDs that you want to search on Twitter (X), Tweets that are part of a thread (direct replies and other replies)
+Sort By	string	Sorts search results by the given option.
+Maximum number of items on output	int	Maximum number of items that you want as output.
+Minimum retweets	int	Returns tweets with at least the given number of retweets.
+Minimum Likes	int	Returns tweets with at least the given number of Likes.
+Minimum Replies	int	Returns tweets with at least the given number of replies.
+Only verified users	boolean	If checked then returns tweets by users who are verified.
+Only Twitter Blue	boolean	If checked then returns tweets by users who are Twitter Blue subscribers.
+Only image	boolean	If checked then returns tweets that contain images.
+Only video	boolean	If checked then returns tweets that contain videos.
+Only quote	boolean	If checked then returns tweets that are quotes.
+Only Reply	boolean	If checked then returns tweets that are replies.
+Output Example
+
+{
+"type": "tweet",
+"id": "1728108619189874825",
+"url": "https://x.com/elonmusk/status/1728108619189874825",
+"twitterUrl": "https://twitter.com/elonmusk/status/1728108619189874825",
+"text": "More than 10 per human on average",
+"retweetCount": 11311,
+"replyCount": 6526,
+"likeCount": 104121,
+"quoteCount": 2915,
+"viewCount": 291500,
+"createdAt": "Fri Nov 24 17:49:36 +0000 2023",
+"lang": "en",
+"quoteId": "1728107610631729415",
+"bookmarkCount": 702,
+"isReply": false,
+"card": {},
+"place": {},
+"source:": "Twitter for Android",
+"author": {
+	"type": "user",
+	"userName": "elonmusk",
+	"url": "https://x.com/elonmusk",
+	"twitterUrl": "https://twitter.com/elonmusk",
+	"id": "44196397",
+	"name": "Elon Musk",
+	"isVerified": true,
+    "isBlueVerified": true,
+    "verifiedType": "business",
+	"hasNftAvatar": false,
+	"profilePicture": "https://pbs.twimg.com/profile_images/1683325380441128960/yRsRRjGO_normal.jpg",
+	"coverPicture": "https://pbs.twimg.com/profile_banners/44196397/1690621312",
+	"description": "",
+	"location": "",
+	"followers": 172669889,
+	"following": 538,
+	"protected": false,
+	"status": "",
+	"canDm": false,
+	"canMediaTag": false,
+	"advertiserAccountType": "promotable_user",
+	"analyticsType": "enabled",
+	"createdAt": "Tue Jun 02 20:12:29 +0000 2009",
+	"entities": {
+		"description": {
+			"hashtags": [],
+			"symbols": [],
+			"urls": [],
+			"user_mentions": []
+		}
+	},
+	"fastFollowersCount": 0,
+	"favouritesCount": 42455,
+	"geoEnabled": false,
+	"hasCustomTimelines": true,
+	"hasExtendedProfile": true,
+	"isTranslator": false,
+	"mediaCount": 2002,
+	"profileBackgroundColor": "C0DEED",
+	"statusesCount": 37933,
+	"translatorTypeEnum": "None",
+	"withheldInCountries": [],
+	"affiliatesHighlightedLabel": {
+		"label": {
+			"url": {
+				"urlType": "DeepLink",
+				"url": "https://twitter.com/X"
+			},
+			"badge": {
+				"url": "https://pbs.twimg.com/profile_images/1683899100922511378/5lY42eHs_bigger.jpg"
+			},
+			"userLabelType": "BusinessLabel",
+			"userLabelDisplayType": "Badge",
+			"description": "X"
+		}
+	}
+},
+"extendedEntities": {},
+"isRetweet": false,
+"isQuote": true,
+"quote": {
+	"type": "tweet",
+	"id": "1728107610631729415",
+	"text": "The posts on 𝕏 gets ~ 100 billion impressions every day.\n\n https://t.co/AuF1KStCFf",
+	"retweetCount": 646,
+	"replyCount": 789,
+	"likeCount": 3983,
+	"quoteCount": 2493,
+	"createdAt": "Fri Nov 24 17:45:35 +0000 2023",
+	"lang": "en",
+	"bookmarkCount": 127,
+	"author": {
+		"type": "user",
+		"userName": "cb_doge",
+		"url": "https://x.com/cb_doge",
+		"twitterUrl": "https://twitter.com/cb_doge",
+		"id": "1389913567671975937",
+		"name": "DogeDesigner",
+		"isVerified": true,
+        "isBlueVerified": true,
+        "verifiedType": "business",
+		"hasNftAvatar": false,
+		"profilePicture": "https://pbs.twimg.com/profile_images/1498070100393754625/C2V-fbll_normal.jpg",
+		"coverPicture": "https://pbs.twimg.com/profile_banners/1389913567671975937/1707664307",
+		"description": "UX/UI & Graphic Designer at Dogecoin & MyDoge Inc./ 𝕏 Creator",
+		"location": "Dogecoin.com",
+		"followers": 441904,
+		"following": 867,
+		"protected": false,
+		"status": "",
+		"canDm": true,
+		"canMediaTag": false,
+		"advertiserAccountType": "promotable_user",
+		"analyticsType": "disabled",
+		"createdAt": "Wed May 05 12:03:43 +0000 2021",
+		"entities": {
+			"url": {
+				"urls": [
+					{
+						"display_url": "MyDoge.com",
+						"expanded_url": "http://MyDoge.com",
+						"indices": [
+							0,
+							23
+						],
+						"url": "https://t.co/E0fsFaNdeI"
+					}
+				]
+			},
+			"description": {
+				"hashtags": [],
+				"symbols": [],
+				"urls": [],
+				"user_mentions": []
+			}
+		},
+		"fastFollowersCount": 0,
+		"favouritesCount": 70660,
+		"geoEnabled": true,
+		"hasCustomTimelines": true,
+		"hasExtendedProfile": true,
+		"isTranslator": false,
+		"mediaCount": 10987,
+		"profileBackgroundColor": "F5F8FA",
+		"statusesCount": 24918,
+		"translatorTypeEnum": "None",
+		"withheldInCountries": [],
+		"affiliatesHighlightedLabel": {
+			"label": {
+				"url": {
+					"urlType": "DeepLink",
+					"url": "https://twitter.com/MyDogeOfficial"
+				},
+				"badge": {
+					"url": "https://pbs.twimg.com/profile_images/1656530956801523719/SC7nEKMa_bigger.png"
+				},
+				"userLabelType": "BusinessLabel",
+				"userLabelDisplayType": "Badge",
+				"description": "MyDoge Wallet"
+			}
+		}
+	},
+	"extendedEntities": {
+		"media": [
+			{
+				"additional_media_info": {
+					"monetizable": false,
+					"graphql_source_user": {
+						"user": {
+							"legacy": {
+								"id_str": "1389913567671975937",
+								"screen_name": "cb_doge",
+								"name": "DogeDesigner",
+								"profile_image_url_https": "https://pbs.twimg.com/profile_images/1498070100393754625/C2V-fbll_normal.jpg",
+								"verified": false,
+								"protected": false,
+								"can_dm": true,
+								"can_media_tag": false
+							}
+						}
+					}
+				},
+				"display_url": "pic.twitter.com/AuF1KStCFf",
+				"expanded_url": "https://twitter.com/cb_doge/status/1727821969343533149/video/1",
+				"ext_media_availability": {
+					"status": "Available"
+				},
+				"id_str": "1727821919171313664",
+				"indices": [
+					59,
+					82
+				],
+				"media_key": "13_1727821919171313664",
+				"media_url_https": "https://pbs.twimg.com/amplify_video_thumb/1727821919171313664/img/t2oLSNoW4igyatu6.jpg",
+				"original_info": {
+					"width": 1920,
+					"height": 1080,
+					"focus_rects": []
+				},
+				"sizes": {
+					"large": {
+						"w": 1920,
+						"h": 1080
+					}
+				},
+				"source_status_id_str": "1727821969343533149",
+				"source_user_id_str": "1389913567671975937",
+				"type": "video",
+				"url": "https://t.co/AuF1KStCFf",
+				"video_info": {
+					"aspect_ratio": [
+						16,
+						9
+					],
+					"duration_millis": 3566,
+					"variants": [
+						{
+							"url": "https://video.twimg.com/amplify_video/1727821919171313664/pl/aGHTtMOSK_JQx9Q1.m3u8?tag=14&container=cmaf",
+							"content_type": "application/x-mpegURL"
+						},
+						{
+							"url": "https://video.twimg.com/amplify_video/1727821919171313664/vid/avc1/480x270/EkwZuvHPaMbH7O1a.mp4?tag=14",
+							"content_type": "video/mp4",
+							"bitrate": 288000
+						},
+						{
+							"url": "https://video.twimg.com/amplify_video/1727821919171313664/vid/avc1/640x360/0XXJiF8kImc0SNUN.mp4?tag=14",
+							"content_type": "video/mp4",
+							"bitrate": 832000
+						},
+						{
+							"url": "https://video.twimg.com/amplify_video/1727821919171313664/vid/avc1/1280x720/VvbDj9laYWdX1dfX.mp4?tag=14",
+							"content_type": "video/mp4",
+							"bitrate": 2176000
+						}
+					]
+				},
+				"allow_download_status": {
+					"allow_download": true
+				}
+			}
+		]
+	}
+},
+"media": []
+}
+3. apidojo/tweet-scraper
+
+Input Example:
+
+{
+    "customMapFunction": "(object) => { return {...object} }",
+    "includeSearchTerms": false,
+    "maxItems": 100,
+    "minimumFavorites": 0,
+    "minimumReplies": 0,
+    "minimumRetweets": 0,
+    "onlyImage": false,
+    "onlyQuote": false,
+    "onlyTwitterBlue": false,
+    "onlyVerifiedUsers": false,
+    "onlyVideo": false,
+    "searchTerms": [
+        "Trump",
+        "Bitcoin"
+    ],
+    "sort": "Latest",
+    "startUrls": [
+        "https://twitter.com/elonmusk/with_replies"
+    ],
+    "tweetLanguage": "en",
+    "twitterHandles": [
+        "elonmusk"
+    ]
+}
+
+Here are some examples:
+Fetching the tweets of a profile
+
+Since Twitter returns ~800 tweets for each search, you need to divide your run into several search queries using since and until alongside with from. This way, the scraper will initiate 11 runs for each month that can get max ~800 tweets each. If you think that profile tweets more than ~800 a month, you need to increase the timeframes to weeks or even to days.
+
+{
+    "includeSearchTerms": false,
+    "onlyImage": false,
+    "onlyQuote": false,
+    "onlyTwitterBlue": false,
+    "onlyVerifiedUsers": false,
+    "onlyVideo": false,
+    "searchTerms": [
+        "from:NASA since:2023-01-01 until:2023-03-01",
+        "from:NASA since:2023-03-01 until:2023-05-01",
+        "from:NASA since:2023-05-01 until:2023-07-01",
+        "from:NASA since:2023-07-01 until:2023-09-01",
+        "from:NASA since:2023-09-01 until:2023-12-01"
+    ],
+    "sort": "Latest",
+    "tweetLanguage": "en"
+}
+
+Fetching replies of a tweet with specific hashtag
+
+{
+    "includeSearchTerms": false,
+    "onlyImage": false,
+    "onlyQuote": false,
+    "onlyTwitterBlue": false,
+    "onlyVerifiedUsers": false,
+    "onlyVideo": false,
+    "searchTerms": [
+        "conversation_id:tweet_id_here #hashtag_here"
+    ],
+    "sort": "Latest",
+    "tweetLanguage": "en"
+}
+
+Some More
+
+    Tweets from @Nasa with all types of media except images
+        from:NASA filter:media -filter:images
+    Mentions of either "puppy" or "kitten", AND with mentions of either "sweet" or "cute", excluding Retweets, with at least 10 likes
+        (puppy OR kitten) (sweet OR cute) -filter:nativeretweets min_faves:10
+
+Please refer to https://github.com/igorbrigadir/twitter-advanced-search to get more informaton about Twitter Queries.
+Important Note
+
+Please note that using our actor for monitoring activies is not allowed. In other words: you should not try to initiate the same run in a very short period of time with time filters in order to understand if a profile tweeted or not or to see if there are any new tweets for a specific keyword/location etc. The actor's main purpose is to fetch historical tweets, not monitor profiles in real time. If you do this, you will get rate-limited automatically and banned very shortly if you continue doing this.
+
+Besides monitoring, these rules also apply:
+
+    You can have max 1 run concurrently (max 5 queries batched) and you need to have a couple of minutes between your runs.
+    You need to fetch at least 50 tweets per query (handle, search keyword, etc). If you are batching several of them, you need to increase this. Let's say, if you are fetching 5 handles at the same time, you have to fetch 250 tweets. Please avoid using undetermenistic queries. This is very important and you will get automatically banned. If you fetch less than 50 tweets, the cost of that query becomes greater than the profit and we make a negative margin.
+    Fetching a single tweet (with tweet URL) is strictly forbidden unless you get a permission from us. Please get in touch first via Discord or email if you want to fetch single tweets.
+
+
+Output Example:
+
+{
+	"type": "tweet",
+	"id": "1728108619189874825",
+	"url": "https://x.com/elonmusk/status/1728108619189874825",
+	"twitterUrl": "https://twitter.com/elonmusk/status/1728108619189874825",
+	"text": "More than 10 per human on average",
+	"retweetCount": 11311,
+	"replyCount": 6526,
+	"likeCount": 104121,
+	"quoteCount": 2915,
+	"createdAt": "Fri Nov 24 17:49:36 +0000 2023",
+	"lang": "en",
+	"quoteId": "1728107610631729415",
+	"bookmarkCount": 702,
+	"isReply": false,
+	"card": {},
+	"place": {},
+	"source:": "Twitter for Android",
+	"author": {
+		"type": "user",
+		"userName": "elonmusk",
+		"url": "https://x.com/elonmusk",
+		"twitterUrl": "https://twitter.com/elonmusk",
+		"id": "44196397",
+		"name": "Elon Musk",
+		"isVerified": true,
+        "isBlueVerified": true,
+        "verifiedType": "business",
+		"hasNftAvatar": false,
+		"profilePicture": "https://pbs.twimg.com/profile_images/1683325380441128960/yRsRRjGO_normal.jpg",
+		"coverPicture": "https://pbs.twimg.com/profile_banners/44196397/1690621312",
+		"description": "",
+		"location": "",
+		"followers": 172669889,
+		"following": 538,
+		"protected": false,
+		"status": "",
+		"canDm": false,
+		"canMediaTag": false,
+		"advertiserAccountType": "promotable_user",
+		"analyticsType": "enabled",
+		"createdAt": "Tue Jun 02 20:12:29 +0000 2009",
+		"entities": {
+			"description": {
+				"hashtags": [],
+				"symbols": [],
+				"urls": [],
+				"user_mentions": []
+			}
+		},
+		"fastFollowersCount": 0,
+		"favouritesCount": 42455,
+		"geoEnabled": false,
+		"hasCustomTimelines": true,
+		"hasExtendedProfile": true,
+		"isTranslator": false,
+		"mediaCount": 2002,
+		"profileBackgroundColor": "C0DEED",
+		"statusesCount": 37933,
+		"translatorTypeEnum": "None",
+		"withheldInCountries": [],
+		"affiliatesHighlightedLabel": {
+			"label": {
+				"url": {
+					"urlType": "DeepLink",
+					"url": "https://twitter.com/X"
+				},
+				"badge": {
+					"url": "https://pbs.twimg.com/profile_images/1683899100922511378/5lY42eHs_bigger.jpg"
+				},
+				"userLabelType": "BusinessLabel",
+				"userLabelDisplayType": "Badge",
+				"description": "X"
+			}
+		}
+	},
+	"extendedEntities": {},
+	"isRetweet": false,
+	"isQuote": true,
+	"quote": {
+		"type": "tweet",
+		"id": "1728107610631729415",
+		"text": "The posts on 𝕏 gets ~ 100 billion impressions every day.\n\n https://t.co/AuF1KStCFf",
+		"retweetCount": 646,
+		"replyCount": 789,
+		"likeCount": 3983,
+		"quoteCount": 2493,
+		"createdAt": "Fri Nov 24 17:45:35 +0000 2023",
+		"lang": "en",
+		"bookmarkCount": 127,
+		"author": {
+			"type": "user",
+			"userName": "cb_doge",
+			"url": "https://x.com/cb_doge",
+			"twitterUrl": "https://twitter.com/cb_doge",
+			"id": "1389913567671975937",
+			"name": "DogeDesigner",
+			"isVerified": true,
+            "isBlueVerified": true,
+            "verifiedType": "business",
+			"hasNftAvatar": false,
+			"profilePicture": "https://pbs.twimg.com/profile_images/1498070100393754625/C2V-fbll_normal.jpg",
+			"coverPicture": "https://pbs.twimg.com/profile_banners/1389913567671975937/1707664307",
+			"description": "UX/UI & Graphic Designer at Dogecoin & MyDoge Inc./ 𝕏 Creator",
+			"location": "Dogecoin.com",
+			"followers": 441904,
+			"following": 867,
+			"protected": false,
+			"status": "",
+			"canDm": true,
+			"canMediaTag": false,
+			"advertiserAccountType": "promotable_user",
+			"analyticsType": "disabled",
+			"createdAt": "Wed May 05 12:03:43 +0000 2021",
+			"entities": {
+				"url": {
+					"urls": [
+						{
+							"display_url": "MyDoge.com",
+							"expanded_url": "http://MyDoge.com",
+							"indices": [
+								0,
+								23
+							],
+							"url": "https://t.co/E0fsFaNdeI"
+						}
+					]
+				},
+				"description": {
+					"hashtags": [],
+					"symbols": [],
+					"urls": [],
+					"user_mentions": []
+				}
+			},
+			"fastFollowersCount": 0,
+			"favouritesCount": 70660,
+			"geoEnabled": true,
+			"hasCustomTimelines": true,
+			"hasExtendedProfile": true,
+			"isTranslator": false,
+			"mediaCount": 10987,
+			"profileBackgroundColor": "F5F8FA",
+			"statusesCount": 24918,
+			"translatorTypeEnum": "None",
+			"withheldInCountries": [],
+			"affiliatesHighlightedLabel": {
+				"label": {
+					"url": {
+						"urlType": "DeepLink",
+						"url": "https://twitter.com/MyDogeOfficial"
+					},
+					"badge": {
+						"url": "https://pbs.twimg.com/profile_images/1656530956801523719/SC7nEKMa_bigger.png"
+					},
+					"userLabelType": "BusinessLabel",
+					"userLabelDisplayType": "Badge",
+					"description": "MyDoge Wallet"
+				}
+			}
+		},
+		"extendedEntities": {
+			"media": [
+				{
+					"additional_media_info": {
+						"monetizable": false,
+						"graphql_source_user": {
+							"user": {
+								"legacy": {
+									"id_str": "1389913567671975937",
+									"screen_name": "cb_doge",
+									"name": "DogeDesigner",
+									"profile_image_url_https": "https://pbs.twimg.com/profile_images/1498070100393754625/C2V-fbll_normal.jpg",
+									"verified": false,
+									"protected": false,
+									"can_dm": true,
+									"can_media_tag": false
+								}
+							}
+						}
+					},
+					"display_url": "pic.twitter.com/AuF1KStCFf",
+					"expanded_url": "https://twitter.com/cb_doge/status/1727821969343533149/video/1",
+					"ext_media_availability": {
+						"status": "Available"
+					},
+					"id_str": "1727821919171313664",
+					"indices": [
+						59,
+						82
+					],
+					"media_key": "13_1727821919171313664",
+					"media_url_https": "https://pbs.twimg.com/amplify_video_thumb/1727821919171313664/img/t2oLSNoW4igyatu6.jpg",
+					"original_info": {
+						"width": 1920,
+						"height": 1080,
+						"focus_rects": []
+					},
+					"sizes": {
+						"large": {
+							"w": 1920,
+							"h": 1080
+						}
+					},
+					"source_status_id_str": "1727821969343533149",
+					"source_user_id_str": "1389913567671975937",
+					"type": "video",
+					"url": "https://t.co/AuF1KStCFf",
+					"video_info": {
+						"aspect_ratio": [
+							16,
+							9
+						],
+						"duration_millis": 3566,
+						"variants": [
+							{
+								"url": "https://video.twimg.com/amplify_video/1727821919171313664/pl/aGHTtMOSK_JQx9Q1.m3u8?tag=14&container=cmaf",
+								"content_type": "application/x-mpegURL"
+							},
+							{
+								"url": "https://video.twimg.com/amplify_video/1727821919171313664/vid/avc1/480x270/EkwZuvHPaMbH7O1a.mp4?tag=14",
+								"content_type": "video/mp4",
+								"bitrate": 288000
+							},
+							{
+								"url": "https://video.twimg.com/amplify_video/1727821919171313664/vid/avc1/640x360/0XXJiF8kImc0SNUN.mp4?tag=14",
+								"content_type": "video/mp4",
+								"bitrate": 832000
+							},
+							{
+								"url": "https://video.twimg.com/amplify_video/1727821919171313664/vid/avc1/1280x720/VvbDj9laYWdX1dfX.mp4?tag=14",
+								"content_type": "video/mp4",
+								"bitrate": 2176000
+							}
+						]
+					},
+					"allow_download_status": {
+						"allow_download": true
+					}
+				}
+			]
+		}
+	},
+	"media": []
+}

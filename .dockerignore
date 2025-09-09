@@ -1,0 +1,18 @@
+# Git files
+.git
+.gitignore
+
+# Local development
+node_modules
+.env*
+npm-debug.log*
+vite-env.d.ts
+
+# Build output
+dist
+.DS_Store
+
+# Documentation and dev material
+*.md
+*.txt
+Dev Material/

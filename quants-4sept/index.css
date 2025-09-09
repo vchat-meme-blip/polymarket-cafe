@@ -1,0 +1,259 @@
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
+    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  height: 100%;
+}
+
+code {
+  font-family:
+    source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+:root {
+  --text: white;
+  --gray-200: #b4b8bb;
+  --gray-300: #80868b;
+  --gray-500: #5f6368;
+  --gray-600: #80868b;
+  --gray-700: #5f6368;
+  --gray-800: #3c4043;
+  --gray-900: #202124;
+  --gray-1000: #0a0a0a;
+  --border-stroke: #444444;
+  --accent-blue: rgb(161, 228, 242);
+  --accent-blue-active-bg: #001233;
+  --accent-blue-active: #98beff;
+  --accent-blue-headers: #448dff;
+  --accent-green: rgb(168, 218, 181);
+  --midnight-blue: rgb(0, 18, 51);
+  --blue-30: #99beff;
+  --accent-red: #ff4600;
+  --background: var(--gray-900);
+  --color: var(--text);
+  scrollbar-color: var(--gray-600) var(--gray-900);
+  scrollbar-width: thin;
+  --font-family: 'Google Sans Display', sans-serif;
+
+  /* --- NEW QUANTS PALETTE --- */
+  --brand-purple: #9b59b6;
+  --brand-blue: #3498db;
+  --brand-cyan: #1abc9c;
+  --brand-green: #2ecc71;
+  --brand-yellow: #f1c40f;
+  --brand-orange: #e67e22;
+  --brand-red: #e74c3c;
+  --brand-pink: #ff76d6;
+  --brand-primary: var(--brand-blue);
+  --brand-primary-dark: #2980b9;
+
+  /* Neutrals */
+  --Neutral-00: #000;
+  --Neutral-05: #0a0a0a;
+  --Neutral-10: #181a1b;
+  --Neutral-15: #232729;
+  --Neutral-20: #2a2f31;
+  --Neutral-30: #404547;
+  --Neutral-50: #707577;
+  --Neutral-60: #888d8f;
+  --Neutral-80: #c3c6c7;
+  --Neutral-90: #e1e2e3;
+  --Green-500: #0d9c53;
+  --Green-700: #025022;
+  --Blue-400: #80c1ff;
+  --Blue-500: #1f94ff;
+  --Blue-800: #0f3557;
+  --Red-400: #ff9c7a;
+  --Red-500: #ff4600;
+  --Red-600: #e03c00;
+  --Red-700: #bd3000;
+  --Red-800: #5c1b03;
+  --card-header: #2e96ff;
+  --card-border: #217bfe;
+  --card-background: #13151a;
+  --card-border-radius: 16px;
+
+  --breakpoint-md: 1024px;
+  --breakpoint-sm: 768px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Google Sans Display', sans-serif;
+  background: var(--Neutral-05);
+  overflow-x: hidden;
+  color: var(--text);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: normal;
+  color: var(--Neutral-90);
+}
+
+li {
+  list-style: none;
+}
+
+input,
+textarea {
+  font-family: var(--font-family);
+  background: none;
+  color: white;
+  border: none;
+  outline: none;
+  font-size: 18px;
+  resize: none;
+  user-select: text;
+}
+
+input::placeholder,
+textarea::placeholder {
+  user-select: none;
+}
+
+select {
+  font-family: inherit;
+  padding: 10px;
+  border: 1px solid var(--gray-700);
+  background: var(--background);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  accent-color: var(--text);
+}
+
+select:focus-visible {
+  outline: none;
+}
+button {
+  font-family: var(--font-family);
+  background: none;
+  color: white;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease-in-out;
+}
+
+.button {
+  background: var(--Neutral-30);
+  display: inline-flex;
+  padding: 10px 16px;
+  border-radius: 8px;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  color: var(--Neutral-90);
+  font-weight: 500;
+}
+.button:hover {
+  background: var(--Neutral-50);
+}
+.button.primary {
+    background-color: var(--brand-primary);
+    color: white;
+    font-weight: 500;
+}
+.button.primary:hover:not(:disabled) {
+    background-color: var(--brand-primary-dark);
+}
+.button.secondary {
+    background-color: transparent;
+    border: 1px solid var(--Neutral-30);
+}
+.button.secondary:hover {
+    background-color: var(--Neutral-20);
+}
+
+
+.button .icon {
+  font-size: 1.2em;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--Blue-400);
+  outline-offset: 2px;
+}
+
+button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button .icon {
+  display: block;
+}
+
+.icon {
+  font-family: 'Material Symbols Outlined';
+  font-weight: 300;
+  line-height: 1;
+}
+
+.hidden {
+  display: none;
+}
+
+.App {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Form */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+form > div,
+form label,
+form details div {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  user-select: none;
+  color: var(--Neutral-80);
+}
+
+form input,
+form textarea {
+  border: 1px solid var(--Neutral-30);
+  background: var(--Neutral-10);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 16px;
+  resize: none;
+  line-height: 1.4;
+  color: white;
+}
+
+form input:focus,
+form textarea:focus {
+  background: var(--Neutral-05);
+  border-color: var(--Blue-400);
+  outline: none;
+}

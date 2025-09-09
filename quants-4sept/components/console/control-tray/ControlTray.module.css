@@ -1,0 +1,68 @@
+.controlTray {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 12;
+}
+
+.controlsWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--Neutral-05);
+  border: 1px solid var(--Neutral-30);
+  border-radius: 99px; /* pill shape */
+  padding: 8px;
+  width: 100%;
+}
+
+.chatInput {
+  flex-grow: 1;
+  padding: 0 16px;
+  font-size: 16px;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--Neutral-20);
+  color: var(--Neutral-80);
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  border-radius: 50%;
+  user-select: none;
+  border: none;
+  width: 48px;
+  height: 48px;
+}
+
+.actionButton:hover:not(:disabled) {
+  background: var(--Neutral-30);
+  color: white;
+}
+
+.actionButton:focus-visible {
+  outline: 2px solid var(--Blue-400);
+  outline-offset: 2px;
+}
+
+.actionButton.active {
+  background: var(--Red-600);
+  color: white;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 70, 0, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 70, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 70, 0, 0); }
+}

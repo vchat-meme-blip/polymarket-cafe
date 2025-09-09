@@ -1,0 +1,7 @@
+{
+  "name": "Quants Café - An AI SocialFi Simulation",
+  "description": "Meme inspired by Google - ChatterBots Demo. \nAn interactive tool that allows you to design, test, and banter with custom AI characters on the fly.\nTrain your own bot and sent it into a CAFE to exchange intel, or watch your twitter circle for intel.\nCreated using Google AI Studio :)",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

@@ -1,0 +1,135 @@
+/* --- My Agents View --- */
+.agentsView {
+  padding: 40px;
+  height: 100%;
+  overflow-y: auto;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.agentsViewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--Neutral-30);
+}
+
+.agentsViewHeader h2 {
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--Neutral-90);
+}
+
+.agentsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.agentCard, .createAgentCard {
+  background: var(--Neutral-10);
+  border: 1px solid var(--Neutral-30);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease-in-out;
+}
+
+.agentCard:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  border-color: var(--brand-primary);
+}
+
+.agentCardHeader {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: radial-gradient(circle, var(--Neutral-20) 0%, var(--Neutral-10) 70%);
+}
+
+.agentCardPreview {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.agentCardName {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--Neutral-90);
+}
+
+.agentCardName.activeAgent {
+  color: var(--brand-cyan);
+  box-shadow: 0 0 10px var(--brand-cyan);
+  border-color: var(--brand-cyan);
+}
+
+.agentCardPersonality {
+  padding: 16px;
+  font-size: 14px;
+  color: var(--Neutral-80);
+  line-height: 1.5;
+  flex-grow: 1;
+  border-bottom: 1px solid var(--Neutral-30);
+  min-height: 100px; /* Ensure a minimum height */
+}
+
+.agentCardActions {
+  padding: 12px;
+  display: flex;
+  gap: 12px;
+  background-color: var(--Neutral-05);
+}
+
+.agentCardActions .button {
+  flex-grow: 1;
+}
+
+.createAgentCard {
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  color: var(--Neutral-60);
+  border-style: dashed;
+}
+
+.createAgentCard:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  background-color: var(--Neutral-15);
+}
+
+.createAgentCard .icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+  .agentsView {
+    padding: 24px;
+  }
+  .agentsViewHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .agentsViewHeader h2 {
+    font-size: 28px;
+  }
+  .agentsGrid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}

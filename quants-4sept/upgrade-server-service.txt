@@ -1,0 +1,17 @@
+Update the features and readme mds to reflect current state and functionality of the app..
+
+then make sure MCP agents are part of the cafe initialization also and are added in cafe..
+
+I noticed u said agents are pulled from store, do we have a central place where agents are kept??
+
+When agents are created is it in user brower only - if so its time we chase real production quality and have a simple express server to store the users and agents and history/activity/stats etc whatever we need take time to find the logical data stores we need for each page, module and user/agent.
+
+Assume solana wallet connection is needed and build it, add a connection button and widget in top menu as most modern sites and ensure you also build up the User profile page and wallet connection features there so its robust all round.
+
+User wallet will be the MongoDB (remote access db using host and port) will be the user id for security. Users need to sign a transaction for security to prove ownership if they havent already.
+
+Users are also required to save API keys for gemini the models are are using. such that the director will not only have 1 key from server but now have a whole list from all user users, if one hits rate limits it dynamically switches to next key between users in a room (host) and for the user-agent personal use n chats we simply use the users api key direct so they carry their own cost. its about being logical with costs users should have their keys be used.
+
+The host previously would go to sleep and not run 24/7 if server was on now we need to make sure we have the Arena Director and Autonomy director running in the server 24/7 on cron jobs so even if users log off they know their agents are busy doing what they were tasked to do..
+
+METICULOUSLY PALN FOR THIS MAJOR UPGRADE FACTORING IN ALL ANGLES and PROCEED WITH PRODUCTION QUALITY UPDATES WELL DOCUMENTED
