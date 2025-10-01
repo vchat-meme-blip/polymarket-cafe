@@ -5,15 +5,16 @@ WORKDIR /app
 # Install build dependencies
 RUN apk add --no-cache python3 make g++
 
-# Copy package files and install all dependencies
+# First copy only package files for better caching
 COPY package*.json ./
+# Install all dependencies
 RUN npm ci
 
 # Copy the rest of the application source code
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN npm run build:client && npm run build:server
 
 # Stage 2: Production Stage
 FROM node:20-alpine
