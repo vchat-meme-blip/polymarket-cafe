@@ -32,10 +32,20 @@ const ConnectWalletButton = () => {
   }
 
   return (
-    <button className={`button primary ${styles.connectWalletBtn}`} onClick={handleConnect} disabled={isConnecting}>
-      <span className="icon">account_balance_wallet</span>
-      {isConnecting ? 'Connecting...' : 'Connect Wallet'}
-    </button>
+    <div className={styles.walletButtonContainer}>
+      <button 
+        className={`button primary ${styles.connectWalletBtn}`} 
+        onClick={handleConnect} 
+        disabled={isConnecting}
+        aria-label={isConnecting ? 'Connecting...' : 'Connect Wallet'}
+        title={isConnecting ? 'Connecting...' : 'Connect Wallet'}
+      >
+        <span className="icon">account_balance_wallet</span>
+        <span className={styles.walletButtonText}>
+          {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+        </span>
+      </button>
+    </div>
   );
 };
 

@@ -67,10 +67,19 @@ export default function SecurityTab() {
               Connect your Solana wallet to serve as your unique user ID and for
               future on-chain interactions.
             </p>
-            <button className="button primary" onClick={handleConnectWallet} disabled={isConnecting}>
-              <span className="icon">account_balance_wallet</span>
-              {isConnecting ? 'Connecting...' : 'Connect Wallet'}
-            </button>
+            <div className={styles.walletButtonContainer}>
+              <button 
+                className={`button primary ${styles.connectWalletBtn}`} 
+                onClick={handleConnectWallet} 
+                disabled={isConnecting}
+                aria-label={isConnecting ? 'Connecting...' : 'Connect Wallet'}
+              >
+                <span className="icon">account_balance_wallet</span>
+                <span className={styles.walletButtonText}>
+                  {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+                </span>
+              </button>
+            </div>
           </div>
         )}
       </div>

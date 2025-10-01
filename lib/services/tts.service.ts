@@ -10,56 +10,101 @@ class TextToSpeechService {
     private audioCache = new Map<string, AudioBuffer>();
 
     private async initializeContext() {
-        if (!this.audioContext || this.audioContext.state === 'closed') {
-            this.audioContext = await getAudioContext();
-        }
-        if (this.audioContext.state === 'suspended') {
-            await this.audioContext.resume();
+        try {
+            if (!this.audioContext || this.audioContext.state === 'closed') {
+                this.audioContext = await getAudioContext();
+            }
+            if (this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+            return true;
+        } catch (error) {
+            console.error('Failed to initialize audio context:', error);
+            return false;
         }
     }
 
     public async synthesize(text: string, voiceId: VoiceID): Promise<AudioBuffer | null> {
-        await this.initializeContext();
-        if (!this.audioContext) return null;
+        if (!text?.trim()) return null;
+        
+        const isInitialized = await this.initializeContext();
+        if (!isInitialized || !this.audioContext) {
+            console.error('Audio context not available');
+            return null;
+        }
 
         const cacheKey = `${voiceId}:${text}`;
-        if (this.audioCache.has(cacheKey)) {
-            return this.audioCache.get(cacheKey)!;
+        const cachedBuffer = this.audioCache.get(cacheKey);
+        if (cachedBuffer) {
+            return cachedBuffer;
         }
         
         const voiceProfile = AVAILABLE_VOICES.find(v => v.id === voiceId);
-        const langCode = voiceProfile ? voiceProfile.lang : 'en-US'; // Default to en-US if not found
-
-                const encodedText = encodeURIComponent(text);
-        const encodedLang = encodeURIComponent(langCode);
-        const url = `/api/tts?text=${encodedText}&voice=${encodedLang}`;
+        const langCode = voiceProfile ? voiceProfile.lang : 'en-US';
 
         try {
+            const encodedText = encodeURIComponent(text);
+            const encodedLang = encodeURIComponent(langCode);
+            const url = `/api/tts?text=${encodedText}&voice=${encodedLang}`;
+            
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`TTS service failed with status ${response.status}`);
             }
+            
             const arrayBuffer = await response.arrayBuffer();
-            const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+            if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+                throw new Error('Empty audio data received');
+            }
             
-            // Cache the successfully decoded buffer
-            this.audioCache.set(cacheKey, audioBuffer);
+            // Add error handling for decodeAudioData
+            const audioBuffer = await new Promise<AudioBuffer>((resolve, reject) => {
+                this.audioContext!.decodeAudioData(
+                    arrayBuffer,
+                    (buffer) => resolve(buffer),
+                    (error) => {
+                        console.error('Failed to decode audio data:', error);
+                        reject(error);
+                    }
+                );
+            });
             
-            return audioBuffer;
+            if (audioBuffer) {
+                this.audioCache.set(cacheKey, audioBuffer);
+                return audioBuffer;
+            }
+            return null;
         } catch (error) {
-            console.error('Error synthesizing speech:', error);
+            console.error('Error in TTS synthesis:', error);
             return null;
         }
     }
 
     public play(audioBuffer: AudioBuffer): AudioBufferSourceNode | null {
-        if (!this.audioContext) return null;
-        
-        const source = this.audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(this.audioContext.destination);
-        source.start(0);
-        return source;
+        try {
+            if (!this.audioContext || !audioBuffer) {
+                console.error('Audio context or buffer not available');
+                return null;
+            }
+            
+            const source = this.audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(this.audioContext.destination);
+            
+            // Add error handling using the correct event listener pattern
+            const handleError = (event: ErrorEvent) => {
+                console.error('Error during audio playback:', event.error);
+                source.removeEventListener('error', handleError);
+                source.disconnect();
+            };
+            source.addEventListener('error', handleError);
+            
+            source.start(0);
+            return source;
+        } catch (error) {
+            console.error('Failed to play audio:', error);
+            return null;
+        }
     }
 }
 

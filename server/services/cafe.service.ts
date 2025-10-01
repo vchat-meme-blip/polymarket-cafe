@@ -280,7 +280,7 @@ Your Task: Based on the conversation history, provide the next logical response.
       if (!room.chatSession) {
         const genAI = new GoogleGenAI({ apiKey });
         room.chatSession = genAI.chats.create({
-          model: 'gemini-1.5-flash',
+          model: 'gemini-2.5-flash',
           config: {
             systemInstruction,
             tools: agentTools,

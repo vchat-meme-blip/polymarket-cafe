@@ -15,17 +15,20 @@ type RoomStripProps = {
 };
 
 const RoomPreview = ({ room, isFocused, onSelect }: { room: Room; isFocused: boolean; onSelect: () => void; }) => {
+    // Ensure agentIds exists and is an array
+    const agentCount = room?.agentIds?.length || 0;
+    
     return (
         <button
             className={c(styles.roomStripPreview, { [styles.focused]: isFocused })}
             onClick={onSelect}
         >
             <div className={styles.roomStripIcon}>
-                <span className="icon">{room.agentIds.length > 0 ? 'meeting_room' : 'no_meeting_room'}</span>
+                <span className="icon">{agentCount > 0 ? 'meeting_room' : 'no_meeting_room'}</span>
             </div>
             <div className={styles.roomStripInfo}>
-                <p className={styles.roomStripName}>Room {room.id.split('-')[1]}</p>
-                <p className={styles.roomStripOccupants}>{room.agentIds.length} / 2 Occupants</p>
+                <p className={styles.roomStripName}>Room {room?.id?.split('-')[1] || '?'}</p>
+                <p className={styles.roomStripOccupants}>{agentCount} / 2 Occupants</p>
             </div>
         </button>
     );

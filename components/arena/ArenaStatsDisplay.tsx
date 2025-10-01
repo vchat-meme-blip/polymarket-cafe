@@ -53,12 +53,12 @@ export default function ArenaStatsDisplay() {
     // re-renders when the world state is updated
 
     const totalAgents = availablePresets.length + availablePersonal.length;
-    const activeRooms = rooms.filter(r => r.agentIds.length > 0).length;
+    const activeRooms = rooms.filter(r => r?.agentIds?.length > 0).length;
     // Count rooms with recent activity (within the last 30 seconds) as "live conversations"
     const liveConversations = Object.entries(activeConversations).filter(([roomId, timestamp]) => {
         // Check if the room exists and has 2 agents
         const room = rooms.find(r => r.id === roomId);
-        if (!room || room.agentIds.length !== 2) return false;
+        if (!room || !room.agentIds || room.agentIds.length !== 2) return false;
         
         // Consider a conversation "live" if there was activity in the last 30 seconds
         return Date.now() - timestamp < 30000;
