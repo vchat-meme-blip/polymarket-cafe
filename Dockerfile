@@ -15,8 +15,8 @@ RUN npm ci
 COPY . .
 
 # Verify files are in place
-RUN ls -la /app
-RUN ls -la /app/public
+RUN echo "Current directory: $(pwd)" && ls -la
+RUN echo "Root directory contents:" && ls -la /
 
 # Set the working directory explicitly for the build
 WORKDIR /app

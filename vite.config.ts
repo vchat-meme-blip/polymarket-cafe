@@ -8,19 +8,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '');
     return {
-      root: process.cwd(),
-      publicDir: 'public',
+      root: __dirname,
+      publicDir: path.resolve(__dirname, 'public'),
       base: '/',
       define: {
         'process.env': JSON.stringify(env),
       },
       build: {
-        outDir: 'dist/client',
+        outDir: path.resolve(__dirname, 'dist/client'),
         emptyOutDir: true,
         rollupOptions: {
-          input: {
-            main: path.resolve(__dirname, 'index.html')
-          }
+          input: path.resolve(__dirname, 'index.html')
         }
       },
       resolve: {
