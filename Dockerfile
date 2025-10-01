@@ -7,7 +7,7 @@ RUN apk add --no-cache python3 make g++
 
 # Copy package files and install all dependencies
 COPY package*.json ./
-RUN npm install -g vite && npm ci
+RUN npm ci
 
 # Copy the rest of the application source code
 COPY . .
@@ -29,6 +29,7 @@ RUN npm ci --only=production
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/node_modules ./node_modules
 
 # Set environment variables
 ENV NODE_ENV=production
