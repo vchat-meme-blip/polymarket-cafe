@@ -64,6 +64,16 @@ const autonomyWorker = new Worker(path.join(__dirname, 'workers/autonomy.worker.
 // API Routes
 app.use('/api', apiRoutes(arenaWorker, autonomyWorker));
 
+// Health Check Endpoint
+app.get('/api/health', (req: express.Request, res: express.Response) => {
+  res.status(200).json({ 
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memoryUsage: process.memoryUsage()
+  });
+});
+
 // --- PRODUCTION STATIC FILE SERVING ---
 if (process.env.NODE_ENV === 'production') {
     const clientBuildPath = path.join(__dirname, '..', 'dist', 'client');
