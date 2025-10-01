@@ -22,14 +22,13 @@ WORKDIR /app
 # Install runtime dependencies
 RUN apk add --no-cache wget
 
-# Copy package files and install only production dependencies
-COPY package*.json ./
-RUN npm ci --only=production
-
 # Copy built files from builder
+COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/node_modules ./node_modules
+
+# Install only production dependencies
+RUN npm ci --only=production
 
 # Set environment variables
 ENV NODE_ENV=production
