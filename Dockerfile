@@ -18,7 +18,7 @@ COPY index.html ./
 COPY public/ ./public/
 
 # Install all dependencies (including devDependencies) for building
-RUN npm ci
+RUN npm ci --include=dev
 
 # Copy the rest of the application source code
 COPY . .
@@ -37,13 +37,13 @@ WORKDIR /app
 # Install runtime dependencies
 RUN apk add --no-cache wget
 
-# Copy only necessary files from builder
+# Copy built files from builder
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 
-# Install only production dependencies
-RUN npm ci --only=production
+# Clean up devDependencies and install only production dependencies
+RUN npm prune --production
 
 # Set environment variables
 ENV NODE_ENV=production
