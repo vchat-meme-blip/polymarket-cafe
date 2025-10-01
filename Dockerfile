@@ -5,13 +5,21 @@ WORKDIR /app
 # Install build dependencies
 RUN apk add --no-cache python3 make g++
 
-# First copy only package files for better caching
+# Copy package files first for better layer caching
 COPY package*.json ./
+
 # Install all dependencies
 RUN npm ci
 
 # Copy the rest of the application source code
 COPY . .
+
+# Verify files are in place
+RUN ls -la /app
+RUN ls -la /app/public
+
+# Set the working directory explicitly for the build
+WORKDIR /app
 
 # Build the application
 RUN npm run build:client && npm run build:server
