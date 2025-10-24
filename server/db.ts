@@ -34,10 +34,9 @@ if (!uri) {
   throw new Error('MONGODB_URI environment variable is not set.');
 }
 
-// Clean up the URI and ensure it has the correct parameters
-const connectionString = uri.includes('?') 
-  ? `${uri}&retryWrites=true&w=majority`
-  : `${uri}?retryWrites=true&w=majority`;
+// Use the URI as-is without appending additional parameters
+// The connection options will be set in the mongoose.connect() call
+const connectionString = uri;
 
 // Collection references with proper typing
 export let usersCollection: Collection<UserDocument>;
