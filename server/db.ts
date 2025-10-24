@@ -1,33 +1,46 @@
 import { MongoClient, Db, Collection, Document } from 'mongodb';
 import { Agent, Room, User, Bet, Bounty, TradeRecord, Transaction, BettingIntel, DailySummary, Notification } from '../lib/types/index.js';
 
-const uri = process.env.MONGODB_URI;
+let uri = process.env.MONGODB_URI;
 if (!uri) {
   throw new Error('MONGODB_URI environment variable is not set.');
 }
 
-// MongoDB connection options with proper TLS configuration
+// Ensure the connection string has the correct parameters
+if (!uri.includes('retryWrites')) {
+  uri += '&retryWrites=true';
+}
+if (!uri.includes('w=')) {
+  uri += '&w=majority';
+}
+if (!uri.includes('tls=') && !uri.includes('ssl=')) {
+  // Add both tls and ssl parameters to ensure compatibility
+  uri += '&tls=true&ssl=true';
+}
+
+// MongoDB connection options
 export const client = new MongoClient(uri, {
   // Connection options
   serverSelectionTimeoutMS: 10000,
   socketTimeoutMS: 45000,
   connectTimeoutMS: 30000,
   
-  // TLS/SSL configuration
-  tls: true,
-  tlsAllowInvalidCertificates: false,
+  // TLS/SSL configuration - let the connection string parameters handle this
+  // to avoid any conflicts with the Node.js driver
   
-  // Write concern
-  w: 'majority',
+  // Write concern is already in the connection string
   
   // Application identification
   appName: 'polymarket-cafe',
   
   // Retry logic
   retryWrites: true,
-  retryReads: true,
   maxPoolSize: 10,
-  minPoolSize: 1
+  minPoolSize: 1,
+  
+  // Additional SSL/TLS options
+  tlsInsecure: false,
+  directConnection: false
 });
 let db: Db;
 
