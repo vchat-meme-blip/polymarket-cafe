@@ -1,4 +1,7 @@
 import OpenAI from 'openai';
+import mongoose from 'mongoose';
+const { Types } = mongoose;
+
 import { Agent, Interaction, MarketIntel, Room, TradeRecord, BettingIntel } from '../../lib/types/index.js';
 import { apiKeyProvider } from './apiKey.provider.js';
 import { agentsCollection, bettingIntelCollection, notificationsCollection } from '../db.js';
@@ -46,9 +49,12 @@ class AiService {
         const guest = isHost ? otherAgent : currentAgent;
         
         if (isHost) {
-            const hostTradableIntel = await bettingIntelCollection.find({ ownerAgentId: host.id, isTradable: true }).toArray();
+            const hostTradableIntel = await bettingIntelCollection.find({ 
+                ownerAgentId: new Types.ObjectId(host.id), 
+                isTradable: true 
+            }).toArray();
             if (hostTradableIntel.length > 0) {
-                systemPrompt += ` This is your owned intel storefront. Your primary goal is to monetize your betting intel by selling it to ${guest.name}. You have the following intel to sell: ${hostTradableIntel.map(i => `(ID: ${i.id}) on ${i.market}`).join(', ')}. Use the 'create_intel_offer' tool to make a formal offer.`;
+                systemPrompt += ` This is your owned intel storefront. Your primary goal is to monetize your betting intel by selling it to ${guest.name}. You have the following intel to sell: ${hostTradableIntel.map(i => `(ID: ${i._id}) on ${i.market}`).join(', ')}. Use the 'create_intel_offer' tool to make a formal offer.`;
                 tools.push({
                     type: 'function',
                     function: {
@@ -308,7 +314,7 @@ ${researchContext}
     const [polymarketResults, kalshiResults, agentIntel] = await Promise.all([
         polymarketService.searchMarkets(query),
         kalshiService.searchMarkets(query),
-        bettingIntelCollection.find({ ownerAgentId: agentId }).toArray()
+        bettingIntelCollection.find({ ownerAgentId: new Types.ObjectId(agentId) }).toArray()
     ]);
 
     const markets: MarketIntel[] = [...polymarketResults.markets, ...kalshiResults];

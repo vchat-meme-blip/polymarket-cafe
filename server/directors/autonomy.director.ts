@@ -1,4 +1,5 @@
 import { agentsCollection, bettingIntelCollection, usersCollection } from '../db.js';
+import mongoose from 'mongoose';
 import { Agent, BettingIntel } from '../../lib/types/index.js';
 import { alphaService } from '../services/alpha.service.js';
 import { notificationService } from '../services/notification.service.js';
@@ -23,13 +24,41 @@ export class AutonomyDirector {
         console.log('[AutonomyDirector] Starting autonomy tick...');
         
         try {
-            const usersWithActiveAgents = await usersCollection.find({ currentAgentId: { $exists: true, $ne: null } }).toArray();
+            // First, find all users with currentAgentId
+            const allUsers = await usersCollection.find({}).toArray();
+            // Then filter in JavaScript to ensure type safety
+            const usersWithActiveAgents = allUsers.filter(user => 
+                user.currentAgentId && typeof user.currentAgentId === 'string'
+            );
 
             for (const user of usersWithActiveAgents) {
                 if (user.currentAgentId) {
-                    const activeAgent = await agentsCollection.findOne({ id: user.currentAgentId });
-                    if (activeAgent) {
-                        await this.decideAndExecuteNextAction(activeAgent as Agent);
+                    // Create a filter that works with both string ID and ObjectId
+                    const filter: any = { $or: [] };
+                    
+                    // Add string ID condition
+                    if (user.currentAgentId) {
+                        filter.$or.push({ id: user.currentAgentId });
+                    }
+                    
+                    // Add ObjectId condition if valid
+                    if (user.currentAgentId && mongoose.Types.ObjectId.isValid(user.currentAgentId)) {
+                        filter.$or.push({ _id: new mongoose.Types.ObjectId(user.currentAgentId) });
+                    }
+                    
+                    // Only run the query if we have valid conditions
+                    if (filter.$or.length > 0) {
+                        const agentDoc = await agentsCollection.findOne(filter);
+                        if (agentDoc) {
+                            // Convert the MongoDB document to our Agent type
+                            const agent: Agent = {
+                                ...agentDoc,
+                                // Initialize bettingHistory as an empty array since we don't need it here
+                                // If you need the actual bets, you'll need to populate them
+                                bettingHistory: []
+                            };
+                            await this.decideAndExecuteNextAction(agent);
+                        }
                     }
                 }
             }
@@ -118,10 +147,39 @@ export class AutonomyDirector {
     private async executeEngageUser(agent: Agent) {
         if (!agent.ownerHandle) return;
 
-        const recentIntel = await bettingIntelCollection.find({ ownerAgentId: agent.id }).sort({ createdAt: -1 }).limit(1).toArray();
+        // Create a query that works with both string and ObjectId
+        const query: any = { 
+            $or: [
+                { ownerAgentId: agent.id },
+                { ownerAgentId: new mongoose.Types.ObjectId(agent.id) }
+            ]
+        };
+        
+        const recentIntel = await bettingIntelCollection
+            .find(query)
+            .sort({ createdAt: -1 })
+            .limit(1)
+            .toArray();
         if (recentIntel.length === 0) return;
 
-        const intel = recentIntel[0];
+        const intelDoc = recentIntel[0];
+        // Map the document to our BettingIntel type
+        const intel: BettingIntel = {
+            id: intelDoc._id.toString(),
+            ownerAgentId: intelDoc.ownerAgentId.toString(),
+            market: intelDoc.market,
+            content: intelDoc.content,
+            sourceDescription: intelDoc.sourceDescription,
+            isTradable: Boolean(intelDoc.isTradable),
+            createdAt: intelDoc.createdAt ? intelDoc.createdAt.getTime() : Date.now(),
+            pnlGenerated: intelDoc.pnlGenerated || { amount: 0, currency: 'USD' },
+            sourceAgentId: intelDoc.sourceAgentId?.toString(),
+            pricePaid: intelDoc.pricePaid,
+            bountyId: intelDoc.bountyId?.toString(),
+            ownerHandle: intelDoc.ownerHandle,
+            sourceUrls: intelDoc.sourceUrls || []
+        };
+        
         const engagementMessage = await aiService.generateProactiveEngagementMessage(agent, intel);
 
         if (engagementMessage) {
@@ -137,9 +195,29 @@ export class AutonomyDirector {
 
     public startResearch(agentId: string) {
         console.log(`[AutonomyDirector] Manual research trigger for agent ${agentId}.`);
-        agentsCollection.findOne({ id: agentId }).then(agent => {
-            if (agent) {
-                this.executeResearch(agent as Agent);
+        agentsCollection.findOne({ id: agentId }).then(agentDoc => {
+            if (agentDoc) {
+                // Convert the MongoDB document to our Agent type with all required fields
+                const agent: Agent = {
+                    id: agentDoc.id,
+                    name: agentDoc.name || 'Unnamed Agent',
+                    personality: agentDoc.personality || '',
+                    instructions: agentDoc.instructions || '',
+                    voice: agentDoc.voice || 'default',
+                    topics: Array.isArray(agentDoc.topics) ? agentDoc.topics : [],
+                    wishlist: Array.isArray(agentDoc.wishlist) ? agentDoc.wishlist : [],
+                    reputation: typeof agentDoc.reputation === 'number' ? agentDoc.reputation : 0,
+                    isShilling: !!agentDoc.isShilling,
+                    shillInstructions: agentDoc.shillInstructions || '',
+                    modelUrl: agentDoc.modelUrl || '',
+                    bettingHistory: [],
+                    currentPnl: typeof agentDoc.currentPnl === 'number' ? agentDoc.currentPnl : 0,
+                    bettingIntel: [],
+                    marketWatchlists: [],
+                    boxBalance: typeof agentDoc.boxBalance === 'number' ? agentDoc.boxBalance : 0,
+                    portfolio: agentDoc.portfolio || {}
+                };
+                this.executeResearch(agent);
             }
         });
     }

@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { agentsCollection, roomsCollection, bettingIntelCollection, tradeHistoryCollection, usersCollection } from '../db.js';
 import { Agent, Room, Interaction, Offer, TradeRecord, BettingIntel } from '../../lib/types/index.js';
 import { aiService } from '../services/ai.service.js';
@@ -354,7 +355,10 @@ export class ArenaDirector {
                 if (room) {
                     room.bannedAgentIds = [...(room.bannedAgentIds || []), agentId];
                     this.rooms.set(roomId, room);
-                    await roomsCollection.updateOne({ id: roomId }, { $addToSet: { bannedAgentIds: agentId } });
+                    await roomsCollection.updateOne(
+                        { id: roomId },
+                        { $addToSet: { bannedAgentIds: new mongoose.Types.ObjectId(agentId) } }
+                    );
                     this.emitToMain?.({ type: 'socketEmit', event: 'roomUpdated', payload: { room } });
                 }
             }
@@ -560,12 +564,14 @@ export class ArenaDirector {
 
         // Create trade record
         const trade: TradeRecord = {
-            buyerId: buyer.id,
-            sellerId: seller.id,
+            fromId: seller.id,
+            toId: buyer.id,
+            type: 'intel',
+            market: offer.market || 'unknown',
             intelId: offer.intelId,
             price: offer.price,
             timestamp: Date.now(),
-            market: offer.market
+            roomId: roomId.toString()
         };
 
         // Clear the offer

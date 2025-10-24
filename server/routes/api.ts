@@ -1,6 +1,7 @@
 import { Router } from 'express';
+import mongoose, { Collection } from 'mongoose';
+import { TradeRecord, BettingIntel } from '../../lib/types/shared.js';
 import { 
-  client as mongoClient,
   usersCollection, 
   agentsCollection,
   betsCollection,
@@ -18,7 +19,7 @@ import { cafeMusicService } from '../services/cafeMusic.service.js';
 import { polymarketService } from '../services/polymarket.service.js';
 import { kalshiService } from '../services/kalshi.service.js';
 import { leaderboardService } from '../services/leaderboard.service.js';
-import { Agent, User, Interaction, Room, MarketIntel, AgentMode } from '../../lib/types/index.js';
+import { Agent, User, Interaction, Room, MarketIntel, AgentMode, Bet } from '../../lib/types/index.js';
 import { createSystemInstructions } from '../../lib/prompts.js';
 import { ObjectId } from 'mongodb';
 import OpenAI from 'openai';
@@ -43,8 +44,18 @@ router.get('/health', (req, res) => {
 router.post('/system/reset-database', async (req, res) => {
     try {
         console.log('[API] Received request to reset database.');
-        const db = mongoClient.db();
-        await db.dropDatabase();
+        
+        // Ensure database connection is established
+        if (!mongoose.connection.db) {
+            throw new Error('Database connection not established');
+        }
+        
+        // Drop all collections
+        const collections = await mongoose.connection.db.listCollections().toArray();
+        await Promise.all(collections.map(async (collection: { name: string }) => {
+            await mongoose.connection.db?.dropCollection(collection.name);
+        }));
+        
         console.log('[API] Database dropped successfully.');
         
         // Re-seed MCP agents
@@ -55,6 +66,7 @@ router.post('/system/reset-database', async (req, res) => {
                 upsert: true
             }
         }));
+        
         if (mcpOps.length > 0) {
             await agentsCollection.bulkWrite(mcpOps as any);
             console.log('[API] Re-seeded MCPs into the database.');
@@ -250,13 +262,74 @@ router.post('/ai/brainstorm-personality', async (req, res) => {
 
 router.post('/ai/analyze-market', async (req, res) => {
     const { agentId, market, comments } = req.body;
-    const agent = await agentsCollection.findOne({ id: agentId });
-    if (!agent) return res.status(404).json({ message: 'Agent not found' });
+    const agentDoc = await agentsCollection.findOne({ id: agentId });
+    if (!agentDoc) return res.status(404).json({ message: 'Agent not found' });
+    
+    // Fetch and map the bet documents to match the Bet type with all required fields
+    const bettingHistory: Bet[] = [];
+    
+    if (agentDoc.bettingHistory?.length) {
+        const betDocs = await betsCollection.find({ 
+            _id: { $in: agentDoc.bettingHistory } 
+        }).toArray();
+        
+        for (const betDoc of betDocs) {
+            // Ensure all required Bet fields are present
+            const bet: Bet = {
+                id: betDoc._id.toString(),
+                agentId: betDoc.agentId?.toString() || '',
+                marketId: betDoc.marketId?.toString() || '',
+                outcome: betDoc.outcome || 'yes', // Default to 'yes' if not specified
+                amount: betDoc.amount || 0,
+                price: betDoc.price || 0,
+                timestamp: betDoc.timestamp instanceof Date ? betDoc.timestamp.getTime() : Date.now(),
+                status: betDoc.status || 'pending',
+                pnl: betDoc.pnl,
+                sourceIntelId: betDoc.sourceIntelId?.toString()
+            };
+            bettingHistory.push(bet);
+        }
+    }
+    
+    // Create a new agent object with all required properties from the Agent type
+    const agent: Agent = {
+        id: agentDoc.id,
+        name: agentDoc.name,
+        personality: agentDoc.personality || '',
+        instructions: agentDoc.instructions || '',
+        voice: agentDoc.voice || '',
+        topics: Array.isArray(agentDoc.topics) ? [...agentDoc.topics] : [],
+        wishlist: Array.isArray(agentDoc.wishlist) ? [...agentDoc.wishlist] : [],
+        reputation: agentDoc.reputation || 0,
+        isShilling: Boolean(agentDoc.isShilling),
+        shillInstructions: agentDoc.shillInstructions || '',
+        modelUrl: agentDoc.modelUrl || '',
+        bettingHistory,
+        currentPnl: agentDoc.currentPnl || 0,
+        ownerHandle: agentDoc.ownerHandle,
+        // Initialize missing required properties with default values
+        bettingIntel: agentDoc.bettingIntel || [],
+        marketWatchlists: agentDoc.marketWatchlists || [],
+        boxBalance: agentDoc.boxBalance || 0,
+        portfolio: agentDoc.portfolio || {},
+        // Include any other properties from the document that we haven't explicitly set
+        ...Object.fromEntries(
+            Object.entries(agentDoc as any).filter(([key]) => 
+                ![
+                    'id', 'name', 'personality', 'instructions', 'voice', 'topics', 
+                    'wishlist', 'reputation', 'isShilling', 'shillInstructions', 
+                    'modelUrl', 'bettingHistory', 'currentPnl', 'ownerHandle',
+                    'bettingIntel', 'marketWatchlists', 'boxBalance', 'portfolio'
+                ].includes(key)
+            )
+        )
+    };
     
     try {
         const analysis = await aiService.analyzeMarket(agent, market, comments);
         res.json({ analysis });
     } catch (error: any) {
+        console.error('Error in analyze-market:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -315,7 +388,74 @@ router.post('/ai/direct-message', async (req, res) => {
         }
         
         const openai = new OpenAI({ apiKey });
-        const systemInstruction = createSystemInstructions(agent, user, false);
+        // Map the agent document to the Agent type
+        // Create a new agent object with required fields
+        const agentWithBets: Agent = {
+            id: agent._id.toString(),
+            name: agent.name,
+            personality: agent.personality || '',
+            instructions: agent.instructions || '',
+            voice: agent.voice || '',
+            topics: Array.isArray(agent.topics) ? [...agent.topics] : [],
+            wishlist: Array.isArray(agent.wishlist) ? [...agent.wishlist] : [],
+            reputation: agent.reputation || 0,
+            isShilling: Boolean(agent.isShilling),
+            shillInstructions: agent.shillInstructions || '',
+            modelUrl: agent.modelUrl || '',
+            bettingHistory: [], // Will be populated below
+            currentPnl: agent.currentPnl || 0,
+            ownerHandle: agent.ownerHandle,
+            // Add any other required Agent properties with defaults
+            bettingIntel: [],
+            marketWatchlists: [],
+            boxBalance: 0,
+            portfolio: {}
+        };
+
+        // If there are bets, fetch and map them
+        if (agent.bettingHistory?.length) {
+            const betDocs = await betsCollection.find({ 
+                _id: { $in: agent.bettingHistory } 
+            }).toArray();
+
+            agentWithBets.bettingHistory = betDocs.map(betDoc => ({
+                id: betDoc._id.toString(),
+                agentId: betDoc.agentId?.toString() || '',
+                marketId: betDoc.marketId?.toString() || '',
+                outcome: betDoc.outcome || 'yes',
+                amount: betDoc.amount || 0,
+                price: betDoc.price || 0,
+                timestamp: betDoc.timestamp instanceof Date ? betDoc.timestamp.getTime() : Date.now(),
+                status: betDoc.status || 'pending',
+                pnl: betDoc.pnl,
+                sourceIntelId: betDoc.sourceIntelId?.toString()
+            }));
+        }
+
+        // Map the user document to the User type
+        const mappedUser: User = {
+            _id: user._id.toString(),
+            name: user.name || '',
+            info: user.info || '',
+            handle: user.handle,
+            hasCompletedOnboarding: Boolean(user.hasCompletedOnboarding),
+            lastSeen: user.lastSeen || null,
+            userApiKey: user.userApiKey || null,
+            solanaWalletAddress: user.solanaWalletAddress || null,
+            createdAt: user.createdAt || Date.now(),
+            updatedAt: user.updatedAt || Date.now(),
+            currentAgentId: user.currentAgentId?.toString(),
+            ownedRoomId: user.ownedRoomId?.toString(),
+            phone: user.phone,
+            notificationSettings: user.notificationSettings || {
+                agentResearch: true,
+                agentTrades: true,
+                newMarkets: true,
+                agentEngagements: true
+            }
+        };
+
+        const systemInstruction = createSystemInstructions(agentWithBets, mappedUser, false);
 
         const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
             { role: 'system', content: systemInstruction },
@@ -472,7 +612,10 @@ router.post('/rooms/purchase', async (req, res) => {
     };
 
     await roomsCollection.insertOne(newRoom as any);
-    await usersCollection.updateOne({ handle: userHandle }, { $set: { ownedRoomId: newRoom.id } });
+    await usersCollection.updateOne(
+      { handle: userHandle },
+      { $set: { ownedRoomId: new mongoose.Types.ObjectId(newRoom.id) } }
+    );
     
     req.arenaWorker?.postMessage({ type: 'roomUpdated', payload: { room: newRoom } });
     
@@ -528,17 +671,57 @@ router.get('/agents/:agentId/activity', async (req, res) => {
   const todayStr = formatISO(startOfToday(), { representation: 'date' });
 
   try {
-    let dailySummary = await dailySummariesCollection.findOne({ agentId, date: todayStr });
+    let dailySummary = await dailySummariesCollection.findOne({
+      agentId: new mongoose.Types.ObjectId(agentId),
+      date: { $eq: todayStr }
+    } as any);
     
     if (dailySummary) {
       return res.json({ summary: dailySummary.summary });
     }
 
     // If no summary exists, generate one
-    const recentTrades = await tradeHistoryCollection.find({ $or: [{ fromId: agentId }, { toId: agentId }] }).sort({ timestamp: -1 }).limit(10).toArray();
-    const recentIntel = await bettingIntelCollection.find({ ownerAgentId: agentId }).sort({ createdAt: -1 }).limit(5).toArray();
+    const recentTrades = await tradeHistoryCollection.find({
+      $or: [
+        { fromId: new mongoose.Types.ObjectId(agentId) },
+        { toId: new mongoose.Types.ObjectId(agentId) }
+      ]
+    }).sort({ timestamp: -1 }).limit(10).toArray();
+    const recentIntel = await bettingIntelCollection.find({
+      ownerAgentId: new mongoose.Types.ObjectId(agentId)
+    }).sort({ createdAt: -1 }).limit(5).toArray();
     
-    const activities = { trades: recentTrades, intel: recentIntel };
+    // Map MongoDB documents to the expected types
+    const mappedTrades: TradeRecord[] = recentTrades.map(trade => ({
+      fromId: trade.fromId.toString(),
+      toId: trade.toId.toString(),
+      type: trade.type,
+      market: trade.market,
+      intelId: trade.intelId?.toString(),
+      price: trade.price,
+      quantity: trade.quantity,
+      timestamp: trade.timestamp instanceof Date ? trade.timestamp.getTime() : Date.now(),
+      roomId: trade.roomId.toString()
+    }));
+
+    const mappedIntel: BettingIntel[] = recentIntel.map(intel => ({
+      id: intel._id.toString(),
+      ownerAgentId: intel.ownerAgentId.toString(),
+      market: intel.market,
+      content: intel.content,
+      sourceDescription: intel.sourceDescription,
+      isTradable: intel.isTradable,
+      createdAt: intel.createdAt instanceof Date ? intel.createdAt.getTime() : Date.now(),
+      pnlGenerated: intel.pnlGenerated,
+      sourceAgentId: intel.sourceAgentId?.toString(),
+      pricePaid: intel.pricePaid,
+      bountyId: intel.bountyId?.toString(),
+      ownerHandle: intel.ownerHandle,
+      sourceUrls: intel.sourceUrls,
+      rawResearchData: intel.rawResearchData
+    }));
+
+    const activities = { trades: mappedTrades, intel: mappedIntel };
     const newSummaryText = await aiService.generateDailySummary(activities);
 
     if (newSummaryText) {

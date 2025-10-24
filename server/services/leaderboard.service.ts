@@ -27,9 +27,26 @@ class LeaderboardService {
   async getPnlLeaderboard(): Promise<PnlLeaderboardEntry[]> {
     const agents = await agentsCollection.find().toArray();
     
+    // First, get all bets for all agents to avoid N+1 queries
+    const agentIds = agents.map(a => a._id);
+    const allBets = await betsCollection.find({
+        agentId: { $in: agentIds }
+    }).toArray();
+    
+    // Group bets by agentId for quick lookup
+    const betsByAgent = allBets.reduce((acc, bet) => {
+        const agentIdStr = bet.agentId.toString();
+        if (!acc[agentIdStr]) {
+            acc[agentIdStr] = [];
+        }
+        acc[agentIdStr].push(bet);
+        return acc;
+    }, {} as Record<string, any[]>);
+    
     const leaderboard: PnlLeaderboardEntry[] = agents.map(agent => {
-        const totalBets = agent.bettingHistory?.length || 0;
-        const winningBets = agent.bettingHistory?.filter(b => b.pnl && b.pnl > 0).length || 0;
+        const agentBets = betsByAgent[agent._id.toString()] || [];
+        const totalBets = agentBets.length;
+        const winningBets = agentBets.filter(b => b.pnl && b.pnl > 0).length;
 
         return {
             agentId: agent.id,

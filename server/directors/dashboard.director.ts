@@ -1,4 +1,5 @@
 import { usersCollection, agentsCollection, betsCollection, bettingIntelCollection } from '../db.js';
+import mongoose from 'mongoose';
 import { User, Agent } from '../../lib/types/index.js';
 import { polymarketService } from '../services/polymarket.service.js';
 import { kalshiService } from '../services/kalshi.service.js';
@@ -20,8 +21,29 @@ export class DashboardAgentDirector {
 
     public async tick() {
         try {
-            const users = await usersCollection.find({ currentAgentId: { $exists: true, $ne: null as any } }).toArray();
-            for (const user of users) {
+            const userDocs = await usersCollection.find({ currentAgentId: { $exists: true, $ne: null as any } }).toArray();
+            for (const userDoc of userDocs) {
+                // Convert MongoDB document to User type
+                const user: User = {
+                    _id: userDoc._id.toString(),
+                    name: userDoc.name || '',
+                    info: userDoc.info || '',
+                    handle: userDoc.handle,
+                    hasCompletedOnboarding: userDoc.hasCompletedOnboarding || false,
+                    lastSeen: userDoc.lastSeen || null,
+                    userApiKey: userDoc.userApiKey || null,
+                    solanaWalletAddress: userDoc.solanaWalletAddress || null,
+                    createdAt: userDoc.createdAt && typeof userDoc.createdAt === 'object' && 'getTime' in userDoc.createdAt 
+                        ? (userDoc.createdAt as Date).getTime() 
+                        : (typeof userDoc.createdAt === 'number' ? userDoc.createdAt : Date.now()),
+                    updatedAt: userDoc.updatedAt && typeof userDoc.updatedAt === 'object' && 'getTime' in userDoc.updatedAt 
+                        ? (userDoc.updatedAt as Date).getTime() 
+                        : (typeof userDoc.updatedAt === 'number' ? userDoc.updatedAt : Date.now()),
+                    currentAgentId: userDoc.currentAgentId?.toString(),
+                    ownedRoomId: userDoc.ownedRoomId?.toString(),
+                    phone: userDoc.phone,
+                    notificationSettings: userDoc.notificationSettings
+                };
                 await this.processAgentAutonomy(user);
             }
         } catch (error) {
@@ -37,8 +59,37 @@ export class DashboardAgentDirector {
             return;
         }
 
-        const agent = await agentsCollection.findOne({ id: user.currentAgentId });
-        if (!agent || !agent.isProactive) return; // Check the new isProactive flag
+        const agentDoc = await agentsCollection.findOne({ id: user.currentAgentId });
+        if (!agentDoc || !agentDoc.isProactive) return; // Check the new isProactive flag
+        
+        // Convert MongoDB document to Agent type
+        const agent: Agent = {
+            id: agentDoc.id,
+            name: agentDoc.name || 'Unnamed Agent',
+            personality: agentDoc.personality || '',
+            instructions: agentDoc.instructions || '',
+            voice: agentDoc.voice || 'default',
+            topics: Array.isArray(agentDoc.topics) ? agentDoc.topics : [],
+            wishlist: Array.isArray(agentDoc.wishlist) ? agentDoc.wishlist : [],
+            reputation: typeof agentDoc.reputation === 'number' ? agentDoc.reputation : 0,
+            isShilling: !!agentDoc.isShilling,
+            shillInstructions: agentDoc.shillInstructions || '',
+            modelUrl: agentDoc.modelUrl || '',
+            bettingHistory: [], // Initialize as empty array since we don't need the actual bets here
+            currentPnl: typeof agentDoc.currentPnl === 'number' ? agentDoc.currentPnl : 0,
+            bettingIntel: [],
+            marketWatchlists: [],
+            boxBalance: typeof agentDoc.boxBalance === 'number' ? agentDoc.boxBalance : 0,
+            portfolio: agentDoc.portfolio || {},
+            // Optional fields
+            ownerHandle: agentDoc.ownerHandle,
+            isProactive: agentDoc.isProactive,
+            trustedRoomIds: agentDoc.trustedRoomIds,
+            operatingHours: agentDoc.operatingHours,
+            mode: agentDoc.mode,
+            templateId: agentDoc.templateId,
+            copiedFromId: agentDoc.copiedFromId
+        };
 
         agentState.isBusy = true;
         this.agentStates.set(agent.id, agentState);
@@ -78,7 +129,14 @@ export class DashboardAgentDirector {
     }
 
     private async reviewIntel(user: User, agent: Agent) {
-        const recentIntel = await bettingIntelCollection.find({ ownerAgentId: agent.id }).sort({ createdAt: -1 }).limit(1).toArray();
+        const recentIntel = await bettingIntelCollection
+            .find({ 
+                ownerAgentId: new mongoose.Types.ObjectId(agent.id) 
+            })
+            .sort({ createdAt: -1 })
+            .limit(1)
+            .toArray();
+            
         if (recentIntel.length === 0) return;
         
         const intel = recentIntel[0];

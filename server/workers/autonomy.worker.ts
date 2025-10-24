@@ -19,20 +19,21 @@ async function main() {
   
   autonomyDirector.initialize(emitToMain);
 
-  parentPort.on('message', (message: { type: string; payload: any; }) => {
-    switch (message.type) {
-      case 'tick':
-        autonomyDirector.tick();
-        break;
-      case 'startResearch':
-        autonomyDirector.startResearch(message.payload.agentId);
-        break;
-      default:
-        console.warn('[AutonomyWorker] Received unknown message type:', message.type);
-    }
-  });
-
-  console.log('[AutonomyWorker] Worker started and listening for messages.');
+  // Add null check before using parentPort
+  if (parentPort) {
+    parentPort.on('message', (message: { type: string; payload: any; }) => {
+      switch (message.type) {
+        case 'tick':
+          autonomyDirector.tick();
+          break;
+        case 'startResearch':
+          autonomyDirector.startResearch(message.payload.agentId);
+          break;
+        default:
+          console.warn(`[AutonomyWorker] Unknown message type: ${message.type}`);
+      }
+    });
+  }
 }
 
 main().catch(err => {
