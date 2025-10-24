@@ -40,77 +40,111 @@ export function createWorker(workerPath: string, options?: WorkerOptions) {
     // Function to find a file in a directory with any extension
     const findFile = (dir: string, baseName: string): string | null => {
       try {
+        if (!fs.existsSync(dir)) {
+          console.log(`[Worker Loader] Directory does not exist: ${dir}`);
+          return null;
+        }
         const files = fs.readdirSync(dir);
+        console.log(`[Worker Loader] Files in ${dir}:`, files);
         const found = files.find((file: string) => {
           const name = path.basename(file, path.extname(file));
           return name === baseName || name === `${baseName}.worker`;
         });
         return found || null;
       } catch (e) {
+        console.error(`[Worker Loader] Error reading directory ${dir}:`, e);
         return null;
       }
     };
     
-    // Check possible directories
-    const workersDir = path.join(basePath, 'workers');
-    const serverWorkersDir = path.join(basePath, 'server', 'workers');
-    
-    // Try to find the worker file
-    let workerFile = findFile(workersDir, workerName) || 
-                    findFile(serverWorkersDir, workerName);
-    
-    let foundPath: string | null = null;
-    
-    if (workerFile) {
-      // If found in workers directory
-      const workersPath = path.join(workersDir, workerFile);
-      const serverWorkersPath = path.join(serverWorkersDir, workerFile);
-      
-      if (fs.existsSync(workersPath)) {
-        foundPath = workersPath;
-      } 
-      // If found in server/workers directory
-      else if (fs.existsSync(serverWorkersPath)) {
-        foundPath = serverWorkersPath;
-      }
-    }
-    
-    // If not found, fall back to default paths
-    const possiblePaths = [
-      path.join(basePath, 'workers', `${workerName}.worker.mjs`),
-      path.join(basePath, 'workers', `${workerName}.mjs`),
-      path.join(basePath, 'workers', `${workerName}.worker.js`),
-      path.join(basePath, 'workers', `${workerName}.js`),
-      path.join(basePath, 'server', 'workers', `${workerName}.worker.mjs`),
-      path.join(basePath, 'server', 'workers', `${workerName}.mjs`),
-      path.join(basePath, 'server', 'workers', `${workerName}.worker.js`),
-      path.join(basePath, 'server', 'workers', `${workerName}.js`)
+    // Define all possible worker directories to check
+    const possibleDirs = [
+      path.join(basePath, 'workers'),
+      path.join(basePath, 'server/workers'),
+      path.join(basePath, 'server/dist/workers'),
+      '/app/dist/workers',
+      '/app/dist/server/workers'
     ];
     
-    // Try to find an existing path
-    const existingPath = possiblePaths.find((p: string) => {
-      try {
-        require.resolve(p);
-        return true;
-      } catch {
-        return false;
+    console.log('[Worker Loader] Searching for worker in directories:', possibleDirs);
+    
+    // Try to find the worker file in any of the possible directories
+    let foundPath: string | null = null;
+    
+    for (const dir of possibleDirs) {
+      if (!fs.existsSync(dir)) {
+        console.log(`[Worker Loader] Directory does not exist: ${dir}`);
+        continue;
       }
-    });
-    
-    // Use the found path or the first possible path as a fallback
-    finalPath = foundPath || existingPath || possiblePaths[0];
-    
-    console.log('[Worker Loader] Using worker path:', finalPath);
-    console.log('[Worker Loader] Worker name:', workerName);
-    console.log('[Worker Loader] Base path:', basePath);
-    console.log('[Worker Loader] Workers dir exists:', fs.existsSync(workersDir));
-    console.log('[Worker Loader] Server workers dir exists:', fs.existsSync(serverWorkersDir));
-    
-    if (!existingPath) {
-      throw new Error(`Worker file not found. Tried: ${possiblePaths.join(', ')}`);
+      
+      const workerFile = findFile(dir, workerName);
+      if (workerFile) {
+        foundPath = path.join(dir, workerFile);
+        console.log(`[Worker Loader] Found worker at: ${foundPath}`);
+        break;
+      }
     }
     
-    finalPath = existingPath;
+    // If not found, try with common extensions
+    if (!foundPath) {
+      console.log('[Worker Loader] Worker not found in any directory, trying with extensions...');
+      const extensions = ['.mjs', '.js', '.cjs', ''];
+      const baseNames = [
+        workerName,
+        `${workerName}.worker`,
+        path.basename(workerName, '.worker')
+      ];
+      
+      for (const dir of possibleDirs) {
+        if (!fs.existsSync(dir)) continue;
+        
+        for (const name of baseNames) {
+          for (const ext of extensions) {
+            const testPath = path.join(dir, `${name}${ext}`);
+            if (fs.existsSync(testPath)) {
+              foundPath = testPath;
+              console.log(`[Worker Loader] Found worker with extension at: ${foundPath}`);
+              break;
+            }
+          }
+          if (foundPath) break;
+        }
+        if (foundPath) break;
+      }
+    }
+    
+    if (!foundPath) {
+      // Last resort: try to find any file that contains the worker name
+      console.log('[Worker Loader] Worker not found with standard patterns, trying broader search...');
+      for (const dir of possibleDirs) {
+        if (!fs.existsSync(dir)) continue;
+        
+        try {
+          const files = fs.readdirSync(dir);
+          const matchingFile = files.find(file => 
+            file.toLowerCase().includes(workerName.toLowerCase())
+          );
+          
+          if (matchingFile) {
+            foundPath = path.join(dir, matchingFile);
+            console.log(`[Worker Loader] Found potential worker file: ${foundPath}`);
+            break;
+          }
+        } catch (e) {
+          console.error(`[Worker Loader] Error searching in ${dir}:`, e);
+        }
+      }
+    }
+    
+    if (!foundPath) {
+      const errorMsg = `Worker file not found for ${workerName}. ` +
+        `Searched in: ${possibleDirs.join(', ')}`;
+      console.error('[Worker Loader]', errorMsg);
+      throw new Error(errorMsg);
+    }
+    
+    finalPath = foundPath;
+    console.log('[Worker Loader] Final worker path:', finalPath);
   }
 
   console.log(`[Worker Loader] Starting worker at: ${finalPath}`);
