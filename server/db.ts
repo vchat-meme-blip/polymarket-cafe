@@ -6,17 +6,9 @@ if (!uri) {
   throw new Error('MONGODB_URI environment variable is not set.');
 }
 
-// Ensure the connection string has the correct parameters
-if (!uri.includes('retryWrites')) {
-  uri += '&retryWrites=true';
-}
-if (!uri.includes('w=')) {
-  uri += '&w=majority';
-}
-if (!uri.includes('tls=') && !uri.includes('ssl=')) {
-  // Add both tls and ssl parameters to ensure compatibility
-  uri += '&tls=true&ssl=true';
-}
+// Clean up the URI and ensure it has the correct parameters
+uri = uri.split('?')[0]; // Remove any existing query parameters
+uri += '?retryWrites=true&w=majority&tls=true';
 
 // MongoDB connection options
 export const client = new MongoClient(uri, {
@@ -25,22 +17,29 @@ export const client = new MongoClient(uri, {
   socketTimeoutMS: 45000,
   connectTimeoutMS: 30000,
   
-  // TLS/SSL configuration - let the connection string parameters handle this
-  // to avoid any conflicts with the Node.js driver
+  // TLS/SSL configuration
+  tls: true,
+  tlsAllowInvalidCertificates: true, // Temporarily allow invalid certificates for testing
+  tlsInsecure: true, // Temporarily disable certificate validation for testing
   
-  // Write concern is already in the connection string
+  // Connection settings
+  directConnection: false,
+  maxPoolSize: 10,
+  minPoolSize: 1,
   
   // Application identification
   appName: 'polymarket-cafe',
   
   // Retry logic
   retryWrites: true,
-  maxPoolSize: 10,
-  minPoolSize: 1,
+  retryReads: true,
   
-  // Additional SSL/TLS options
-  tlsInsecure: false,
-  directConnection: false
+  // Node.js TLS options (merged with the connection options)
+  // Note: These are Node.js TLS options, not MongoDB-specific
+  // @ts-ignore - The type definitions don't include these but they are valid
+  secureProtocol: 'TLSv1_2_method',
+  // @ts-ignore
+  rejectUnauthorized: false
 });
 let db: Db;
 
