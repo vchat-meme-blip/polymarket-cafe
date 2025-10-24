@@ -33,25 +33,62 @@ export function createWorker(workerPath: string, options?: WorkerOptions) {
     // In production, handle Docker environment
     const basePath = isDocker ? '/app/dist' : path.resolve(__dirname, '..');
     const workerName = path.basename(workerPath, '.worker');
-    // Try multiple possible paths and extensions
+    
+    // First, try to find the worker file in the filesystem
+    const fs = require('fs');
+    
+    // Function to find a file in a directory with any extension
+    const findFile = (dir: string, baseName: string): string | null => {
+      try {
+        const files = fs.readdirSync(dir);
+        const found = files.find((file: string) => {
+          const name = path.basename(file, path.extname(file));
+          return name === baseName || name === `${baseName}.worker`;
+        });
+        return found || null;
+      } catch (e) {
+        return null;
+      }
+    };
+    
+    // Check possible directories
+    const workersDir = path.join(basePath, 'workers');
+    const serverWorkersDir = path.join(basePath, 'server', 'workers');
+    
+    // Try to find the worker file
+    let workerFile = findFile(workersDir, workerName) || 
+                    findFile(serverWorkersDir, workerName);
+    
+    let foundPath: string | null = null;
+    
+    if (workerFile) {
+      // If found in workers directory
+      const workersPath = path.join(workersDir, workerFile);
+      const serverWorkersPath = path.join(serverWorkersDir, workerFile);
+      
+      if (fs.existsSync(workersPath)) {
+        foundPath = workersPath;
+      } 
+      // If found in server/workers directory
+      else if (fs.existsSync(serverWorkersPath)) {
+        foundPath = serverWorkersPath;
+      }
+    }
+    
+    // If not found, fall back to default paths
     const possiblePaths = [
-      // Try with .mjs extension first (ES Modules)
       path.join(basePath, 'workers', `${workerName}.worker.mjs`),
       path.join(basePath, 'workers', `${workerName}.mjs`),
-      // Then try with .js extension (CommonJS)
       path.join(basePath, 'workers', `${workerName}.worker.js`),
       path.join(basePath, 'workers', `${workerName}.js`),
-      // Also try in server/workers directory
       path.join(basePath, 'server', 'workers', `${workerName}.worker.mjs`),
       path.join(basePath, 'server', 'workers', `${workerName}.mjs`),
       path.join(basePath, 'server', 'workers', `${workerName}.worker.js`),
       path.join(basePath, 'server', 'workers', `${workerName}.js`)
     ];
     
-    console.log('[Worker Loader] Looking for worker in paths:', possiblePaths);
-    
-    // Find the first existing path
-    const existingPath = possiblePaths.find(p => {
+    // Try to find an existing path
+    const existingPath = possiblePaths.find((p: string) => {
       try {
         require.resolve(p);
         return true;
@@ -59,6 +96,15 @@ export function createWorker(workerPath: string, options?: WorkerOptions) {
         return false;
       }
     });
+    
+    // Use the found path or the first possible path as a fallback
+    finalPath = foundPath || existingPath || possiblePaths[0];
+    
+    console.log('[Worker Loader] Using worker path:', finalPath);
+    console.log('[Worker Loader] Worker name:', workerName);
+    console.log('[Worker Loader] Base path:', basePath);
+    console.log('[Worker Loader] Workers dir exists:', fs.existsSync(workersDir));
+    console.log('[Worker Loader] Server workers dir exists:', fs.existsSync(serverWorkersDir));
     
     if (!existingPath) {
       throw new Error(`Worker file not found. Tried: ${possiblePaths.join(', ')}`);
