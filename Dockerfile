@@ -46,20 +46,31 @@ COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps
 
 # Create necessary directories
-RUN mkdir -p /app/dist/server/workers /app/logs /app/dist/client
+RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
 
 # Copy built files from builder
 COPY --from=builder /app/dist/server/ /app/dist/server/
+# Copy workers if they exist
+RUN if [ -d "/app/dist/workers" ]; then \
+      echo "Copying workers from dist/workers" && \
+      cp -r /app/dist/workers/* /app/dist/workers/ 2>/dev/null || true; \
+    else \
+      echo "No workers directory found in dist/workers"; \
+    fi
 COPY --from=builder /app/dist/client/ /app/dist/client/
 COPY --from=builder /app/public/ /app/public/
 COPY --from=builder /app/ecosystem.config.* ./
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.env* ./
 
+# Create symlinks for backward compatibility
+RUN ln -sf /app/dist/workers/* /app/dist/server/workers/ 2>/dev/null || echo "No workers to link"
+
 # Verify the build output
 RUN echo "Build output verification:" && \
-    echo "Server files:" && ls -la /app/dist/server/ && \
-    echo "\nWorkers directory:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers found" && \
+    echo "\nServer files:" && ls -la /app/dist/server/ && \
+    echo "\nWorkers in /app/dist/workers/:" && ls -la /app/dist/workers/ 2>/dev/null || echo "No workers in /app/dist/workers/" && \
+    echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/" && \
     echo "\nClient files:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found"
 
 COPY --from=builder /app/server/env.ts ./dist/server/

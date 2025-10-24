@@ -31,15 +31,24 @@ export function createWorker(workerPath: string, options?: WorkerOptions) {
       : resolvedPath;
   } else {
     // In production, handle Docker environment
-    const basePath = isDocker ? '/app/dist/server' : path.resolve(__dirname, '..');
+    const basePath = isDocker ? '/app/dist' : path.resolve(__dirname, '..');
     const workerName = path.basename(workerPath, '.worker');
-    // Try both .js and .mjs extensions
+    // Try multiple possible paths and extensions
     const possiblePaths = [
-      path.join(basePath, 'workers', `${workerName}.worker.js`),
+      // Try with .mjs extension first (ES Modules)
       path.join(basePath, 'workers', `${workerName}.worker.mjs`),
+      path.join(basePath, 'workers', `${workerName}.mjs`),
+      // Then try with .js extension (CommonJS)
+      path.join(basePath, 'workers', `${workerName}.worker.js`),
       path.join(basePath, 'workers', `${workerName}.js`),
-      path.join(basePath, 'workers', `${workerName}.mjs`)
+      // Also try in server/workers directory
+      path.join(basePath, 'server', 'workers', `${workerName}.worker.mjs`),
+      path.join(basePath, 'server', 'workers', `${workerName}.mjs`),
+      path.join(basePath, 'server', 'workers', `${workerName}.worker.js`),
+      path.join(basePath, 'server', 'workers', `${workerName}.js`)
     ];
+    
+    console.log('[Worker Loader] Looking for worker in paths:', possiblePaths);
     
     // Find the first existing path
     const existingPath = possiblePaths.find(p => {
