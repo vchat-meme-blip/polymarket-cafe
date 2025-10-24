@@ -10,6 +10,16 @@ import OpenAI from 'openai';
 type EmitToMainThread = (message: { type: 'socketEmit'; event: string; payload: any; room?: string }) => void;
 
 export class DashboardAgentDirector {
+    private parseDate(date: Date | string | number | null | undefined): number {
+        if (!date) return Date.now();
+        if (date instanceof Date) return date.getTime();
+        if (typeof date === 'number') return date;
+        if (typeof date === 'string') {
+            const parsed = new Date(date);
+            return !isNaN(parsed.getTime()) ? parsed.getTime() : Date.now();
+        }
+        return Date.now();
+    }
     private emitToMain?: EmitToMainThread;
     private agentStates: Map<string, { lastActionTime: number; isBusy: boolean }> = new Map();
     private readonly ACTION_COOLDOWN = 2 * 60 * 1000; // 2 minutes
@@ -33,12 +43,8 @@ export class DashboardAgentDirector {
                     lastSeen: userDoc.lastSeen || null,
                     userApiKey: userDoc.userApiKey || null,
                     solanaWalletAddress: userDoc.solanaWalletAddress || null,
-                    createdAt: userDoc.createdAt && typeof userDoc.createdAt === 'object' && 'getTime' in userDoc.createdAt 
-                        ? (userDoc.createdAt as Date).getTime() 
-                        : (typeof userDoc.createdAt === 'number' ? userDoc.createdAt : Date.now()),
-                    updatedAt: userDoc.updatedAt && typeof userDoc.updatedAt === 'object' && 'getTime' in userDoc.updatedAt 
-                        ? (userDoc.updatedAt as Date).getTime() 
-                        : (typeof userDoc.updatedAt === 'number' ? userDoc.updatedAt : Date.now()),
+                    createdAt: this.parseDate(userDoc.createdAt),
+                    updatedAt: this.parseDate(userDoc.updatedAt),
                     currentAgentId: userDoc.currentAgentId?.toString(),
                     ownedRoomId: userDoc.ownedRoomId?.toString(),
                     phone: userDoc.phone,

@@ -46,7 +46,7 @@ class LeaderboardService {
     const leaderboard: PnlLeaderboardEntry[] = agents.map(agent => {
         const agentBets = betsByAgent[agent._id.toString()] || [];
         const totalBets = agentBets.length;
-        const winningBets = agentBets.filter(b => b.pnl && b.pnl > 0).length;
+        const winningBets = agentBets.filter((b: any) => b && typeof b === 'object' && 'pnl' in b && b.pnl > 0).length;
 
         return {
             agentId: agent.id,
