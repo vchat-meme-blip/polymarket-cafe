@@ -55,19 +55,23 @@ export class ResolutionDirector {
             // Prepare bet update
             bulkBetUpdates.push({
                 updateOne: {
-                    filter: { id: bet.id },
+                    filter: { _id: bet._id },
                     update: { $set: { status: 'resolved', pnl: pnl } }
                 }
             });
 
+            // Convert ObjectId to string for Map keys
+            const agentIdStr = bet.agentId.toString();
+            const sourceIntelIdStr = bet.sourceIntelId?.toString();
+
             // Aggregate PNL updates for agents
-            const currentAgentPnl = bulkAgentPnlUpdates.get(bet.agentId) || 0;
-            bulkAgentPnlUpdates.set(bet.agentId, currentAgentPnl + pnl);
+            const currentAgentPnl = bulkAgentPnlUpdates.get(agentIdStr) || 0;
+            bulkAgentPnlUpdates.set(agentIdStr, currentAgentPnl + pnl);
 
             // Aggregate PNL updates for intel attribution
-            if (bet.sourceIntelId && pnl > 0) {
-                const currentIntelPnl = bulkIntelPnlUpdates.get(bet.sourceIntelId) || 0;
-                bulkIntelPnlUpdates.set(bet.sourceIntelId, currentIntelPnl + pnl);
+            if (sourceIntelIdStr && pnl > 0) {
+                const currentIntelPnl = bulkIntelPnlUpdates.get(sourceIntelIdStr) || 0;
+                bulkIntelPnlUpdates.set(sourceIntelIdStr, currentIntelPnl + pnl);
             }
         }
 

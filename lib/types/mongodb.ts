@@ -11,7 +11,7 @@ import type {
   Notification as SharedNotification,
   Transaction as SharedTransaction,
   TradeRecord as SharedTradeRecord
-} from './shared';
+} from './shared.js';
 
 // Helper type to convert string IDs to ObjectId in a type
 type WithObjectId<T> = Omit<T, '_id'> & { _id: ObjectId };

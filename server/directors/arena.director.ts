@@ -74,16 +74,40 @@ export class ArenaDirector {
         // Load all agents
         const allAgents = await agentsCollection.find({}).toArray();
         allAgents.forEach(agent => {
-            this.agents.set(agent.id, agent);
-            this.agentLocations.set(agent.id, null); // Assume all are wandering initially
+            const agentId = agent._id.toString();
+            this.agents.set(agentId, {
+                ...agent,
+                id: agentId,
+                // Ensure all IDs are strings in the agent object
+                currentRoomId: agent.currentRoomId?.toString(),
+                bettingHistory: agent.bettingHistory?.map((id: any) => id.toString()) || [],
+                bets: agent.bets?.map((id: any) => id.toString()) || []
+            } as Agent);
+            this.agentLocations.set(agentId, null); // Assume all are wandering initially
         });
 
         // Load all rooms and populate agent locations
         const allRooms = await roomsCollection.find({}).toArray();
         allRooms.forEach(room => {
-            this.rooms.set(room.id, room);
-            room.agentIds.forEach(agentId => {
-                this.agentLocations.set(agentId, room.id);
+            const roomId = room._id.toString();
+            const roomData: Room = {
+                ...room,
+                id: roomId,
+                hostId: room.hostId?.toString() || null,
+                agentIds: room.agentIds.map((id: any) => id.toString()),
+                bannedAgentIds: room.bannedAgentIds?.map((id: any) => id.toString()) || [],
+                // Convert any other ObjectId fields as needed
+                ...(room.ownerHandle && { ownerHandle: room.ownerHandle }),
+                ...(room.roomBio && { roomBio: room.roomBio }),
+                ...(room.twitterUrl && { twitterUrl: room.twitterUrl }),
+                ...(room.rules && { rules: room.rules })
+            };
+            
+            this.rooms.set(roomId, roomData);
+            
+            room.agentIds.forEach((agentId: any) => {
+                const agentIdStr = agentId.toString();
+                this.agentLocations.set(agentIdStr, roomId);
             });
         });
 
@@ -354,6 +378,7 @@ export class ArenaDirector {
 
     private async moveAgent(agentId: string, toRoomId: string | null) {
         const fromRoomId = this.agentLocations.get(agentId);
+        const agentObjId = new ObjectId(agentId);
 
         // Remove from old room if they were in one
         if (fromRoomId) {
@@ -365,7 +390,7 @@ export class ArenaDirector {
                     // Delete empty, non-owned rooms from memory and DB
                     this.rooms.delete(fromRoomId);
                     this.conversations.delete(fromRoomId);
-                    await roomsCollection.deleteOne({ id: fromRoom.id });
+                    await roomsCollection.deleteOne({ _id: new ObjectId(fromRoomId) });
                 } else {
                     // If room becomes empty but is owned, just clear host if host left.
                     if (fromRoom.agentIds.length === 0) {
@@ -375,7 +400,21 @@ export class ArenaDirector {
                         fromRoom.hostId = fromRoom.agentIds[0];
                     }
                     this.rooms.set(fromRoomId, fromRoom);
-                    await roomsCollection.updateOne({ id: fromRoom.id }, { $set: { agentIds: fromRoom.agentIds, hostId: fromRoom.hostId, activeOffer: fromRoom.activeOffer } });
+                    
+                    // Convert agentIds to ObjectId for database operation
+                    const agentIdsAsObjectIds = fromRoom.agentIds.map(id => new ObjectId(id));
+                    const hostIdObj = fromRoom.hostId ? new ObjectId(fromRoom.hostId) : null;
+                    
+                    await roomsCollection.updateOne(
+                        { _id: new ObjectId(fromRoomId) }, 
+                        { 
+                            $set: { 
+                                agentIds: agentIdsAsObjectIds, 
+                                hostId: hostIdObj,
+                                activeOffer: fromRoom.activeOffer 
+                            } 
+                        }
+                    );
                 }
             }
         }
@@ -387,7 +426,20 @@ export class ArenaDirector {
                 toRoom.agentIds.push(agentId);
                 this.agentLocations.set(agentId, toRoomId);
                 this.rooms.set(toRoomId, toRoom);
-                await roomsCollection.updateOne({ id: toRoom.id }, { $set: { agentIds: toRoom.agentIds } });
+                
+                // Convert agentIds to ObjectId for database operation
+                const agentIdsAsObjectIds = toRoom.agentIds.map(id => new ObjectId(id));
+                const hostIdObj = toRoom.hostId ? new ObjectId(toRoom.hostId) : null;
+                
+                await roomsCollection.updateOne(
+                    { _id: new ObjectId(toRoomId) }, 
+                    { 
+                        $set: { 
+                            agentIds: agentIdsAsObjectIds,
+                            hostId: hostIdObj
+                        } 
+                    }
+                );
             } else {
                 this.agentLocations.set(agentId, null);
             }
@@ -400,7 +452,12 @@ export class ArenaDirector {
     }
     
     private async handleCreateOffer(seller: Agent, buyer: Agent, room: Room, args: { intel_id: string; price: number }) {
-        const intel = await bettingIntelCollection.findOne({ id: args.intel_id, ownerAgentId: seller.id, isTradable: true });
+        const intel = await bettingIntelCollection.findOne({ 
+            _id: new ObjectId(args.intel_id), 
+            ownerAgentId: new ObjectId(seller.id), 
+            isTradable: true 
+        });
+        
         if (!intel) {
             console.warn(`[ArenaDirector] ${seller.name} tried to offer non-existent or non-tradable intel ${args.intel_id}.`);
             return;
@@ -410,7 +467,7 @@ export class ArenaDirector {
             fromId: seller.id,
             toId: buyer.id,
             type: 'intel',
-            intelId: intel.id,
+            intelId: intel._id.toString(),
             market: intel.market,
             price: args.price,
             status: 'pending',
@@ -418,79 +475,119 @@ export class ArenaDirector {
         
         room.activeOffer = newOffer;
         this.rooms.set(room.id, room);
-        await roomsCollection.updateOne({ id: room.id }, { $set: { activeOffer: newOffer } });
+        
+        await roomsCollection.updateOne(
+            { _id: new ObjectId(room.id) }, 
+            { $set: { activeOffer: newOffer } }
+        );
 
-        this.emitToMain?.({ type: 'socketEmit', event: 'roomUpdated', payload: { room } });
+        this.emitToMain?.({ 
+            type: 'socketEmit', 
+            event: 'roomUpdated', 
+            payload: { room } 
+        });
     }
 
     private async handleAcceptOffer(buyer: Agent, seller: Agent, room: Room, args: { offer_id: string }) {
         const offer = room.activeOffer;
-        if (!offer || offer.intelId !== args.offer_id || offer.status !== 'pending') {
-            console.warn(`[ArenaDirector] ${buyer.name} tried to accept an invalid or non-existent offer.`);
+        if (!offer) {
+            console.warn(`[ArenaDirector] No active offer to accept in room ${room.id}`);
             return;
         }
 
-        // Here you would check buyer's balance. For simulation, we assume they can afford it.
-        
-        const trade: TradeRecord = {
-            fromId: seller.id,
-            toId: buyer.id,
-            type: 'intel',
-            market: offer.market!,
-            intelId: offer.intelId,
-            price: offer.price,
-            timestamp: Date.now(),
-            roomId: room.id,
-        };
-        
-        await tradeHistoryCollection.insertOne(trade as any);
-        
-        // --- Intel Transfer Logic ---
-        const originalIntel = await bettingIntelCollection.findOne({ id: offer.intelId });
-        if (originalIntel) {
-            const newIntelForBuyer: Omit<BettingIntel, '_id'> = {
-                ...originalIntel,
-                id: `bettingintel-${new ObjectId().toHexString()}`, // New unique ID
-                ownerAgentId: buyer.id,
-                ownerHandle: buyer.ownerHandle,
-                sourceAgentId: seller.id,
-                pricePaid: offer.price,
-                isTradable: false, // Purchased intel is not tradable by default
-                createdAt: Date.now(),
-                pnlGenerated: { amount: 0, currency: 'USD' }, // Reset PNL for the new owner
-            };
-            delete (newIntelForBuyer as any)._id; // Remove MongoDB specific field before insertion
-            const { insertedId } = await bettingIntelCollection.insertOne(newIntelForBuyer as any);
-            const savedIntel = await bettingIntelCollection.findOne({ _id: insertedId });
-            
-            // Notify the buyer's owner of the new intel
-            if (buyer.ownerHandle) {
-                 this.emitToMain?.({
-                    type: 'socketEmit',
-                    event: 'newIntel',
-                    payload: { intel: savedIntel },
-                    room: buyer.ownerHandle
-                });
-            }
+        // Convert string IDs to ObjectId for database operations
+        const buyerId = new ObjectId(buyer.id);
+        const sellerId = new ObjectId(seller.id);
+        const intelId = new ObjectId(offer.intelId);
+        const roomId = new ObjectId(room.id);
+
+        // Get the original intel
+        const originalIntel = await bettingIntelCollection.findOne({ _id: intelId });
+        if (!originalIntel) {
+            console.warn(`[ArenaDirector] Intel ${offer.intelId} not found`);
+            return;
         }
-        // --- End Intel Transfer Logic ---
+
+        // Create a new intel record for the buyer
+        const newIntelForBuyer = {
+            ...originalIntel,
+            _id: new ObjectId(),
+            ownerAgentId: buyerId,
+            ownerHandle: buyer.ownerHandle,
+            sourceAgentId: sellerId,
+            pricePaid: offer.price,
+            isTradable: false,
+            createdAt: new Date(),
+            pnlGenerated: { amount: 0, currency: 'USD' },
+            updatedAt: new Date()
+        };
+
+        // Insert the new intel record for the buyer
+        const { insertedId } = await bettingIntelCollection.insertOne(newIntelForBuyer);
+        const savedIntel = await bettingIntelCollection.findOne({ _id: insertedId });
+
+        if (savedIntel && buyer.ownerHandle) {
+            // Notify the buyer's owner of the new intel
+            this.emitToMain?.({
+                type: 'socketEmit',
+                event: 'newIntel',
+                payload: { intel: savedIntel },
+                room: buyer.ownerHandle
+            });
+        }
 
         // Update PNL for both agents
         await agentsCollection.bulkWrite([
-            { updateOne: { filter: { id: seller.id }, update: { $inc: { currentPnl: offer.price } } } },
-            { updateOne: { filter: { id: buyer.id }, update: { $inc: { currentPnl: -offer.price } } } }
+            { 
+                updateOne: { 
+                    filter: { _id: sellerId }, 
+                    update: { $inc: { currentPnl: offer.price } } 
+                } 
+            },
+            { 
+                updateOne: { 
+                    filter: { _id: buyerId }, 
+                    update: { $inc: { currentPnl: -offer.price } } 
+                } 
+            }
         ]);
         
         // Update intel PNL for the original piece of intel
-        await bettingIntelCollection.updateOne({ id: offer.intelId }, { $inc: { 'pnlGenerated.amount': offer.price } });
+        await bettingIntelCollection.updateOne(
+            { _id: intelId }, 
+            { $inc: { 'pnlGenerated.amount': offer.price } }
+        );
+
+        // Create trade record
+        const trade: TradeRecord = {
+            buyerId: buyer.id,
+            sellerId: seller.id,
+            intelId: offer.intelId,
+            price: offer.price,
+            timestamp: Date.now(),
+            market: offer.market
+        };
 
         // Clear the offer
         room.activeOffer = null;
         this.rooms.set(room.id, room);
-        await roomsCollection.updateOne({ id: room.id }, { $set: { activeOffer: null } });
+        await roomsCollection.updateOne(
+            { _id: roomId }, 
+            { $set: { activeOffer: null } }
+        );
 
-        this.emitToMain?.({ type: 'socketEmit', event: 'tradeExecuted', payload: { trade } });
-        this.emitToMain?.({ type: 'socketEmit', event: 'roomUpdated', payload: { room } });
+        // Emit events
+        this.emitToMain?.({ 
+            type: 'socketEmit', 
+            event: 'tradeExecuted', 
+            payload: { trade } 
+        });
+        
+        this.emitToMain?.({ 
+            type: 'socketEmit', 
+            event: 'roomUpdated', 
+            payload: { room } 
+        });
 
         // Send notifications
         await this.sendTradeNotifications(seller, buyer, trade);
