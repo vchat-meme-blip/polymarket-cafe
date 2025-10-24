@@ -17,10 +17,10 @@ export const client = new MongoClient(uri, {
   socketTimeoutMS: 45000,
   connectTimeoutMS: 30000,
   
-  // TLS/SSL configuration
+  // TLS/SSL configuration - use only one of these:
+  // Option 1: For development/testing with self-signed certificates
   tls: true,
-  tlsAllowInvalidCertificates: true, // Temporarily allow invalid certificates for testing
-  tlsInsecure: true, // Temporarily disable certificate validation for testing
+  tlsAllowInvalidCertificates: true,
   
   // Connection settings
   directConnection: false,
@@ -34,12 +34,13 @@ export const client = new MongoClient(uri, {
   retryWrites: true,
   retryReads: true,
   
-  // Node.js TLS options (merged with the connection options)
-  // Note: These are Node.js TLS options, not MongoDB-specific
-  // @ts-ignore - The type definitions don't include these but they are valid
-  secureProtocol: 'TLSv1_2_method',
-  // @ts-ignore
-  rejectUnauthorized: false
+  // Force TLS 1.2
+  tlsOptions: {
+    // @ts-ignore - The type definitions don't include these but they are valid
+    secureProtocol: 'TLSv1_2_method',
+    // @ts-ignore
+    rejectUnauthorized: false
+  }
 });
 let db: Db;
 
