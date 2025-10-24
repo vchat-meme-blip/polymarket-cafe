@@ -1,92 +1,108 @@
-import { MongoClient, Db, Collection, Document } from 'mongodb';
+import mongoose from 'mongoose';
 import { Agent, Room, User, Bet, Bounty, TradeRecord, Transaction, BettingIntel, DailySummary, Notification } from '../lib/types/index.js';
 
-let uri = process.env.MONGODB_URI;
+const uri = process.env.MONGODB_URI;
 if (!uri) {
   throw new Error('MONGODB_URI environment variable is not set.');
 }
 
 // Clean up the URI and ensure it has the correct parameters
-uri = uri.split('?')[0]; // Remove any existing query parameters
-uri += '?retryWrites=true&w=majority&tls=true';
+const connectionString = uri.includes('?') 
+  ? `${uri}&retryWrites=true&w=majority`
+  : `${uri}?retryWrites=true&w=majority`;
 
-// MongoDB connection options
-export const client = new MongoClient(uri, {
-  // Connection options
-  serverSelectionTimeoutMS: 10000,
-  socketTimeoutMS: 45000,
-  connectTimeoutMS: 30000,
-  
-  // TLS/SSL configuration - use only one of these:
-  // Option 1: For development/testing with self-signed certificates
-  tls: true,
-  tlsAllowInvalidCertificates: true,
-  
-  // Connection settings
-  directConnection: false,
-  maxPoolSize: 10,
-  minPoolSize: 1,
-  
-  // Application identification
-  appName: 'polymarket-cafe',
-  
-  // Retry logic
-  retryWrites: true,
-  retryReads: true,
-  
-  // Force TLS 1.2
-  tlsOptions: {
-    // @ts-ignore - The type definitions don't include these but they are valid
-    secureProtocol: 'TLSv1_2_method',
-    // @ts-ignore
-    rejectUnauthorized: false
+// Collection references
+export let usersCollection: mongoose.Collection;
+export let agentsCollection: mongoose.Collection;
+export let roomsCollection: mongoose.Collection;
+export let betsCollection: mongoose.Collection;
+export let bountiesCollection: mongoose.Collection;
+export let activityLogCollection: mongoose.Collection;
+export let tradeHistoryCollection: mongoose.Collection;
+export let transactionsCollection: mongoose.Collection;
+export let bettingIntelCollection: mongoose.Collection;
+export let marketWatchlistsCollection: mongoose.Collection;
+export let dailySummariesCollection: mongoose.Collection;
+export let notificationsCollection: mongoose.Collection;
+
+// Initialize database connection and collections
+const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
+  try {
+    await mongoose.connect(connectionString, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 30000,
+      tls: true,
+      tlsAllowInvalidCertificates: true,
+      maxPoolSize: 10,
+      minPoolSize: 1,
+      appName: 'polymarket-cafe',
+      retryWrites: true,
+      retryReads: true,
+    });
+
+    console.log('MongoDB connected successfully.');
+
+    // Initialize collection references
+    usersCollection = mongoose.connection.collection('users');
+    agentsCollection = mongoose.connection.collection('agents');
+    roomsCollection = mongoose.connection.collection('rooms');
+    betsCollection = mongoose.connection.collection('bets');
+    bountiesCollection = mongoose.connection.collection('bounties');
+    activityLogCollection = mongoose.connection.collection('activity_logs');
+    tradeHistoryCollection = mongoose.connection.collection('trade_history');
+    transactionsCollection = mongoose.connection.collection('transactions');
+    bettingIntelCollection = mongoose.connection.collection('bettingIntel');
+    marketWatchlistsCollection = mongoose.connection.collection('marketWatchlists');
+    dailySummariesCollection = mongoose.connection.collection('dailySummaries');
+    notificationsCollection = mongoose.connection.collection('notifications');
+
+    // Create indexes
+    await Promise.all([
+      usersCollection.createIndex({ handle: 1 }, { unique: true }),
+      agentsCollection.createIndex({ id: 1 }, { unique: true }),
+      agentsCollection.createIndex({ ownerHandle: 1 }),
+      roomsCollection.createIndex({ id: 1 }, { unique: true })
+    ]);
+
+    return mongoose.connection;
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
+  }
+};
+
+// Handle connection events
+mongoose.connection.on('connected', () => {
+  console.log('Mongoose connected to MongoDB');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('Mongoose connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('Mongoose disconnected from MongoDB');
+});
+
+// Close the Mongoose connection when the Node process ends
+process.on('SIGINT', async () => {
+  try {
+    await mongoose.connection.close();
+    console.log('Mongoose default connection disconnected through app termination');
+    process.exit(0);
+  } catch (err) {
+    console.error('Error closing MongoDB connection:', err);
+    process.exit(1);
   }
 });
-let db: Db;
 
-// Define exported variables for collections
-export let usersCollection: Collection<User>;
-export let agentsCollection: Collection<Agent>;
-export let roomsCollection: Collection<Room>;
-export let betsCollection: Collection<Bet>;
-export let bountiesCollection: Collection<Bounty>;
-export let activityLogCollection: Collection<any>;
-export let tradeHistoryCollection: Collection<TradeRecord>;
-export let transactionsCollection: Collection<Transaction>;
-export let bettingIntelCollection: Collection<BettingIntel>;
-export let marketWatchlistsCollection: Collection<any>;
-export let dailySummariesCollection: Collection<DailySummary>;
-export let notificationsCollection: Collection<Notification>;
-
-
-export async function connectDB() {
-  if (db) {
-    return;
-  }
-  await client.connect();
-  db = client.db();
-  console.log('[DB] Successfully connected to MongoDB.');
-
-  // Initialize collections after the connection is established
-  usersCollection = db.collection<User>('users');
-  agentsCollection = db.collection<Agent>('agents');
-  roomsCollection = db.collection<Room>('rooms');
-  betsCollection = db.collection<Bet>('bets');
-  bountiesCollection = db.collection<Bounty>('bounties');
-  activityLogCollection = db.collection<any>('activity_logs');
-  tradeHistoryCollection = db.collection<TradeRecord>('trade_history');
-  transactionsCollection = db.collection<Transaction>('transactions');
-  bettingIntelCollection = db.collection<BettingIntel>('bettingIntel');
-  marketWatchlistsCollection = db.collection('marketWatchlists');
-  dailySummariesCollection = db.collection<DailySummary>('dailySummaries');
-  notificationsCollection = db.collection<Notification>('notifications');
-
-  // Ensure indexes for performance
-  await usersCollection.createIndex({ handle: 1 }, { unique: true });
-  await agentsCollection.createIndex({ id: 1 }, { unique: true });
-  await agentsCollection.createIndex({ ownerHandle: 1 });
-  await roomsCollection.createIndex({ id: 1 }, { unique: true });
-}
+export { mongoose as db };
+export default connectDB;
 
 export async function seedDatabase() {
   const roomCount = await roomsCollection.countDocuments();
