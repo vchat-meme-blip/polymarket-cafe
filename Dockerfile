@@ -50,21 +50,24 @@ RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/clie
 
 # Copy built files from builder
 COPY --from=builder /app/dist/server/ /app/dist/server/
-# Copy workers if they exist
-RUN if [ -d "/app/dist/workers" ]; then \
-      echo "Copying workers from dist/workers" && \
-      cp -r /app/dist/workers/* /app/dist/workers/ 2>/dev/null || true; \
-    else \
-      echo "No workers directory found in dist/workers"; \
-    fi
+
+# Create workers directory in the final image
+RUN mkdir -p /app/dist/workers /app/dist/server/workers
+
+# Copy workers from builder to both locations for compatibility
+COPY --from=builder /app/dist/workers/ /app/dist/workers/
+COPY --from=builder /app/dist/workers/ /app/dist/server/workers/
+
+# Copy other necessary files
 COPY --from=builder /app/dist/client/ /app/dist/client/
 COPY --from=builder /app/public/ /app/public/
 COPY --from=builder /app/ecosystem.config.* ./
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.env* ./
 
-# Create symlinks for backward compatibility
-RUN ln -sf /app/dist/workers/* /app/dist/server/workers/ 2>/dev/null || echo "No workers to link"
+# Verify workers were copied
+RUN echo "Workers in /app/dist/workers/:" && ls -la /app/dist/workers/ 2>/dev/null || echo "No workers in /app/dist/workers/" && \
+    echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/"
 
 # Verify the build output
 RUN echo "Build output verification:" && \
