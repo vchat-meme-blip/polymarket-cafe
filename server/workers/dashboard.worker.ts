@@ -1,7 +1,7 @@
 /// <reference types="node" />
 
 import { parentPort } from 'worker_threads';
-import { connectDB } from '../db.js';
+import connectDB from '../db.js';
 import { DashboardAgentDirector } from '../directors/dashboard.director.js';
 import { apiKeyProvider } from '../services/apiKey.provider.js';
 

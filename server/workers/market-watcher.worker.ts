@@ -1,7 +1,7 @@
 /// <reference types="node" />
 
 import { parentPort } from 'worker_threads';
-import { connectDB } from '../db.js';
+import connectDB from '../db.js';
 import { MarketWatcherDirector } from '../directors/market-watcher.director.js';
 
 if (!parentPort) {

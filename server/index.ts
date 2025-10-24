@@ -2,7 +2,7 @@
 
 import './env.js';
 
-import { connectDB, seedDatabase } from './db.js';
+import connectDB, { seedDatabase } from './db.js';
 // FIX: Add .js extension to fix module resolution error.
 import { startServer } from './server.js';
 
