@@ -8,21 +8,26 @@ if (!uri) {
 
 // MongoDB connection options with proper TLS configuration
 export const client = new MongoClient(uri, {
-  tls: true,
-  tlsAllowInvalidCertificates: false, // Don't allow invalid certificates in production
-  retryWrites: true,
-  w: 'majority',
-  appName: 'Cluster0',
+  // Connection options
   serverSelectionTimeoutMS: 10000,
   socketTimeoutMS: 45000,
-  // Add SSL validation options
-  ssl: true,
-  sslValidate: true,
-  // Increase timeout for initial connection
   connectTimeoutMS: 30000,
-  // Add retry logic
-  retryAttempts: 3,
-  retryDelay: 1000
+  
+  // TLS/SSL configuration
+  tls: true,
+  tlsAllowInvalidCertificates: false,
+  
+  // Write concern
+  w: 'majority',
+  
+  // Application identification
+  appName: 'polymarket-cafe',
+  
+  // Retry logic
+  retryWrites: true,
+  retryReads: true,
+  maxPoolSize: 10,
+  minPoolSize: 1
 });
 let db: Db;
 
