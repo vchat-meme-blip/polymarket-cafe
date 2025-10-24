@@ -155,8 +155,11 @@ export async function startServer() {
   });
   
   const PORT = process.env.PORT || 3001;
-  server.listen(PORT, async () => {
-    console.log(`[Server] Server listening on http://localhost:${PORT}`);
+  const HOST = process.env.HOST || '0.0.0.0';
+  server.listen(Number(PORT), HOST, async () => {
+    console.log(`[Server] Server listening on http://${HOST}:${PORT}`);
+    console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`[Server] Database: ${process.env.MONGODB_URI ? 'Configured' : 'Not Configured'}`);
 
     try {
         const { PRESET_AGENTS } = await import('../lib/presets/agents.js');

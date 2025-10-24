@@ -6,7 +6,17 @@ if (!uri) {
   throw new Error('MONGODB_URI environment variable is not set.');
 }
 
-export const client = new MongoClient(uri);
+// Update MongoDB connection options for SSL
+export const client = new MongoClient(uri, {
+  tls: true,
+  tlsAllowInvalidCertificates: false,
+  tlsInsecure: false,
+  retryWrites: true,
+  w: 'majority',
+  appName: 'Cluster0',
+  serverSelectionTimeoutMS: 10000,
+  socketTimeoutMS: 45000
+});
 let db: Db;
 
 // Define exported variables for collections
