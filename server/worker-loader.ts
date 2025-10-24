@@ -33,8 +33,49 @@ export function createWorker(workerPath: string, options?: WorkerOptions) {
     // In production, handle Docker environment
     const basePath = isDocker ? '/app/dist/server' : path.resolve(__dirname, '..');
     const workerName = path.basename(workerPath, '.worker');
-    finalPath = path.join(basePath, 'workers', `${workerName}.worker.js`);
+    // Try both .js and .mjs extensions
+    const possiblePaths = [
+      path.join(basePath, 'workers', `${workerName}.worker.js`),
+      path.join(basePath, 'workers', `${workerName}.worker.mjs`),
+      path.join(basePath, 'workers', `${workerName}.js`),
+      path.join(basePath, 'workers', `${workerName}.mjs`)
+    ];
+    
+    // Find the first existing path
+    const existingPath = possiblePaths.find(p => {
+      try {
+        require.resolve(p);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    
+    if (!existingPath) {
+      throw new Error(`Worker file not found. Tried: ${possiblePaths.join(', ')}`);
+    }
+    
+    finalPath = existingPath;
   }
 
   console.log(`[Worker Loader] Starting worker at: ${finalPath}`);
+  
+  try {
+    const worker = new Worker(finalPath, workerOptions);
+    
+    worker.on('error', (error) => {
+      console.error(`[Worker ${worker.threadId}] Error:`, error);
+    });
+    
+    worker.on('exit', (code) => {
+      if (code !== 0) {
+        console.error(`[Worker ${worker.threadId}] stopped with exit code ${code}`);
+      }
+    });
+    
+    return worker;
+  } catch (error) {
+    console.error(`[Worker Loader] Failed to start worker at ${finalPath}:`, error);
+    throw error;
+  }
 }

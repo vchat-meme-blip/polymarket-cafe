@@ -45,18 +45,22 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps
 
+# Create necessary directories
+RUN mkdir -p /app/dist/server/workers /app/logs /app/dist/client
+
 # Copy built files from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/ecosystem.config.cjs ./
+COPY --from=builder /app/dist/server/ /app/dist/server/
+COPY --from=builder /app/dist/client/ /app/dist/client/
+COPY --from=builder /app/public/ /app/public/
+COPY --from=builder /app/ecosystem.config.* ./
+COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.env* ./
 
-# Ensure the workers directory exists and has the correct files
-RUN mkdir -p /app/dist/server/workers && \
-    cp /app/dist/server/workers/*.js /app/dist/server/workers/ 2>/dev/null || :
-
-# Print directory structure for debugging
-RUN ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers directory found"
+# Verify the build output
+RUN echo "Build output verification:" && \
+    echo "Server files:" && ls -la /app/dist/server/ && \
+    echo "\nWorkers directory:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers found" && \
+    echo "\nClient files:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found"
 
 COPY --from=builder /app/server/env.ts ./dist/server/
 
