@@ -7,8 +7,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export function createWorker(workerPath: string, options?: WorkerOptions) {
-  // In development, use ts-node to run TypeScript files directly
   const isDev = process.env.NODE_ENV !== 'production';
+  const isDocker = process.env.DOCKER_ENV === 'true';
   
   const workerOptions: WorkerOptions = {
     ...options,
@@ -21,13 +21,20 @@ export function createWorker(workerPath: string, options?: WorkerOptions) {
     ]
   };
 
-  // Resolve the worker path relative to the current file
-  const resolvedPath = path.resolve(__dirname, workerPath);
+  let finalPath: string;
   
-  // Add .ts extension if not present and in development
-  const finalPath = isDev && !workerPath.endsWith('.ts') && !workerPath.endsWith('.js')
-    ? `${resolvedPath}.ts`
-    : resolvedPath;
+  if (isDev) {
+    // In development, use the TypeScript files directly
+    const resolvedPath = path.resolve(__dirname, workerPath);
+    finalPath = !workerPath.endsWith('.ts') && !workerPath.endsWith('.js')
+      ? `${resolvedPath}.ts`
+      : resolvedPath;
+  } else {
+    // In production, handle Docker environment
+    const basePath = isDocker ? '/app/dist/server' : path.resolve(__dirname, '..');
+    const workerName = path.basename(workerPath, '.worker');
+    finalPath = path.join(basePath, 'workers', `${workerName}.worker.js`);
+  }
 
-  return new Worker(finalPath, workerOptions);
+  console.log(`[Worker Loader] Starting worker at: ${finalPath}`);
 }

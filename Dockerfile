@@ -38,6 +38,8 @@ WORKDIR /app
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ENV VITE_SOCKET_URL=${VITE_SOCKET_URL}
 ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
+ENV DOCKER_ENV=true
+ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
@@ -48,6 +50,13 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/ecosystem.config.cjs ./
 COPY --from=builder /app/.env* ./
+
+# Ensure the workers directory exists and has the correct files
+RUN mkdir -p /app/dist/server/workers && \
+    cp /app/dist/server/workers/*.js /app/dist/server/workers/ 2>/dev/null || :
+
+# Print directory structure for debugging
+RUN ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers directory found"
 
 COPY --from=builder /app/server/env.ts ./dist/server/
 
