@@ -36,8 +36,8 @@ class FirecrawlService {
         scrapeOptions: { formats: ['markdown'] }
       });
       
-      // The SDK returns { success: boolean, data: [...] }. We want the data.
-      return results.data || [];
+      // The SDK now returns the results array directly
+      return Array.isArray(results) ? results : [];
     } catch (error) {
       console.error('[FirecrawlService] Error during search:', error);
       return [];
