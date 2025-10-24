@@ -6,16 +6,23 @@ if (!uri) {
   throw new Error('MONGODB_URI environment variable is not set.');
 }
 
-// Update MongoDB connection options for SSL
+// MongoDB connection options with proper TLS configuration
 export const client = new MongoClient(uri, {
   tls: true,
-  tlsAllowInvalidCertificates: false,
-  tlsInsecure: false,
+  tlsAllowInvalidCertificates: false, // Don't allow invalid certificates in production
   retryWrites: true,
   w: 'majority',
   appName: 'Cluster0',
   serverSelectionTimeoutMS: 10000,
-  socketTimeoutMS: 45000
+  socketTimeoutMS: 45000,
+  // Add SSL validation options
+  ssl: true,
+  sslValidate: true,
+  // Increase timeout for initial connection
+  connectTimeoutMS: 30000,
+  // Add retry logic
+  retryAttempts: 3,
+  retryDelay: 1000
 });
 let db: Db;
 
