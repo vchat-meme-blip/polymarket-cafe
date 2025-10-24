@@ -1,8 +1,33 @@
 import mongoose, { Collection, Document } from 'mongoose';
-import { Agent, Room, User, Bet, Bounty, TradeRecord, Transaction, BettingIntel, DailySummary, Notification } from '../lib/types/index.js';
-
-// Extend the Document type to include our custom _id
-type WithId<T> = T & { _id: mongoose.Types.ObjectId };
+import type {
+  // Base types
+  Agent,
+  Room,
+  User,
+  Bet,
+  Bounty,
+  TradeRecord,
+  Transaction,
+  BettingIntel,
+  DailySummary,
+  Notification,
+  // MongoDB document types
+  AgentDocument,
+  RoomDocument,
+  UserDocument,
+  BetDocument,
+  BountyDocument,
+  TradeRecordDocument,
+  TransactionDocument,
+  BettingIntelDocument,
+  DailySummaryDocument,
+  NotificationDocument,
+  // Utility types
+  WithMongoId,
+  // Conversion functions
+  toSharedUser,
+  toSharedAgent
+} from '../lib/types/mongodb.js';
 
 const uri = process.env.MONGODB_URI;
 if (!uri) {
@@ -15,18 +40,26 @@ const connectionString = uri.includes('?')
   : `${uri}?retryWrites=true&w=majority`;
 
 // Collection references with proper typing
-export let usersCollection: Collection<WithId<User>>;
-export let agentsCollection: Collection<WithId<Agent>>;
-export let roomsCollection: Collection<WithId<Room>>;
-export let betsCollection: Collection<WithId<Bet>>;
-export let bountiesCollection: Collection<WithId<Bounty>>;
+export let usersCollection: Collection<UserDocument>;
+export let agentsCollection: Collection<AgentDocument>;
+export let roomsCollection: Collection<RoomDocument>;
+export let betsCollection: Collection<BetDocument>;
+export let bountiesCollection: Collection<BountyDocument>;
 export let activityLogCollection: Collection<Document>;
-export let tradeHistoryCollection: Collection<WithId<TradeRecord>>;
-export let transactionsCollection: Collection<WithId<Transaction>>;
-export let bettingIntelCollection: Collection<WithId<BettingIntel>>;
+export let tradeHistoryCollection: Collection<TradeRecordDocument>;
+export let transactionsCollection: Collection<TransactionDocument>;
+export let bettingIntelCollection: Collection<BettingIntelDocument>;
 export let marketWatchlistsCollection: Collection<Document>;
-export let dailySummariesCollection: Collection<WithId<DailySummary>>;
-export let notificationsCollection: Collection<WithId<Notification>>;
+export let dailySummariesCollection: Collection<DailySummaryDocument>;
+export let notificationsCollection: Collection<NotificationDocument>;
+
+// Helper function to convert MongoDB document to plain object
+function toPlainObject<T>(doc: any): T {
+  if (!doc) return doc;
+  if (Array.isArray(doc)) return doc.map(toPlainObject) as unknown as T;
+  if (doc.toObject) return doc.toObject({ getters: true, virtuals: false });
+  return doc;
+}
 
 // Initialize database connection and collections
 const connectDB = async () => {
@@ -51,18 +84,18 @@ const connectDB = async () => {
     console.log('MongoDB connected successfully.');
 
     // Initialize collection references with proper typing
-    usersCollection = mongoose.connection.collection<WithId<User>>('users');
-    agentsCollection = mongoose.connection.collection<WithId<Agent>>('agents');
-    roomsCollection = mongoose.connection.collection<WithId<Room>>('rooms');
-    betsCollection = mongoose.connection.collection<WithId<Bet>>('bets');
-    bountiesCollection = mongoose.connection.collection<WithId<Bounty>>('bounties');
+    usersCollection = mongoose.connection.collection<UserDocument>('users');
+    agentsCollection = mongoose.connection.collection<AgentDocument>('agents');
+    roomsCollection = mongoose.connection.collection<RoomDocument>('rooms');
+    betsCollection = mongoose.connection.collection<BetDocument>('bets');
+    bountiesCollection = mongoose.connection.collection<BountyDocument>('bounties');
     activityLogCollection = mongoose.connection.collection<Document>('activity_logs');
-    tradeHistoryCollection = mongoose.connection.collection<WithId<TradeRecord>>('trade_history');
-    transactionsCollection = mongoose.connection.collection<WithId<Transaction>>('transactions');
-    bettingIntelCollection = mongoose.connection.collection<WithId<BettingIntel>>('bettingIntel');
+    tradeHistoryCollection = mongoose.connection.collection<TradeRecordDocument>('trade_history');
+    transactionsCollection = mongoose.connection.collection<TransactionDocument>('transactions');
+    bettingIntelCollection = mongoose.connection.collection<BettingIntelDocument>('bettingIntel');
     marketWatchlistsCollection = mongoose.connection.collection<Document>('marketWatchlists');
-    dailySummariesCollection = mongoose.connection.collection<WithId<DailySummary>>('dailySummaries');
-    notificationsCollection = mongoose.connection.collection<WithId<Notification>>('notifications');
+    dailySummariesCollection = mongoose.connection.collection<DailySummaryDocument>('dailySummaries');
+    notificationsCollection = mongoose.connection.collection<NotificationDocument>('notifications');
 
     // Create indexes
     await Promise.all([
