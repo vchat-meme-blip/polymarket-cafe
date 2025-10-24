@@ -1,10 +1,7 @@
 import { io, Socket } from 'socket.io-client';
-import { useUser, useSystemLogStore, useAgent } from '../state';
-import { useArenaStore } from '../state/arena';
-import { useAutonomyStore } from '../state/autonomy';
+// FIX: Fix imports for `useUser` and `useSystemLogStore` by changing the path from `../state` to `../state/index.js`.
+import { useUser, useSystemLogStore } from '../state/index.js';
 import { SOCKET_URL } from '../config.js';
-// FIX: Imported `Interaction` and `Room` types from their canonical source in `lib/types` instead of from the state store to resolve module export errors.
-import { Interaction, Room } from '../types/index.js';
 
 class SocketService {
   private socket: Socket | null = null;
@@ -34,8 +31,6 @@ class SocketService {
     this.socket.on('disconnect', () => {
       useSystemLogStore.getState().addLog({ type: 'system', message: 'Disconnected from server.' });
     });
-
-    this.registerListeners();
   }
 
   disconnect() {
@@ -45,44 +40,13 @@ class SocketService {
     }
   }
 
-  private registerListeners() {
-    if (!this.socket) return;
-    
-    this.socket.on('agentMoved', (data: { agentId: string; roomId: string | null }) => {
-        const agentName = useAgent.getState().availablePresets.find(a => a.id === data.agentId)?.name || data.agentId;
-        const message = data.roomId 
-            ? `Agent ${agentName} moved to Room ${data.roomId}.`
-            : `Agent ${agentName} is now wandering the Café.`;
-        useSystemLogStore.getState().addLog({ type: 'move', message });
-        useArenaStore.getState().moveAgentFromSocket(data.agentId, data.roomId);
-    });
+  // FIX: Added public `on` and `off` methods to proxy socket events, allowing `useCafeSocket` to handle all listeners. Removed the redundant `registerListeners` method to centralize event handling and prevent duplicate listeners.
+  public on(event: string, listener: (...args: any[]) => void) {
+    this.socket?.on(event, listener);
+  }
 
-    // OPTIMIZED LISTENER: The payload now includes agentIds, preventing an inefficient client-side lookup.
-    this.socket.on('newConversationTurn', (data: { roomId: string; turn: Interaction, agentIds: [string, string] }) => {
-        // FIX: Re-enabled browser console logging for debugging agent conversations.
-        console.log('[Socket.IO] Received newConversationTurn:', data);
-        const message = `${data.turn.agentName} in Room ${data.roomId}: "${data.turn.text.slice(0, 50)}..."`;
-        useSystemLogStore.getState().addLog({ type: 'conversation', message });
-        if (data.agentIds && data.agentIds.length === 2) {
-            const [agent1Id, agent2Id] = data.agentIds;
-            useArenaStore.getState().addConversationTurnFromSocket(agent1Id, agent2Id, data.turn);
-        } else {
-            console.warn('[Socket.IO] Received conversation turn for a room that does not have 2 agents.', data);
-        }
-    });
-
-    this.socket.on('newIntel', (data: { intel: any }) => {
-        const message = `New intel discovered for $${data.intel.token} for user ${data.intel.ownerHandle}.`;
-        useSystemLogStore.getState().addLog({ type: 'intel', message });
-        // The server now sends intel only to the intended user, so no ownerHandle check is needed here.
-        useAutonomyStore.getState().addIntelFromSocket(data.intel);
-    });
-
-    this.socket.on('roomUpdated', (data: { room: Room }) => {
-        const message = `Room ${data.room.id} state updated. Offer: ${data.room.activeOffer ? data.room.activeOffer.token : 'None'}`;
-        useSystemLogStore.getState().addLog({ type: 'system', message });
-        useArenaStore.getState().updateRoomFromSocket(data.room);
-    });
+  public off(event: string, listener: (...args: any[]) => void) {
+    this.socket?.off(event, listener);
   }
 }
 

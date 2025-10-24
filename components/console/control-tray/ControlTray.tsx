@@ -4,20 +4,21 @@
 */
 import cn from 'classnames';
 import { FormEvent, useEffect, useState } from 'react';
-import { useAgent, useUI, useUser } from '../../../lib/state';
+// FIX: Fix imports for `useAgent`, `useUI`, and `useUser` by changing the path from `../../../lib/state` to `../../../lib/state/index.js`.
+import { useAgent, useUI, useUser } from '../../../lib/state/index.js';
 import { useAutonomyStore } from '../../../lib/state/autonomy';
 import { useArenaStore, USER_ID } from '../../../lib/state/arena';
-import { apiService } from '../../../lib/services/api.service';
+// FIX: Add .js extension for ES module compatibility.
+import { apiService } from '../../../lib/services/api.service.js';
 import useAudioInput from '../../../hooks/useAudioInput';
 import styles from './ControlTray.module.css';
 
 export default function ControlTray() {
-  // FIX: Removed unused `agentToEditId` from the `useUI` hook destructuring. This property was renamed to `agentDossierId` and is not used in this component.
-  const { setChatContextToken, setIsAgentResponding } = useUI();
+  const { setChatContextToken, setIsAgentResponding, chatPrompt, setChatPrompt, setIsAgentTyping } = useUI();
   const { setActivity } = useAutonomyStore();
   const { current: currentAgent } = useAgent();
-  const { addConversationTurn } = useArenaStore();
-  const { name: userName } = useUser();
+  const { addConversationTurn, agentConversations } = useArenaStore();
+  const { name: userName, handle } = useUser();
   const [textInput, setTextInput] = useState('');
   const [isResearching, setIsResearching] = useState(false);
 
@@ -29,12 +30,21 @@ export default function ControlTray() {
     }
   });
 
+  useEffect(() => {
+    if (chatPrompt) {
+      setTextInput(chatPrompt);
+      setChatPrompt(null); // Clear the prompt so it doesn't re-trigger
+    }
+  }, [chatPrompt, setChatPrompt]);
+
   const handleSubmit = async (text: string | FormEvent<HTMLFormElement>) => {
     if (typeof text !== 'string') {
       text.preventDefault();
     }
     const message = (typeof text === 'string' ? text : textInput).trim();
     if (!message) return;
+
+    const conversationHistory = agentConversations[currentAgent.id]?.[USER_ID] || [];
 
     setActivity('CHATTING_WITH_USER');
     setTextInput('');
@@ -48,19 +58,18 @@ export default function ControlTray() {
       timestamp: Date.now(),
     });
 
-    try {
-      const response = await apiService.sendDirectMessage(message);
-      
-      // Start talking animation now that we have a response
-      setIsAgentResponding(true);
-      addConversationTurn(currentAgent.id, USER_ID, response.agentMessage);
-      
-      if (response.contextToken) {
-        setChatContextToken(response.contextToken);
-      }
+    setIsAgentTyping(true); // Start typing indicator
 
+    try {
+      const { agentMessage } = await apiService.sendDirectMessage(message, conversationHistory);
+      
+      setIsAgentTyping(false); // Stop typing indicator
+      setIsAgentResponding(true); // Start talking animation
+
+      addConversationTurn(currentAgent.id, USER_ID, agentMessage);
+      
       // Stop talking after a delay proportional to the message length
-      const messageDuration = Math.max(1000, response.agentMessage.text.length * 50); // 50ms per char, 1s min
+      const messageDuration = Math.max(1000, agentMessage.text.length * 50); // 50ms per char, 1s min
       setTimeout(() => {
         setIsAgentResponding(false);
         setActivity('IDLE'); // Return to idle only after talking
@@ -68,6 +77,7 @@ export default function ControlTray() {
 
     } catch (error) {
       console.error('Error sending message:', error);
+      setIsAgentTyping(false); // Ensure typing indicator stops on error
       addConversationTurn(currentAgent.id, USER_ID, {
         agentId: 'system',
         agentName: 'System',
@@ -82,8 +92,8 @@ export default function ControlTray() {
   const handleStartResearch = async () => {
     setIsResearching(true);
     try {
-      await apiService.startResearch(currentAgent.id);
-      // Optionally show a toast or confirmation
+      await apiService.startResearch(currentAgent.id, handle);
+      // Server will send a toast notification for confirmation
     } catch (error) { 
       console.error('Failed to start research:', error);
       // Optionally show an error toast

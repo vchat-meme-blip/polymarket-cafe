@@ -7,6 +7,8 @@ import React, { useState, useEffect } from 'react';
 import LandingPageAgent from './LandingPageAgent';
 import { TheStranger, MexicanTrump, TrenchBoudica, TonyPump, PRESET_AGENTS } from '../../lib/presets/agents';
 import DynamicTrees from './DynamicTrees';
+import Skybox from './Skybox';
+// Post-processing effects removed for compatibility
 
 const agentTooltips: Record<string, { name: string; catchphrase: string }> = PRESET_AGENTS.reduce((acc, agent) => {
     let catchphrase = "Ready for action.";
@@ -40,17 +42,43 @@ export default function PixarScene() {
 
   return (
     <>
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[0, 2, 8]} intensity={2.0} />
-      <hemisphereLight intensity={1} groundColor="black" color="white" />
+      <Skybox />
+      
+      {/* Enhanced lighting */}
+      <ambientLight intensity={0.8} color="#ffffff" />
+      <directionalLight 
+        position={[10, 15, 10]} // Lowered the light position
+        intensity={1.5} 
+        castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-far={50}
+        shadow-camera-left={-20}
+        shadow-camera-right={20}
+        shadow-camera-top={20}
+        shadow-camera-bottom={-20}
+      />
+      <hemisphereLight 
+        intensity={0.8} // Increased intensity for better overall lighting
+        color="#ffffff" // Brighter sky color
+        groundColor="#3c3c3c" 
+      />
+      
+      {/* Fill light from below */}
+      <directionalLight 
+        position={[0, -5, 0]} // Raised the fill light
+        intensity={0.4} // Slightly increased fill light
+      />
+      
       <DynamicTrees />
 
-      {/* Group to position the entire scene */}
-      <group position={[0, 0.5, 0]} scale={1.9}>
+      {/* Group to position the entire scene - slightly larger scale */}
+      <group position={[0, -0.4, 1.0]} scale={1.0}>
+        {/* Stranger - properly positioned */}
         <LandingPageAgent
-            position={[-2.2, -0.1, 0]}
-            scale={1.0} /* Use standardized scale */
-            rotation={[0, 0.4 + Math.PI, 0]}
+            position={[-2.0, -0.4, 0]}
+            scale={1.5}
+            rotation={[0, 0.6 + Math.PI, 0]} // Facing more towards center
             modelUrl={TheStranger.modelUrl!}
             idleUrl="/animations/idle_loop.vrma"
             triggerAnimationUrl="/animations/gesture_elegant.vrma"
@@ -61,9 +89,10 @@ export default function PixarScene() {
             hovered={hoveredAgent === TheStranger.id}
         />
         
+        {/* Boudica - properly positioned */}
         <LandingPageAgent
-            position={[-1.2, -0.1, 0]}
-            scale={1.0} /* Use standardized scale */
+            position={[-0.5, 0.1, 1.5]}
+            scale={1.2}
             rotation={[0, -2.8 + Math.PI, 0]}
             modelUrl={TrenchBoudica.modelUrl!}
             idleUrl="/animations/idle2.vrma"
@@ -75,12 +104,13 @@ export default function PixarScene() {
             hovered={hoveredAgent === TrenchBoudica.id}
         />
 
+        {/* Trump - properly positioned */}
         <LandingPageAgent
-            position={[1.0, -0.05, 0.1]}
-            scale={1.0} /* Use standardized scale */
+            position={[0.6, 0.1, 1.5]}
+            scale={1.2}
             rotation={[0, -0.4 + Math.PI, 0]}
             modelUrl={MexicanTrump.modelUrl!}
-            idleUrl="/animations/gesture_shoot.vrma" // Unique idle
+            idleUrl="/animations/gesture_shoot.vrma"
             triggerAnimationUrl="/animations/gesture_greeting.vrma"
             triggerKey={triggerKeys[MexicanTrump.id]}
             tooltipInfo={agentTooltips[MexicanTrump.id]}
@@ -90,10 +120,11 @@ export default function PixarScene() {
             darkenFace={0.5}
         />
 
+        {/* Tony Pump - properly positioned */}
         <LandingPageAgent
-            position={[1.7, -0.2, 0.2]}
-            scale={1.0} /* Use standardized scale */
-            rotation={[0, -0.3 + Math.PI, 0]}
+            position={[2.1, -0.2, 0]}
+            scale={1.5}
+            rotation={[0, -0.2 + Math.PI, 0]}
             modelUrl={TonyPump.modelUrl!}
             idleUrl="/animations/idle_loop.vrma"
             triggerAnimationUrl="/animations/gesture_squat.vrma"

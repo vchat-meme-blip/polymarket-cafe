@@ -1,0 +1,187 @@
+.leaderboardView {
+    padding: 40px;
+    height: 100%;
+    overflow-y: auto;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.leaderboardView h2 {
+    font-size: 32px;
+    font-weight: 500;
+    color: var(--brand-cyan);
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--Neutral-30);
+}
+
+.leaderboardTabs {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--Neutral-30);
+}
+
+.tabButton {
+    padding: 12px 20px;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--Neutral-60);
+    position: relative;
+    border-bottom: 2px solid transparent;
+}
+
+.tabButton.active {
+    color: var(--brand-primary);
+    border-bottom-color: var(--brand-primary);
+}
+
+.leaderboardTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 24px;
+}
+
+.leaderboardTable th, .leaderboardTable td {
+    padding: 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--Neutral-20);
+}
+
+.leaderboardTable th {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--Neutral-60);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.leaderboardTable tr:hover {
+    background-color: var(--Neutral-15);
+}
+
+.rankCell {
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--brand-yellow);
+    width: 80px;
+    text-align: center;
+}
+
+.agentCell {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.agentAvatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: var(--Neutral-20);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 20px;
+    color: white;
+    flex-shrink: 0;
+}
+
+.agentName {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--Neutral-90);
+}
+
+.statCell {
+    font-size: 16px;
+    color: var(--Neutral-80);
+    text-align: right;
+}
+
+.scoreCell {
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--brand-cyan);
+    text-align: right;
+}
+
+.shareCell {
+    width: 120px;
+    text-align: right;
+}
+
+.shareCell .button .icon {
+    font-size: 20px;
+}
+
+.userRow {
+    background-color: var(--brand-primary-dark);
+    border-left: 4px solid var(--brand-primary);
+}
+
+.emptyState {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--Neutral-60);
+}
+.emptyState .icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+.emptyState p {
+  font-size: 18px;
+}
+
+
+@media (max-width: 768px) {
+    .leaderboardView {
+        padding: 20px;
+    }
+    .leaderboardTable {
+        display: block;
+        width: 100%;
+    }
+    .leaderboardTable thead, .leaderboardTable tbody, .leaderboardTable th, .leaderboardTable td, .leaderboardTable tr {
+        display: block;
+    }
+    .leaderboardTable thead {
+        display: none; /* Hide headers on mobile */
+    }
+    .leaderboardTable tr {
+        margin-bottom: 16px;
+        border: 1px solid var(--Neutral-30);
+        border-radius: 12px;
+        padding: 16px;
+    }
+    .leaderboardTable td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px dashed var(--Neutral-20);
+        text-align: right;
+    }
+    .leaderboardTable td:last-child {
+        border-bottom: none;
+    }
+    .leaderboardTable td::before {
+        content: attr(data-label);
+        font-weight: 500;
+        color: var(--Neutral-60);
+        text-align: left;
+        margin-right: 16px;
+    }
+    .rankCell, .scoreCell, .statCell {
+        text-align: right;
+    }
+    .shareCell {
+        justify-content: center;
+    }
+    .shareCell .button {
+        width: 100%;
+        justify-content: center;
+    }
+}

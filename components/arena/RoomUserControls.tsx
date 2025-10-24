@@ -2,7 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useAgent } from '../../lib/state';
+// FIX: Fix import for `useAgent` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useAgent } from '../../lib/state/index.js';
 // FIX: Imported `Room` type from its canonical source in `lib/types` instead of from the state store to resolve module export errors.
 import { Room } from '../../lib/types/index.js';
 import { useArenaStore } from '../../lib/state/arena';

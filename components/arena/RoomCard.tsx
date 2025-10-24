@@ -3,16 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import '@react-three/fiber';
-// FIX: Added missing imports for 'useRef' and 'useFrame' to resolve errors.
 import React, { Suspense, useEffect, useMemo, useState, useRef } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Html, Text, useTexture } from '@react-three/drei';
 import { useArenaStore } from '../../lib/state/arena';
-// FIX: Imported `Interaction` and `Room` types from their canonical source in `lib/types` instead of from the state store to resolve module export errors.
-import { Interaction, Room as RoomType } from '../../lib/types/index.js';
+import { Interaction, Offer, Room as RoomType } from '../../lib/types/index.js';
 import { Agent } from '../../lib/types/index.js';
-import { useAgent } from '../../lib/state';
+import { useAgent } from '../../lib/state/index.js';
 import RenderOnView from '../agents/RenderOnView';
 import ArenaAgent from './ArenaAgent';
 import styles from './Arena.module.css';
@@ -30,25 +28,6 @@ const WALLPAPER_URLS = [
     '/textures/wall_pattern7.png',
 ];
 
-const SkyWindowMaterial = () => {
-  const texture = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const context = canvas.getContext('2d');
-    if (context) {
-      const gradient = context.createLinearGradient(0, 0, 0, 128);
-      gradient.addColorStop(0, '#87CEEB'); // Sky Blue
-      gradient.addColorStop(1, '#B0E0E6'); // Powder Blue
-      context.fillStyle = gradient;
-      context.fillRect(0, 0, 128, 128);
-    }
-    return new THREE.CanvasTexture(canvas);
-  }, []);
-
-  return <meshBasicMaterial map={texture} toneMapped={false} />;
-};
-
 function getAgentById(id: string, allAgents: Agent[]): Agent | undefined {
   return allAgents.find(agent => agent.id === id);
 }
@@ -62,15 +41,23 @@ const ThinkingIndicator = () => {
     }
   });
   return (
-    <group ref={ref} position={[0, 1.8, 0]}>
+    <group ref={ref}>
       <Text fontSize={0.15} color="white" material-toneMapped={false}>THINKING...</Text>
     </group>
   );
 };
 
-const HolographicOffer = ({ text }: { text: string }) => {
+const HolographicOffer = ({ offer }: { offer: Offer }) => {
   const ref = useRef<any>(null);
   useFrame(({ clock }) => { if (ref.current) { ref.current.fillOpacity = 0.5 + 0.5 * Math.sin(clock.getElapsedTime() * 5); } });
+
+  let text = '';
+  if (offer.type === 'intel') {
+      text = `INTEL ON\n${offer.market}\n@ ${offer.price} BOX`;
+  } else if (offer.type === 'watchlist') {
+      text = `WATCHLIST\n@ ${offer.price} BOX`;
+  }
+
   return (
     <Text ref={ref} position={[0, 0.6, 0]} fontSize={0.25} color="#1abc9c" anchorX="center" anchorY="middle" material-toneMapped={false}>
       {text}
@@ -107,7 +94,6 @@ function RoomScene({ room }: RoomSceneProps) {
     const [latestTurn, setLatestTurn] = useState<Interaction | null>(null);
     const [offerKey, setOfferKey] = useState<string>("");
     
-    // Effect to update the latest conversation turn
     useEffect(() => {
         if (room.agentIds.length < 2) {
             setLatestTurn(null);
@@ -120,13 +106,17 @@ function RoomScene({ room }: RoomSceneProps) {
         } else {
             setLatestTurn(null);
         }
-    }, [agentConversations, room.agentIds]);
+    }, [agentConversations, room.agentIds, lastSyncTimestamp]);
     
-    // Effect to update the offer key when a trade offer changes
-    // This ensures the holographic offer animation resets when a new offer is made
     useEffect(() => {
         if (room.activeOffer) {
-            const newOfferKey = `${room.activeOffer.token}-${room.activeOffer.price}-${Date.now()}`;
+            const activeOffer = room.activeOffer;
+            let newOfferKey = '';
+            if (activeOffer.type === 'intel') {
+                newOfferKey = `${activeOffer.type}-${activeOffer.market}-${activeOffer.price}-${Date.now()}`;
+            } else if (activeOffer.type === 'watchlist') {
+                newOfferKey = `${activeOffer.type}-${activeOffer.watchlistId}-${activeOffer.price}-${Date.now()}`;
+            }
             setOfferKey(newOfferKey);
         } else {
             setOfferKey("");
@@ -135,25 +125,23 @@ function RoomScene({ room }: RoomSceneProps) {
 
     return (
         <Suspense fallback={null}>
-            <ambientLight intensity={1.2} />
+            <ambientLight intensity={2.0} />
             <directionalLight position={[0, 8, 5]} intensity={3} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024}/>
-            <rectAreaLight width={4} height={0.5} intensity={15} color={vibeColor} position={[-2.5, -0.7, 2]} rotation-x={-Math.PI / 2} rotation-y={0.5} />
-            <rectAreaLight width={4} height={0.5} intensity={15} color={vibeColor} position={[2.5, -0.7, 2]} rotation-x={-Math.PI / 2} rotation-y={-0.5}/>
+            <rectAreaLight width={8} height={2} intensity={20} color={vibeColor} position={[0, -0.9, 0]} rotation-x={-Math.PI / 2} />
 
             <mesh position={[0, -1.0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
                 <planeGeometry args={[10, 8]} />
                 <meshStandardMaterial color="#333333" />
             </mesh>
             
-            <group position={[0, 1.2, -4]} rotation-x={0}>
+            <group position={[0, 1.2, -4]}>
                 <mesh receiveShadow castShadow>
                     <boxGeometry args={[10, 4, 0.2]} />
                     <meshStandardMaterial map={wallpaper} roughness={0.8} />
                 </mesh>
-                {/* Windows */}
                 <mesh position={[-2.5, 0.8, 0.11]} renderOrder={1}>
                     <planeGeometry args={[1.5, 1]} />
-                    <SkyWindowMaterial />
+                    <meshStandardMaterial color="#87CEEB" emissive="#87CEEB" emissiveIntensity={0.5} toneMapped={false} />
                 </mesh>
                  <mesh position={[-2.5, 0.8, 0.1]}>
                     <boxGeometry args={[1.6, 1.1, 0.05]} />
@@ -161,7 +149,7 @@ function RoomScene({ room }: RoomSceneProps) {
                 </mesh>
                 <mesh position={[2.5, 0.8, 0.11]} renderOrder={1}>
                     <planeGeometry args={[1.5, 1]} />
-                    <SkyWindowMaterial />
+                    <meshStandardMaterial color="#87CEEB" emissive="#87CEEB" emissiveIntensity={0.5} toneMapped={false} />
                 </mesh>
                  <mesh position={[2.5, 0.8, 0.1]}>
                     <boxGeometry args={[1.6, 1.1, 0.05]} />
@@ -177,7 +165,6 @@ function RoomScene({ room }: RoomSceneProps) {
                 <meshStandardMaterial map={wallpaper} roughness={0.8} />
             </mesh>
             
-            {/* Table */}
             <mesh position={[0, 0.15, 0]} castShadow>
                 <boxGeometry args={[2.2, 0.1, 0.7]} />
                 <meshStandardMaterial color="#6f4e37" roughness={0.3} metalness={0.2} />
@@ -187,7 +174,6 @@ function RoomScene({ room }: RoomSceneProps) {
                 <meshStandardMaterial color="#3a2d27" />
             </mesh>
 
-            {/* Cups */}
             <mesh position={[-0.5, 0.25, 0]} scale={0.07} castShadow>
                 <cylinderGeometry args={[0.5, 0.4, 0.7, 16]}/>
                 <meshStandardMaterial color="#ffffff" roughness={0.1} metalness={0.2} />
@@ -197,20 +183,24 @@ function RoomScene({ room }: RoomSceneProps) {
                 <meshStandardMaterial color="#ffffff" roughness={0.1} metalness={0.2} />
             </mesh>
 
-            {room.activeOffer && <HolographicOffer key={offerKey} text={`$${room.activeOffer.token}\n@ ${room.activeOffer.price} BOX`} />}
-            
+            {room.activeOffer && <HolographicOffer key={offerKey} offer={room.activeOffer} />}
             
             {roomAgents.map((agent, index) => {
                 const isSpeaking = latestTurn?.agentId === agent.id;
+                const isThinking = thinkingAgents.has(agent.id);
+                
+                const position: [number, number, number] = [1.5 * (index === 0 ? -1 : 1), -1.0, 0.8];
+                const rotationOffset = agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI;
+                // Statically face slightly inwards to be more stable than dynamic lookAt
+                const facingRotation = index === 0 ? Math.PI / 12 : -Math.PI / 12;
+
                 return (
-                    <React.Fragment key={agent.id}>
-                        <group position-y={0.5}>
-                            <ArenaAgent agent={agent} index={index} isSpeaking={isSpeaking} />
-                        </group>
-                        {isSpeaking && latestTurn && <group position={[1.3 * (index === 0 ? -1 : 1), -0.5, 0.8]}><ThoughtBubble text={latestTurn.text} /></group>}
-                        {thinkingAgents.has(agent.id) && !isSpeaking && <group position={[1.3 * (index === 0 ? -1 : 1), -0.5, 0.8]}><ThinkingIndicator /></group>}
-                    </React.Fragment>
-                )
+                    <group key={agent.id} position={position} rotation={[0, rotationOffset + facingRotation, 0]}>
+                        <ArenaAgent agent={agent} isSpeaking={isSpeaking} />
+                        {isSpeaking && latestTurn && <ThoughtBubble text={latestTurn.text} />}
+                        {isThinking && !isSpeaking && <ThinkingIndicator />}
+                    </group>
+                );
             })}
         </Suspense>
     );
@@ -237,7 +227,7 @@ export default function RoomCard({ room, userAgent }: RoomCardProps) {
         <div className={styles.roomCard}>
             <RenderOnView placeholder={placeholder}>
                 <div className={styles.roomCardCanvas}>
-                    <Canvas shadows camera={{ position: [0, 1.5, 4.2], fov: 50 }}>
+                    <Canvas shadows camera={{ position: [0, 1.0, 4.5], fov: 45 }}>
                         <RoomScene room={room} />
                     </Canvas>
                 </div>

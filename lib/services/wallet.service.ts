@@ -2,8 +2,9 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useWalletStore } from '../state/wallet';
-import { useAgent } from '../state';
+import { useWalletStore } from '../state/wallet.js';
+// FIX: Fix import for `useAgent` by changing the path from `../state` to `../state/index.js`.
+import { useAgent } from '../state/index.js';
 
 /**
  * A service to handle the logic for virtual BOX token transactions.

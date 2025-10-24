@@ -3,8 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { useEffect } from 'react';
-import { useUI } from '../../lib/state';
+// FIX: Fix imports for `useUI` and `Toast` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useUI, Toast as ToastType } from '../../lib/state/index.js';
 import styles from './Shell.module.css';
+
+const TOAST_ICONS: Record<ToastType['type'], string> = {
+    intel: '🚀',
+    system: 'settings_system_daydream',
+    error: 'error'
+};
 
 export default function ToastContainer() {
   const { toastQueue, removeToast, openIntelDossier } = useUI();
@@ -16,10 +23,10 @@ export default function ToastContainer() {
           key={toast.id}
           toast={toast}
           onClose={() => removeToast(toast.id)}
-          onView={() => {
-            openIntelDossier(toast.intel);
+          onView={toast.intel ? () => {
+            openIntelDossier(toast.intel!);
             removeToast(toast.id);
-          }}
+          } : undefined}
         />
       ))}
     </div>
@@ -31,9 +38,9 @@ const Toast = ({
   onClose,
   onView,
 }: {
-  toast: any;
+  toast: ToastType;
   onClose: () => void;
-  onView: () => void;
+  onView?: () => void;
 }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -44,18 +51,22 @@ const Toast = ({
   }, [onClose]);
 
   return (
-    <div className={styles.toast}>
-      <span className={`icon ${styles.toastIcon}`}>🚀</span>
+    <div className={`${styles.toast} ${styles[toast.type]}`}>
+      <span className={`icon ${styles.toastIcon}`}>{TOAST_ICONS[toast.type]}</span>
       <div className={styles.toastContent}>
         <p>{toast.message}</p>
-        <p>
-          <strong className={styles.tokenName}>${toast.tokenName}</strong>
-        </p>
+        {toast.tokenName && (
+          <p>
+            <strong className={styles.tokenName}>${toast.tokenName}</strong>
+          </p>
+        )}
       </div>
       <div className={styles.toastActions}>
-        <button className="button primary" onClick={onView}>
-          View
-        </button>
+        {onView && (
+            <button className="button primary" onClick={onView}>
+                View
+            </button>
+        )}
         <button className="button secondary" onClick={onClose}>
           <span className="icon">close</span>
         </button>

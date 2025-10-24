@@ -3,11 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { useArenaStore } from '../../lib/state/arena';
-import { useAgent, useUI } from '../../lib/state';
-import React, { useMemo, useState, useEffect } from 'react';
+import { useAgent, useUI } from '../../lib/state/index.js';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import RoomCard from './RoomCard';
 import ArenaStatsDisplay from './ArenaStatsDisplay';
 import RoomStrip from './RoomStrip';
+import CafeMusicController from './CafeMusicController';
 import styles from './Arena.module.css';
 import './Pulse.css';
 
@@ -72,18 +73,22 @@ const RoomCardActions = ({ onListenIn, onShowDetails, isConversationActive }: { 
 };
 
 /**
- * The main Café view, featuring a large "Focus View" for one room
+ * The main Intel Exchange view, featuring a large "Focus View" for one room
  * and a scrollable "Room Strip" at the bottom for navigation.
  */
-export default function ArenaView() {
+export default function IntelExchangeView() {
     const { rooms, agentLocations, activeConversations } = useArenaStore();
   const { current: userAgent } = useAgent();
   const { openListenInModal, openHelpModal, setShowRoomDetailModal, openServerHealthModal, initialArenaFocus, setInitialArenaFocus } = useUI();
   const [focusedRoomId, setFocusedRoomId] = useState<string | null>(null);
+  const roomStripRef = useRef<HTMLDivElement>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     if (initialArenaFocus) {
         setFocusedRoomId(initialArenaFocus);
+        const roomElement = roomStripRef.current?.querySelector(`[data-room-id="${initialArenaFocus}"]`);
+        roomElement?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         setInitialArenaFocus(null); // Reset after focusing
     } else if (focusedRoomId && rooms.some(r => r.id === focusedRoomId)) {
         return; // Already focused on a valid room
@@ -113,6 +118,8 @@ export default function ArenaView() {
     const myRoomId = agentLocations[userAgent.id];
     if (myRoomId) {
       setFocusedRoomId(myRoomId);
+      const roomElement = roomStripRef.current?.querySelector(`[data-room-id="${myRoomId}"]`);
+      roomElement?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
   };
 
@@ -126,10 +133,45 @@ export default function ArenaView() {
     }
   };
   
-  const isUserAgentInCafe = agentLocations[userAgent.id] !== null;
+  const isUserAgentInCafe = agentLocations[userAgent.id] !== undefined;
+
+  const CafeActionButtons = () => (
+    <>
+      <button className="button" onClick={handleGoToMyAgent} disabled={!isUserAgentInCafe} title="Focus on the room your active agent is in">
+          <span className="icon">my_location</span> Go to My Agent
+      </button>
+       <button className="button" onClick={handleFindRoom} title="Jump to a random active room">
+          <span className="icon">casino</span> Find Intel
+      </button>
+       <button className="button" onClick={openServerHealthModal} title="View live server statistics and activity feed">
+          <span className="icon">monitoring</span> Server Health
+      </button>
+       <button className="button" onClick={openHelpModal} title="Get help and learn about the features">
+          <span className="icon">help</span> Help
+      </button>
+    </>
+  );
 
   return (
     <div className={styles.arenaFocusView}>
+      <div className={`${styles.arenaUiOverlay} ${styles.top}`}>
+        <ArenaStatsDisplay />
+        <CafeMusicController roomId={focusedRoomId} />
+        <div className={styles.cafeActions}>
+          <CafeActionButtons />
+        </div>
+        <div className={styles.mobileMenuContainer}>
+            <button className={`button ${styles.menuButton}`} onClick={() => setIsMenuOpen(!isMenuOpen)}>
+                <span className="icon">menu</span> Menu
+            </button>
+            {isMenuOpen && (
+                <div className={styles.dropdownMenu}>
+                    <CafeActionButtons />
+                </div>
+            )}
+        </div>
+      </div>
+
       <div className={styles.arenaMainContent}>
         {focusedRoom ? (
           <RoomCard
@@ -140,40 +182,23 @@ export default function ArenaView() {
         ) : (
            <div className={styles.roomCardPlaceholder}>
               <span className="icon">coffee</span>
-              <p>No rooms available. The Café is warming up!</p>
+              <p>No rooms available. The Intel Exchange is warming up!</p>
           </div>
         )}
       </div>
 
       {focusedRoom && (
           <RoomCardActions
-                            onListenIn={() => openListenInModal(focusedRoom.id)}
-              onShowDetails={() => setShowRoomDetailModal(focusedRoom.id)}
-              isConversationActive={isFocusedRoomActive}
+            onListenIn={() => openListenInModal(focusedRoom.id)}
+            onShowDetails={() => setShowRoomDetailModal(focusedRoom.id)}
+            isConversationActive={isFocusedRoomActive}
           />
       )}
-
-      <div className={`${styles.arenaUiOverlay} ${styles.top}`}>
-          <ArenaStatsDisplay />
-          <div className={styles.cafeActions}>
-            <button className="button" onClick={handleGoToMyAgent} disabled={!isUserAgentInCafe}>
-                <span className="icon">my_location</span> Go to My Agent
-            </button>
-             <button className="button" onClick={handleFindRoom}>
-                <span className="icon">casino</span> Find a Room
-            </button>
-             <button className="button" onClick={openServerHealthModal}>
-                <span className="icon">monitoring</span> Server Health
-            </button>
-             <button className="button" onClick={openHelpModal}>
-                <span className="icon">help</span> Help
-            </button>
-          </div>
-      </div>
 
       <div className={`${styles.arenaUiOverlay} ${styles.bottom}`}>
          <WanderingAgentsPanel />
          <RoomStrip
+            ref={roomStripRef}
             rooms={rooms}
             focusedRoomId={focusedRoomId}
             onRoomSelect={setFocusedRoomId}

@@ -4,8 +4,10 @@
 */
 import { create } from 'zustand';
 import { subscribeWithSelector, persist, createJSONStorage } from 'zustand/middleware';
-import { Agent, Room, Interaction } from '../types/index.js';
-import { useAgent } from '../state.js';
+// FIX: Import types from canonical source
+import { Agent, Room, Interaction, TradeRecord } from '../types/index.js';
+// FIX: Fix import for `useAgent` by changing the path from `../state.js` to `../state/index.js`.
+import { useAgent } from '../state/index.js';
 import { useAutonomyStore } from './autonomy.js';
 
 // A unique identifier for the user in conversation logs.
@@ -17,16 +19,6 @@ interface ServerHydrationData {
     conversations: Interaction[];
 }
 
-
-export type TradeRecord = {
-  roomId: string;
-  fromId: string;
-  toId: string;
-  token: string;
-  price: number;
-  timestamp: number;
-};
-
 export type ArenaState = {
   rooms: Room[];
   agentLocations: Record<string, string | null>; // { agentId: roomId | null }
@@ -35,12 +27,12 @@ export type ArenaState = {
   joinTimestamps: Record<string, number>; // { agentId: timestamp }
   activeChat: Record<string, { agentId: string; text: string } | null>;
   joinRequests: Record<string, string | null>; // { roomId: requestingAgentId | null }
-  lastTradeDetails: { roomId: string; fromId: string; toId: string; timestamp: number; token?: string; price?: number } | null;
-  tradeHistory: TradeRecord[]; // History of all completed trades
   thinkingAgents: Set<string>;
   activeConversations: Record<string, number>; // { roomId: lastMessageTimestamp }
   lastSyncTimestamp: number; // When the last worldState sync happened
-  hydrate: (data: ServerHydrationData) => void;
+  tradeHistory: TradeRecord[];
+  lastTradeDetails: TradeRecord | null;
+  hydrate: (data?: ServerHydrationData) => void;
   // Actions initiated by client UI
   moveAgentToRoom: (agentId: string, roomId: string) => void;
   removeAgentFromRoom: (agentId: string) => void;
@@ -51,6 +43,8 @@ export type ArenaState = {
   addRoom: (room: Room) => void;
   recordActivityInRoom: (roomId: string) => void;
   syncWorldState: (worldState: { rooms: Room[], agentLocations: Record<string, string | null>, thinkingAgents: string[] }) => void;
+  recordTrade: (trade: TradeRecord) => void;
+  setLastTradeDetails: (trade: TradeRecord | null) => void;
   removeRoom: (roomId: string) => void;
 
   kickAgentFromRoom: (agentToKickId: string, roomId: string) => void;
@@ -64,15 +58,6 @@ export type ArenaState = {
   createJoinRequest: (roomId: string, requestingAgentId: string) => void;
   resolveJoinRequest: (roomId: string, accepted: boolean) => void;
   incrementWarnFlag: (roomId: string) => void;
-  makeOffer: (
-    roomId: string,
-    fromAgentId: string,
-    token: string,
-    price: number,
-  ) => void;
-  clearOffer: (roomId: string) => void;
-  setLastTradeDetails: (details: { roomId: string; fromId: string; toId: string; timestamp: number; token?: string; price?: number }) => void;
-  clearLastTradeDetails: () => void;
   setRoomRules: (roomId: string, rules: string[]) => void;
   setRoomVibe: (roomId: string, vibe: string) => void;
   updateReputation: (agentId: string, change: number) => void;
@@ -84,7 +69,6 @@ export type ArenaState = {
 function calculateRoomTopics(agentIds: string[]): string[] {
   const topics = new Set<string>();
   agentIds.forEach(id => {
-    // FIX: Retrieve agents directly from the useAgent store.
     const agent = useAgent.getState().availablePersonal.find(a => a.id === id) || useAgent.getState().availablePresets.find(a => a.id === id);
     agent?.topics.forEach((topic: string) => topics.add(topic));
   });
@@ -170,16 +154,17 @@ export const useArenaStore = create(
         joinTimestamps: {},
         activeChat: {},
         joinRequests: {},
-        lastTradeDetails: null,
-        tradeHistory: [],
         thinkingAgents: new Set(),
         activeConversations: {},
         lastSyncTimestamp: Date.now(),
+        tradeHistory: [],
+        lastTradeDetails: null,
 
-                hydrate: (data) => set(state => {
-          // Create a new state object, merging the persisted state with fresh server data.
-          // This ensures that transient client-side state (like conversation history)
-          // is not lost on a page refresh.
+        hydrate: (data) => set(state => {
+          if (!data || !Array.isArray(data.rooms)) {
+            return state;
+          }
+
           const newState = { ...state, ...data };
 
           const agentLocations: Record<string, string | null> = {};
@@ -191,14 +176,12 @@ export const useArenaStore = create(
               agentReputations[agent.id] = agent.reputation || 100;
           });
           
-          // Accurately set initial agent locations based on hydrated room data
           data.rooms.forEach(room => {
             room.agentIds.forEach(agentId => {
               agentLocations[agentId] = room.id;
             });
           });
 
-          // Return the fully merged and updated state.
           return { 
             ...newState, 
             agentLocations, 
@@ -252,12 +235,9 @@ export const useArenaStore = create(
         }),
         
         // Keep addRoom for backward compatibility, but delegate to updateRoomFromSocket
-        addRoom: (newRoom) => set(state => {
-          // This is just a wrapper that calls updateRoomFromSocket internally
-          // We still need to return the state to satisfy the TypeScript signature
+        addRoom: (newRoom) => {
           get().updateRoomFromSocket(newRoom);
-          return state; // Return unchanged state as the actual update happens in updateRoomFromSocket
-        }),
+        },
 
         syncWorldState: (worldState) => set(state => {
           // Preserve conversation history and other client-side state that isn't included in worldState
@@ -281,213 +261,116 @@ export const useArenaStore = create(
           });
           
           mergedState.activeConversations = updatedActiveConversations;
-          
           return mergedState;
         }),
-
-        recordActivityInRoom: (roomId) => set(state => ({
+        recordActivityInRoom: (roomId: string) => set(state => ({
           activeConversations: { ...state.activeConversations, [roomId]: Date.now() },
         })),
-
-        removeRoom: (roomId) => set(state => {
-          // Find agents in this room and update their locations
-          const agentsInRoom = Object.keys(state.agentLocations).filter(
-            agentId => state.agentLocations[agentId] === roomId
-          );
-
-          const newAgentLocations = { ...state.agentLocations };
-          agentsInRoom.forEach(agentId => {
-            newAgentLocations[agentId] = null;
-          });
-          
-          // Remove the room from activeConversations
-          const newActiveConversations = { ...state.activeConversations };
-          delete newActiveConversations[roomId];
-          
-          return {
-            rooms: state.rooms.filter(r => r.id !== roomId),
-            agentLocations: newAgentLocations,
-            activeConversations: newActiveConversations,
-            // Update lastSyncTimestamp to trigger UI updates
-            lastSyncTimestamp: Date.now()
-          };
-        }),
-
+        recordTrade: (trade) => set(state => ({
+            tradeHistory: [trade, ...state.tradeHistory].slice(0, 100),
+        })),
+        setLastTradeDetails: (trade) => set({ lastTradeDetails: trade }),
+        removeRoom: (roomId) => set(state => ({
+          rooms: state.rooms.filter(r => r.id !== roomId)
+        })),
         kickAgentFromRoom: (agentToKickId, roomId) => {
+          console.log(`[KICK_LOG] Kicking agent ${agentToKickId} from room ${roomId}`);
+          get().removeAgentFromRoom(agentToKickId);
+        },
+        addConversationTurn: (agent1Id, agent2Id, interaction) => {
+          const key1 = agent1Id;
+          const key2 = agent2Id;
+    
           set(state => {
-            const room = state.rooms.find(r => r.id === roomId);
-            if (!room || !room.hostId || room.hostId === agentToKickId) {
-              return state;
-            }
-            get().updateReputation(agentToKickId, -10);
-            return _moveAgent(state, agentToKickId, null);
+            const conversations = { ...state.agentConversations };
+            if (!conversations[key1]) conversations[key1] = {};
+            if (!conversations[key2]) conversations[key2] = {};
+    
+            if (!conversations[key1][key2]) conversations[key1][key2] = [];
+            if (!conversations[key2][key1]) conversations[key2][key1] = [];
+            
+            const newHistory = [...conversations[key1][key2], interaction].slice(-50); // Keep last 50
+    
+            conversations[key1][key2] = newHistory;
+            conversations[key2][key1] = newHistory;
+    
+            return { agentConversations: conversations };
           });
         },
-        
-                addConversationTurn: (agent1Id, agent2Id, interaction) =>
-          set(state => {
-            const newConversations = {
-              ...state.agentConversations,
-              [agent1Id]: {
-                ...state.agentConversations[agent1Id],
-                [agent2Id]: [...(state.agentConversations[agent1Id]?.[agent2Id] || []), interaction].slice(-50),
-              },
-              [agent2Id]: {
-                ...state.agentConversations[agent2Id],
-                [agent1Id]: [...(state.agentConversations[agent2Id]?.[agent1Id] || []), interaction].slice(-50),
-              },
-            };
-            return { agentConversations: newConversations };
-          }),
-
-        setActiveChat: (roomId, agentId, text) =>
-          set(state => ({
-            activeChat: { ...state.activeChat, [roomId]: { agentId, text } },
-          })),
-
-        clearActiveChat: roomId =>
-          set(state => ({ activeChat: { ...state.activeChat, [roomId]: null } })),
-
-        createJoinRequest: (roomId, requestingAgentId) => {
-          set(state => ({
-            joinRequests: { ...state.joinRequests, [roomId]: requestingAgentId },
-          }));
-        },
-
+        setActiveChat: (roomId, agentId, text) => set(state => ({
+          activeChat: { ...state.activeChat, [roomId]: { agentId, text } },
+        })),
+        clearActiveChat: (roomId) => set(state => {
+          const newActiveChat = { ...state.activeChat };
+          delete newActiveChat[roomId];
+          return { activeChat: newActiveChat };
+        }),
+        createJoinRequest: (roomId, requestingAgentId) => set(state => ({
+          joinRequests: { ...state.joinRequests, [roomId]: requestingAgentId },
+        })),
         resolveJoinRequest: (roomId, accepted) => {
           const requestingAgentId = get().joinRequests[roomId];
-          if (!requestingAgentId) return;
-
-          set(state => {
-            const newJoinRequests = { ...state.joinRequests };
-            delete newJoinRequests[roomId];
-            const stateWithClearedRequest = { ...state, joinRequests: newJoinRequests };
-            return accepted ? _moveAgent(stateWithClearedRequest, requestingAgentId, roomId) : stateWithClearedRequest;
-          });
-        },
-
-        incrementWarnFlag: roomId =>
           set(state => ({
-            rooms: state.rooms.map(r =>
-              r.id === roomId ? { ...r, warnFlags: r.warnFlags + 1 } : r,
-            ),
-          })),
-
-                makeOffer: (roomId, fromAgentId, token, price) =>
-          set(state => {
-            const room = state.rooms.find(r => r.id === roomId);
-            if (!room) return state; 
-
-            const toAgentId = room.agentIds.find(id => id !== fromAgentId);
-            if (!toAgentId) return state;
-
-            return {
-              rooms: state.rooms.map(r =>
-                r.id === roomId
-                  ? { ...r, activeOffer: { fromAgentId, toAgentId, token, price } }
-                  : r
-              ),
-            };
-          }),
-
-        clearOffer: roomId =>
-          set(state => ({
-            rooms: state.rooms.map(r =>
-              r.id === roomId ? { ...r, activeOffer: null } : r,
-            ),
-          })),
-
-        setLastTradeDetails: (details) => {
-          const state = get();
-          
-          // Check if we already have token and price in the details (from socket event)
-          if (details.token && details.price) {
-            // Create a complete trade record directly from the provided details
-            const tradeRecord: TradeRecord = {
-              roomId: details.roomId,
-              fromId: details.fromId,
-              toId: details.toId,
-              timestamp: details.timestamp,
-              token: details.token,
-              price: details.price,
-            };
-            
-            // Update state with both lastTradeDetails and add to tradeHistory
-            set({
-              lastTradeDetails: details,
-              tradeHistory: [...state.tradeHistory, tradeRecord]
-            });
-            console.log('[ArenaState] Added trade to history:', tradeRecord);
-          } 
-          // Fallback to looking up room offer data if token/price not provided
-          else {
-            const room = state.rooms.find(r => r.id === details.roomId);
-            
-            if (room && room.activeOffer) {
-              // Create a complete trade record from room offer
-              const tradeRecord: TradeRecord = {
-                ...details,
-                token: room.activeOffer.token,
-                price: room.activeOffer.price,
-              };
-              
-              // Update state with both lastTradeDetails and add to tradeHistory
-              set({
-                lastTradeDetails: details,
-                tradeHistory: [...state.tradeHistory, tradeRecord]
-              });
-              console.log('[ArenaState] Added trade to history from room offer:', tradeRecord);
-            } else {
-              // If we can't find the room or offer, just update lastTradeDetails
-              set({ lastTradeDetails: details });
-              console.warn('[ArenaState] Could not add trade to history - missing token/price data');
-            }
+            joinRequests: { ...state.joinRequests, [roomId]: null },
+          }));
+          if (accepted && requestingAgentId) {
+            get().moveAgentToRoom(requestingAgentId, roomId);
           }
         },
-        clearLastTradeDetails: () => set({ lastTradeDetails: null }),
-
+        incrementWarnFlag: (roomId) => set(state => ({
+          rooms: state.rooms.map(r => r.id === roomId ? { ...r, warnFlags: r.warnFlags + 1 } : r),
+        })),
         setRoomRules: (roomId, rules) => set(state => ({
-            rooms: state.rooms.map(r => r.id === roomId ? {...r, rules} : r)
+          rooms: state.rooms.map(r => r.id === roomId ? { ...r, rules } : r),
         })),
-        
         setRoomVibe: (roomId, vibe) => set(state => ({
-            rooms: state.rooms.map(r => r.id === roomId ? {...r, vibe} : r)
+          rooms: state.rooms.map(r => r.id === roomId ? { ...r, vibe } : r),
         })),
-
         updateReputation: (agentId, change) => set(state => ({
-            agentReputations: {
-                ...state.agentReputations,
-                [agentId]: (state.agentReputations[agentId] || 100) + change,
-            }
+          agentReputations: {
+            ...state.agentReputations,
+            [agentId]: (state.agentReputations[agentId] || 100) + change,
+          },
         })),
-
         setThinkingAgent: (agentId, isThinking) => set(state => {
-            const newThinkingAgents = new Set(state.thinkingAgents);
-            isThinking ? newThinkingAgents.add(agentId) : newThinkingAgents.delete(agentId);
-            return { thinkingAgents: newThinkingAgents };
-        }),
-
-        createAndJoinRoom: (agentId) => {
-          const emptyRoom = get().rooms.find(r => r.agentIds.length === 0);
-          if (emptyRoom) {
-             set(state => _moveAgent(state, agentId, emptyRoom.id));
+          const newThinkingAgents = new Set(state.thinkingAgents);
+          if (isThinking) {
+            newThinkingAgents.add(agentId);
           } else {
-            const newRoomId = `room-${get().rooms.length + 1}`;
-            get()._ensureRoomExists(newRoomId);
-            set(state => _moveAgent(state, agentId, newRoomId));
+            newThinkingAgents.delete(agentId);
+          }
+          return { thinkingAgents: newThinkingAgents };
+        }),
+        createAndJoinRoom: (agentId: string) => {
+          const newRoomId = `room-${Math.random().toString(36).substring(2, 7)}`;
+          const newRoom: Room = {
+            id: newRoomId,
+            agentIds: [],
+            hostId: null,
+            topics: [],
+            warnFlags: 0,
+            rules: DEFAULT_ROOM_RULES,
+            activeOffer: null,
+            vibe: 'General Chat ☕️'
+          };
+          set(state => ({ rooms: [...state.rooms, newRoom] }));
+          get().moveAgentToRoom(agentId, newRoomId);
+        },
+        _ensureRoomExists: (roomId) => {
+          if (!get().rooms.some(r => r.id === roomId)) {
+            const newRoom: Room = {
+              id: roomId,
+              agentIds: [],
+              hostId: null,
+              topics: [],
+              warnFlags: 0,
+              rules: DEFAULT_ROOM_RULES,
+              activeOffer: null,
+              vibe: 'General Chat ☕️'
+            };
+            set(state => ({ rooms: [...state.rooms, newRoom] }));
           }
         },
-
-        _ensureRoomExists: (roomId) => set(state => {
-            if (state.rooms.some(r => r.id === roomId)) return state;
-            const newRoom: Room = {
-                id: roomId,
-                agentIds: [], hostId: null, topics: [], warnFlags: 0,
-                rules: DEFAULT_ROOM_RULES, activeOffer: null, vibe: 'General Chat ☕️',
-            };
-            return { rooms: [...state.rooms, newRoom] };
-        }),
-
       }),
       {
         name: 'quants-arena-storage',
@@ -501,10 +384,10 @@ export const useArenaStore = create(
             }
             return value;
           },
+          // FIX: Cast `value` to `any` to safely access custom properties `dataType` and `value` during JSON deserialization, resolving TypeScript errors.
           reviver: (key, value) => {
-            const valAsAny = value as any;
-            if (typeof value === 'object' && value !== null && valAsAny.dataType === 'Set') {
-              return new Set(valAsAny.value);
+            if (typeof value === 'object' && value !== null && (value as any).dataType === 'Set') {
+              return new Set((value as any).value);
             }
             return value;
           },
@@ -513,16 +396,3 @@ export const useArenaStore = create(
     ),
   ),
 );
-
-export function registerAgentInArena(agentId: string) {
-  // FIX: Retrieve agents directly from the useAgent store.
-  const allAgents = [...useAgent.getState().availablePersonal, ...useAgent.getState().availablePresets];
-  const agent = allAgents.find(a => a.id === agentId);
-  if (!agent) return;
-
-  useArenaStore.setState(state => ({
-    agentLocations: { ...state.agentLocations, [agentId]: null },
-    agentReputations: { ...state.agentReputations, [agentId]: agent.reputation || 100 },
-  }));
-   console.log(`[Arena] Registered new agent "${agent.name}" in simulation state.`);
-}

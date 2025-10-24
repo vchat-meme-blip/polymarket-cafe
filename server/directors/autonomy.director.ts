@@ -1,194 +1,146 @@
-import { agentsCollection, intelCollection, activityLogCollection, bountiesCollection } from '../db.js';
+import { agentsCollection, bettingIntelCollection, usersCollection } from '../db.js';
+import { Agent, BettingIntel } from '../../lib/types/index.js';
 import { alphaService } from '../services/alpha.service.js';
-import { Intel } from '../../lib/types/index.js';
-import { apiKeyProvider } from '../services/apiKey.provider.js';
+import { notificationService } from '../services/notification.service.js';
+import { aiService } from '../services/ai.service.js';
+import { ObjectId } from 'mongodb';
 
-type EmitToMainThread = (message: 
-  | { type: 'socketEmit', event: string, payload: any, room?: string }
-  | { type: 'worldState', payload: any }
-  | { type: 'globalPause', payload: { duration: number, reason: string, resumeTime: number } }
-) => void;
+type EmitToMainThread = (message: { type: string; event?: string; payload?: any; room?: string; worker?: string; message?: any; }) => void;
 
 export class AutonomyDirector {
-  private emitToMain: EmitToMainThread | null = null;
-  private isTicking = false;
+    private emitToMain?: EmitToMainThread;
+    private isTicking = false;
+    private agentStates: Map<string, { lastActionTime: number; isBusy: boolean }> = new Map();
 
-  constructor() {
-    console.log('[AutonomyDirector] Initialized.');
-  }
-
-  public initialize(emitCallback: EmitToMainThread) {
-    this.emitToMain = emitCallback;
-  }
-  
-  private async logActivity(agentId: string, type: 'intel_discovery' | 'bounty_hit', description: string, details?: Record<string, any>) {
-    await activityLogCollection.insertOne({
-        agentId, type, description, details, timestamp: Date.now(),
-    });
-  }
-  
-  public async researchForAgent(agentId: string) {
-    const agent = await agentsCollection.findOne({ id: agentId });
-    if (!agent) {
-      console.error(`[AutonomyDirector] Agent ${agentId} not found for research task.`);
-      return;
+    public initialize(emitCallback: EmitToMainThread) {
+        this.emitToMain = emitCallback;
+        console.log('[AutonomyDirector] Initialized.');
     }
 
-    const apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
-    if (!apiKey) {
-      console.warn(`[AutonomyDirector] No API key for ${agent.name}, skipping research.`);
-      return;
-    }
+    public async tick() {
+        if (this.isTicking) return;
+        this.isTicking = true;
+        console.log('[AutonomyDirector] Starting autonomy tick...');
+        
+        try {
+            const usersWithActiveAgents = await usersCollection.find({ currentAgentId: { $exists: true, $ne: null } }).toArray();
 
-    console.log(`[AutonomyDirector] Starting direct research for ${agent.name}...`);
-
-    try {
-      const newTokens = await alphaService.discoverNewTokens();
-      console.log(`[AutonomyDirector] Discovered ${newTokens.length} potential tokens for analysis.`);
-
-      for (const token of newTokens) {
-        const existingIntel = await intelCollection.findOne({ id: `intel-${token.mintAddress}` });
-        if (existingIntel) {
-          console.log(`[AutonomyDirector] Skipping ${token.symbol}, intel already exists.`);
-          continue;
-        }
-
-        console.log(`[AutonomyDirector] Analyzing new token: $${token.symbol}`);
-        const analysis = await alphaService.scoutTokenByQuery(token.mintAddress);
-
-        if (analysis?.marketData?.mintAddress) {
-            const summary = await alphaService.synthesizeIntelWithAI(analysis, apiKey);
-            const newIntel: Intel = {
-                id: `intel-${analysis.marketData.mintAddress}`,
-                token: token.symbol,
-                source: `Research by ${agent.name}`,
-                summary,
-                timestamp: Date.now(),
-                ownerHandle: agent.ownerHandle,
-                marketData: analysis.marketData,
-                socialSentiment: analysis.socialSentiment,
-                securityAnalysis: analysis.securityAnalysis,
-            };
-
-            await intelCollection.insertOne(newIntel);
-            this.logActivity(agent.id, 'intel_discovery', `Discovered new intel for $${token.symbol}.`);
-            
-            if (agent.ownerHandle) {
-                console.log(`[AutonomyDirector] New intel for ${token.symbol} generated for user ${agent.ownerHandle}`);
-                this.emitToMain?.({ type: 'socketEmit', event: 'newIntel', payload: { intel: newIntel }, room: agent.ownerHandle });
-            }
-            
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        } else {
-            console.log(`[AutonomyDirector] Analysis for ${token.symbol} was incomplete, skipping.`);
-            this.emitToMain?.({ type: 'socketEmit', event: 'systemMessage', payload: { message: `Research failed for ${token.symbol}: Analysis was incomplete.` }, room: agent.ownerHandle });
-        }
-      }
-    } catch (error) {
-      console.error(`[AutonomyDirector] Direct research failed for agent ${agent.name}:`, error);
-      if (typeof error === 'object' && error !== null && 'status' in error && (error as any).status === 429 && apiKey) {
-        apiKeyProvider.reportRateLimit(apiKey, 60);
-      }
-    }
-  }
-
-  private async handleIntelGathering() {
-      if (Math.random() < 0.8) { // Increased from 10% to 80% for more frequent discoveries
-          const newTokens = await alphaService.discoverNewTokens();
-          if (newTokens.length > 0) {
-            const token = newTokens[0];
-            console.log(`[AutonomyDirector] Discovered new token: ${token.symbol}`);
-            
-            // --- INTELLIGENT AGENT ASSIGNMENT ---
-            const tokenSymbolRegex = new RegExp(token.symbol, 'i');
-            const agentsWithMatchingWishlist = await agentsCollection.find({ wishlist: tokenSymbolRegex }).toArray();
-            const bountiesForToken = await bountiesCollection.find({ objective: tokenSymbolRegex, status: 'active' }).toArray();
-            const ownerHandlesWithBounties = bountiesForToken.map(b => b.ownerHandle);
-            const agentsWithMatchingBounties = await agentsCollection.find({ ownerHandle: { $in: ownerHandlesWithBounties } }).toArray();
-            
-            let potentialAgents = [...agentsWithMatchingWishlist, ...agentsWithMatchingBounties];
-            let targetAgent = null;
-
-            if (potentialAgents.length > 0) {
-                // De-duplicate and pick one
-                const uniqueAgents = Array.from(new Map(potentialAgents.map(a => [a.id, a])).values());
-                targetAgent = uniqueAgents[Math.floor(Math.random() * uniqueAgents.length)];
-                console.log(`[AutonomyDirector] Assigning intel task for $${token.symbol} to ${targetAgent.name} based on goals.`);
-            } else {
-                 // Fallback to a random MCP if no user agent has matching goals
-                const mcps = await agentsCollection.find({ ownerHandle: { $exists: false } }).toArray();
-                if (mcps.length > 0) {
-                    targetAgent = mcps[Math.floor(Math.random() * mcps.length)];
-                    console.log(`[AutonomyDirector] Assigning intel task for $${token.symbol} to random MCP ${targetAgent.name}.`);
-                }
-            }
-
-            if (!targetAgent) {
-                console.log(`[AutonomyDirector] No available agent to research $${token.symbol}.`);
-                return;
-            }
-
-                        const apiKey = await apiKeyProvider.getKeyForAgent(targetAgent.id);
-            if (!apiKey) {
-                console.warn(`[AutonomyDirector] Cannot synthesize intel for ${targetAgent.name}. No API key available, skipping task.`);
-                return; // Explicitly return to stop execution for this task.
-            }
-
-            const existingIntel = await intelCollection.findOne({ id: `intel-${token.mintAddress}` });
-            if (!existingIntel) {
-                try {
-                    const analysis = await alphaService.scoutTokenByQuery(token.mintAddress);
-                    if (analysis?.marketData?.mintAddress) {
-                        try {
-                            const summary = await alphaService.synthesizeIntelWithAI(analysis, apiKey);
-                            const newIntel: Intel = {
-                                id: `intel-${analysis.marketData.mintAddress}`,
-                                token: token.symbol,
-                                source: 'Autonomous Discovery',
-                                summary,
-                                timestamp: Date.now(),
-                                ownerHandle: targetAgent.ownerHandle,
-                                marketData: analysis.marketData,
-                                socialSentiment: analysis.socialSentiment,
-                                securityAnalysis: analysis.securityAnalysis,
-                            };
-
-                            await intelCollection.insertOne(newIntel);
-                            this.logActivity(targetAgent.id, 'intel_discovery', `Discovered new intel for $${token.symbol}.`);
-                            
-                            if (targetAgent.ownerHandle) {
-                                console.log(`[AutonomyDirector] New intel for ${token.symbol} generated and saved for user ${targetAgent.ownerHandle}`);
-                                this.emitToMain?.({ type: 'socketEmit', event: 'newIntel', payload: { intel: newIntel }, room: targetAgent.ownerHandle });
-                            } else {
-                                console.log(`[AutonomyDirector] New intel for ${token.symbol} generated and saved for MCP ${targetAgent.name}`);
-                            }
-                        } catch (error) {
-                            console.log(`[AutonomyDirector] Analysis for ${token.symbol} was incomplete, skipping.`);
-                        }
-                    } else {
-                        console.log(`[AutonomyDirector] Analysis for ${token.symbol} was incomplete, skipping.`);
-                    }
-                } catch (error) {
-                    console.error(`[AutonomyDirector] Gemini API call failed for agent ${targetAgent.name}:`, error);
-                    if (typeof error === 'object' && error !== null && 'status' in error && (error as any).status === 429 && apiKey) {
-                        apiKeyProvider.reportRateLimit(apiKey, 60); // Longer cooldown for autonomy tasks
+            for (const user of usersWithActiveAgents) {
+                if (user.currentAgentId) {
+                    const activeAgent = await agentsCollection.findOne({ id: user.currentAgentId });
+                    if (activeAgent) {
+                        await this.decideAndExecuteNextAction(activeAgent as Agent);
                     }
                 }
             }
-          }
-      }
-  }
+        } catch (error) {
+            console.error('[AutonomyDirector] Error during tick:', error);
+        } finally {
+            this.isTicking = false;
+        }
+    }
 
-  public async tick() {
-    if (this.isTicking) return;
-    this.isTicking = true;
+    private async decideAndExecuteNextAction(agent: Agent) {
+        const agentState = this.agentStates.get(agent.id) || { lastActionTime: 0, isBusy: false };
+        const ACTION_COOLDOWN = 5 * 60 * 1000; // 5 minutes
+
+        if (agentState.isBusy || Date.now() - agentState.lastActionTime < ACTION_COOLDOWN) {
+            return;
+        }
+
+        agentState.isBusy = true;
+        this.agentStates.set(agent.id, agentState);
+
+        try {
+            const actionRoll = Math.random();
+
+            if (actionRoll < 0.6) { // 60% chance to research
+                console.log(`[AutonomyDirector] Action for ${agent.name}: RESEARCH_MARKET`);
+                await this.executeResearch(agent);
+            } else if (actionRoll < 0.9) { // 30% chance to go to cafe
+                console.log(`[AutonomyDirector] Action for ${agent.name}: GO_TO_CAFE`);
+                await this.executeGoToCafe(agent);
+            } else { // 10% chance to engage user
+                console.log(`[AutonomyDirector] Action for ${agent.name}: ENGAGE_USER`);
+                await this.executeEngageUser(agent);
+            }
+
+        } finally {
+            agentState.isBusy = false;
+            agentState.lastActionTime = Date.now();
+            this.agentStates.set(agent.id, agentState);
+        }
+    }
+
+    private async executeResearch(agent: Agent) {
+        const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
+        if (newIntel && agent.ownerHandle) {
+            const intelWithId = { ...newIntel, id: `bettingintel-${new ObjectId().toHexString()}` };
+            const { insertedId } = await bettingIntelCollection.insertOne(intelWithId as any);
+            const savedIntel = await bettingIntelCollection.findOne({ _id: insertedId });
+            
+            this.emitToMain?.({
+                type: 'socketEmit',
+                event: 'newIntel',
+                payload: { intel: savedIntel },
+                room: agent.ownerHandle
+            });
+
+            const message = `🔬 Your agent, ${agent.name}, has completed its research and discovered new intel on the market: "${savedIntel!.market}"`;
+            await notificationService.logAndSendNotification({
+                userId: agent.ownerHandle,
+                agentId: agent.id,
+                type: 'agentResearch',
+                message,
+            });
+        }
+    }
+
+    private async executeGoToCafe(agent: Agent) {
+        this.emitToMain?.({
+            type: 'forwardToWorker',
+            worker: 'arena',
+            message: { type: 'moveAgentToCafe', payload: { agentId: agent.id } }
+        });
+        
+        if (agent.ownerHandle) {
+            const message = `☕️ Your agent, ${agent.name}, is heading to the Intel Exchange to look for alpha.`;
+             await notificationService.logAndSendNotification({
+                userId: agent.ownerHandle,
+                agentId: agent.id,
+// FIX: Corrected typo from 'agentEngagements' to 'agentEngagement' to match the Notification type definition.
+                type: 'agentEngagement',
+                message,
+            });
+        }
+    }
     
-    try {
-        await this.handleIntelGathering();
-    } catch (error) {
-        console.error('[AutonomyDirector] Error during tick:', error);
-    } finally {
-        this.isTicking = false;
+    private async executeEngageUser(agent: Agent) {
+        if (!agent.ownerHandle) return;
+
+        const recentIntel = await bettingIntelCollection.find({ ownerAgentId: agent.id }).sort({ createdAt: -1 }).limit(1).toArray();
+        if (recentIntel.length === 0) return;
+
+        const intel = recentIntel[0];
+        const engagementMessage = await aiService.generateProactiveEngagementMessage(agent, intel);
+
+        if (engagementMessage) {
+            const message = `💡 Your agent, ${agent.name}, has a thought: "${engagementMessage}"`;
+            await notificationService.logAndSendNotification({
+                userId: agent.ownerHandle,
+                agentId: agent.id,
+                type: 'agentEngagement',
+                message,
+            });
+        }
     }
-  }
+
+    public startResearch(agentId: string) {
+        console.log(`[AutonomyDirector] Manual research trigger for agent ${agentId}.`);
+        agentsCollection.findOne({ id: agentId }).then(agent => {
+            if (agent) {
+                this.executeResearch(agent as Agent);
+            }
+        });
+    }
 }

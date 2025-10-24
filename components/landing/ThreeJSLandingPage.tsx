@@ -2,29 +2,50 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import React, { Suspense, useState, useRef, useEffect } from 'react';
+import React, { Suspense, useState, useRef, useEffect, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import PixarScene from './PixarScene';
 import styles from './Landing.module.css';
 import * as THREE from 'three';
-import { useUI } from '../../lib/state';
+// FIX: Fix imports for `useUI` and `useUser` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useUI, useUser } from '../../lib/state/index.js';
 import TokenModal from './TokenModal';
+// FIX: Add .js extension for ES module compatibility.
+import { apiService } from '../../lib/services/api.service.js';
+import { debounce } from 'lodash';
 
 const CameraRig = ({ scrollProgress }: { scrollProgress: React.MutableRefObject<number> }) => {
   const { camera, mouse } = useThree();
   const vec = new THREE.Vector3();
+  const targetPosition = useRef(new THREE.Vector3(0, 1.5, 5)); // Higher and further back by default
+  const targetLookAt = useRef(new THREE.Vector3(0, 0, 0));
 
-  // Implements the parallax effect and the cinematic zoom
+  // Camera with parallax effect for background
   return useFrame(() => {
-    const parallaxX = mouse.x * 1.2; 
-    const parallaxY = 0.2 + (mouse.y * 1.2);
+    // Base camera position - slightly further back for better depth
+    const basePosition = new THREE.Vector3(0, 0.4, 4.2);
     
-    // Zoom is now controlled by the scroll progress
-    const zoomZ = 4.8 - scrollProgress.current * 10;
+    // Parallax effect - stronger for background, less for models
+    const parallaxX = mouse.x * 0.5;
+    const parallaxY = mouse.y * 0.2;
     
-    camera.position.lerp(vec.set(parallaxX, parallaxY, zoomZ), 0.05);
-    camera.lookAt(0, 0.4, 0); 
+    // Apply smooth interpolation for camera movement
+    camera.position.lerp(
+      new THREE.Vector3(
+        basePosition.x + parallaxX * 0.5,
+        basePosition.y + parallaxY * 0.3,
+        basePosition.z
+      ),
+      0.1
+    );
+    
+    // Look at a point slightly above the models
+    camera.lookAt(parallaxX * 0.2, 0.2 + parallaxY * 0.1, 0);
+    
+    // Add subtle auto-rotation for more dynamic feel
+    const time = Date.now() * 0.0001;
+    camera.position.x += Math.sin(time) * 0.1;
   });
 };
 
@@ -33,23 +54,76 @@ const CameraRig = ({ scrollProgress }: { scrollProgress: React.MutableRefObject<
  * The main landing page component. It now wraps the visually rich PixarScene
  * and provides the user interface for signing in.
  */
-export default function ThreeJSLandingPage({
-  onSignIn,
-}: {
-  onSignIn: (handle: string) => void;
-}) {
+interface ThreeJSLandingPageProps {
+  onSignIn: (handle: string, isNewUser: boolean) => void | Promise<void>;
+}
+
+export default function ThreeJSLandingPage({ onSignIn }: ThreeJSLandingPageProps) {
   const [handle, setHandle] = useState('');
+  const [handleStatus, setHandleStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const { openAboutPage } = useUI();
+  const { connectWallet } = useUser();
   const [showTokenModal, setShowTokenModal] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
   const scrollProgress = useRef(0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Debounced function to check handle availability
+  const checkHandleAvailability = useCallback(debounce(async (h: string) => {
+    if (h.length < 3) {
+        setHandleStatus('idle');
+        return;
+    }
+    setHandleStatus('checking');
+    try {
+        const { available } = await apiService.checkHandle(h);
+        setHandleStatus(available ? 'available' : 'taken');
+    } catch (error) {
+        console.error("Failed to check handle", error);
+        setHandleStatus('idle'); // Reset on error
+    }
+  }, 500), []);
+
+  useEffect(() => {
+    if (handle) {
+      checkHandleAvailability(handle);
+    }
+  }, [handle, checkHandleAvailability]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (handle.trim()) {
-      onSignIn(handle);
+    const trimmedHandle = handle.trim();
+    if (!trimmedHandle) return;
+    
+    try {
+      // First check if the handle exists
+      const { available, isNewUser } = await apiService.checkHandle(trimmedHandle);
+      
+      if (!available && !isNewUser) {
+        // Handle exists, proceed with login (existing user)
+        onSignIn(trimmedHandle, false);
+      } else if (available || isNewUser) {
+        // New handle, proceed with account creation
+        onSignIn(trimmedHandle, true);
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      alert("An error occurred while trying to log in. Please try again.");
     }
   };
+
+  const handleRecover = async () => {
+    try {
+      const { success, address } = await connectWallet('4p4h2h1q8z2z8z8y8f8e8d8c8b8a898887868584'); // Simulated
+      if (success && address) {
+        const { handle: recoveredHandle } = await apiService.recoverByWallet(address);
+        alert(`Welcome back! Your handle is: ${recoveredHandle}`);
+        onSignIn(recoveredHandle, false); // Added false as second argument
+      }
+    } catch (error) {
+      alert("Could not find an account associated with this wallet.");
+    }
+  };
+
 
   // Full-page parallax for HTML content
   useEffect(() => {
@@ -80,6 +154,16 @@ export default function ThreeJSLandingPage({
     }
   }, []);
 
+  const getHandleFeedback = () => {
+    switch (handleStatus) {
+        case 'checking': return <span className={styles.handleFeedbackChecking}>Checking...</span>;
+        case 'available': return <span className={styles.handleFeedbackAvailable}>Handle available!</span>;
+        case 'taken': return <span className={styles.handleFeedbackTaken}>Handle is taken.</span>;
+        default: return null;
+    }
+  };
+
+
   return (
     <div className={styles.landingPageContainer}>
       <div className={styles.topNav}>
@@ -87,9 +171,15 @@ export default function ThreeJSLandingPage({
             <span className="icon">coffee</span>
             What is this?
         </button>
-        <button type="button" onClick={() => setShowTokenModal(true)} className={styles.tokenButton}>
-            A1B...pump
-        </button>
+        <div style={{display: 'flex', gap: '16px'}}>
+          <a href="/pitchdeck.html" target="_blank" rel="noopener noreferrer" className={styles.aboutLink}>
+              <span className="icon">rocket_launch</span>
+              Pitch Deck
+          </a>
+          <button type="button" onClick={() => setShowTokenModal(true)} className={styles.tokenButton}>
+              A1B...pump
+          </button>
+        </div>
       </div>
 
 
@@ -112,9 +202,9 @@ export default function ThreeJSLandingPage({
         </Suspense>
       </Canvas>
       <div className={styles.heroContainer} ref={heroRef}>
-        <h1 className={styles.shadowText}>Quants Café</h1>
+        <h1 className={styles.shadowText}>Poly Cafe</h1>
         <p className={styles.landingSubtitle}>
-          The virtual AI simulator meta. Unleash your agents in a live SocialFi arena, trade meme intel, and hunt for alpha.
+          Discover, share or monitor Polymarket opportunities with the help of AI Companions.
         </p>
         <form onSubmit={handleSubmit} className={styles.landingForm}>
           <input
@@ -124,8 +214,18 @@ export default function ThreeJSLandingPage({
             placeholder="Enter your handle to begin"
             aria-label="Enter your handle"
           />
-          <button type="submit" className={styles.landingButton} disabled={!handle.trim()}>
-            Enter the Café
+           <div className={styles.handleFeedbackContainer}>
+              {getHandleFeedback()}
+           </div>
+          <button 
+            type="submit" 
+            className={styles.landingButton} 
+            disabled={!handle.trim() || handleStatus === 'checking'}
+          >
+            {handleStatus === 'taken' ? 'Login' : 'Enter the Arena'}
+          </button>
+          <button type="button" className={styles.recoverButton} onClick={handleRecover}>
+            Forgot your handle? Recover with Wallet
           </button>
         </form>
       </div>

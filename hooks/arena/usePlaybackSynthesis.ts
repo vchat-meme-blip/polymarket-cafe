@@ -44,7 +44,7 @@ export const usePlaybackSynthesis = (
     const bufferPromises = interactions.map(interaction => {
       const agent = allAgents.find(a => a.id === interaction.agentId);
       if (!agent) return Promise.resolve(null);
-      return ttsService.synthesize(interaction.text, agent.voice);
+      return ttsService.synthesize({ text: interaction.text, voiceId: agent.voice });
     });
 
     const buffers = await Promise.all(bufferPromises);
@@ -60,7 +60,7 @@ export const usePlaybackSynthesis = (
     audioQueueRef.current = [];
     if (currentSourceRef.current) {
       currentSourceRef.current.onended = null; // Prevent onended from firing
-      currentSourceRef.current.stop();
+      ttsService.stop(currentSourceRef.current);
       currentSourceRef.current = null;
     }
   }, []);

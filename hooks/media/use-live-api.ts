@@ -20,24 +20,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GenAILiveClient, UserTurn } from '../../lib/genai-live-client';
-import {
-  Chat,
-  GoogleGenAI,
-  LiveConnectConfig,
-  Part,
-  Tool,
-  GenerateContentResponse,
-  Type,
-} from '@google/genai';
+import OpenAI from 'openai';
 import { AudioStreamer } from '../../lib/audio-streamer';
 import { audioContext } from '../../lib/utils';
 import VolMeterWorket from '../../lib/worklets/vol-meter';
 import { DEFAULT_LIVE_API_MODEL } from '../../lib/constants';
 import { useAutonomyStore } from '../../lib/state/autonomy';
-import { useAgent, useUI, useUser } from '../../lib/state';
+import { useAgent, useUI, useUser } from '../../lib/state/index.js';
 import { USER_ID, useArenaStore } from '../../lib/state/arena';
 import { createSystemInstructions } from '../../lib/prompts';
 import { Agent } from '../../lib/types/index.js';
+// FIX: Added 'LiveConnectConfig' import to resolve 'Cannot find name' error.
+// FIX: Changed from a type-only import to a value import to resolve the 'Cannot find name' error.
+import { LiveConnectConfig } from '@google/genai';
 
 export type UseLiveApiResults = {
   client: GenAILiveClient;
@@ -51,29 +46,25 @@ export type UseLiveApiResults = {
   volume: number;
 };
 
-// Create a single, persistent text-only AI client for the parallel chat.
-const textAi = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-
-// Define the tools available to the agent in the parallel text chat.
-const agentTools: Tool[] = [
+// Define the tools available to the agent in the parallel text chat, using OpenAI's format.
+const agentTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
-    functionDeclarations: [
-      {
+    type: 'function',
+    function: {
         name: 'access_intel_bank',
         description:
           "Access the agent's memory. Can be used to get general intel, or to retrieve a specific conversation history with another agent.",
         parameters: {
-          type: Type.OBJECT,
+          type: 'object',
           properties: {
             partner_name: {
-              type: Type.STRING,
+              type: 'string',
               description:
                 "The name of the agent whose conversation history you want to retrieve. Omit to get general intel.",
             },
           },
         },
       },
-    ],
   },
 ];
 
@@ -95,7 +86,7 @@ export function useLiveApi({
   model?: string;
 }): UseLiveApiResults {
   const client = useMemo(() => new GenAILiveClient(apiKey, model), [apiKey]);
-  const textChatRef = useRef<Chat | null>(null);
+  const textChatRef = useRef<{ openai: OpenAI; messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] } | null>(null);
 
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
 
@@ -113,26 +104,28 @@ export function useLiveApi({
   const { addConversationTurn, agentConversations } = useArenaStore();
   const { setChatContextToken } = useUI();
 
-  // Effect to initialize and update the parallel text chat session
+  // Effect to initialize and update the parallel text chat session using OpenAI
   useEffect(() => {
-    textChatRef.current = textAi.chats.create({
-      model: 'gemini-2.5-flash', // Use a standard text model
-      config: {
-        // FIX: Pass only the user state properties to the prompt creation function, not the entire Zustand store object (which includes methods). This resolves the type mismatch.
-        systemInstruction: createSystemInstructions(currentAgent, {
-          name: user.name,
-          info: user.info,
-          handle: user.handle,
-          hasCompletedOnboarding: user.hasCompletedOnboarding,
-          lastSeen: user.lastSeen,
-          solanaWalletAddress: user.solanaWalletAddress,
-          userApiKey: user.userApiKey,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-        }, true),
-        tools: agentTools,
-      },
+    const openai = new OpenAI({ 
+        apiKey: user.userApiKey || process.env.GEMINI_API_KEY || '', // Fallback for server key
+        dangerouslyAllowBrowser: true 
     });
+    const systemInstruction = createSystemInstructions(currentAgent, {
+        name: user.name,
+        info: user.info,
+        handle: user.handle,
+        hasCompletedOnboarding: user.hasCompletedOnboarding,
+        lastSeen: user.lastSeen,
+        solanaWalletAddress: user.solanaWalletAddress,
+        userApiKey: user.userApiKey,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+    }, true);
+
+    textChatRef.current = {
+        openai,
+        messages: [{ role: 'system', content: systemInstruction }],
+    };
   }, [currentAgent, user]);
 
   useEffect(() => {
@@ -162,91 +155,92 @@ export function useLiveApi({
       const textPart = turn.parts?.find(p => p.text)?.text;
       if (!textPart || !textChatRef.current) return;
 
-      // 1. Save the user's message to the store immediately.
       addConversationTurn(currentAgent.id, USER_ID, {
         agentId: USER_ID,
         agentName: userName || 'You',
         text: textPart,
         timestamp: Date.now(),
       });
-      // Clear any previous context card
       setChatContextToken(null);
+      
+      textChatRef.current.messages.push({ role: 'user', content: textPart });
 
-      // 2. Send message to the parallel text chat and handle the response.
-      let chatResponse: GenerateContentResponse =
-        await textChatRef.current.sendMessage({ message: textPart });
-
-      // 3. Robustly handle the function-calling loop.
-      let functionCalls = chatResponse.functionCalls;
-      while (functionCalls && functionCalls.length > 0) {
-        const toolResponses: Part[] = [];
-
-        for (const toolCall of functionCalls) {
-          if (toolCall.name === 'access_intel_bank') {
-            const partnerName = toolCall.args?.partner_name as string;
-            let content = '';
-
-            if (partnerName) {
-              const allAgents = [...availablePresets, ...availablePersonal];
-              const partner = getAgentByName(partnerName, allAgents);
-              const history = partner
-                ? agentConversations[currentAgent.id]?.[partner.id]
-                : undefined;
-
-              if (history && history.length > 0) {
-                content = `Conversation with ${partnerName}:\n${history.map(h => `${h.agentName}: ${h.text}`).join('\n')}`;
-              } else {
-                content = `I haven't talked to ${partnerName} yet.`;
-              }
-            } else {
-              if (intelBank.length > 0) {
-                content = `General Intel:\n${intelBank.map(item => `- ${item.token}: ${item.summary || 'Research pending.'}`).join('\n')}`;
-              } else {
-                content =
-                  'My intel bank is currently empty. I need to do more research.';
-              }
-            }
-
-            toolResponses.push({
-              functionResponse: {
-                name: 'access_intel_bank',
-                response: { content },
-              },
-            });
-          }
-        }
-
-        // Send tool responses back to the model
-        if (toolResponses.length > 0) {
-          chatResponse = await textChatRef.current.sendMessage({
-            message: toolResponses,
-          });
-          functionCalls = chatResponse.functionCalls;
-        } else {
-          // Break if no tools were actually called, to prevent infinite loops.
-          break;
-        }
-      }
-
-      // 4. Save the agent's final text response to the store.
-      const agentResponseText = chatResponse.text;
-      if (agentResponseText) {
-        addConversationTurn(currentAgent.id, USER_ID, {
-          agentId: currentAgent.id,
-          agentName: currentAgent.name,
-          text: agentResponseText,
-          timestamp: Date.now(),
+      try {
+        let response = await textChatRef.current.openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: textChatRef.current.messages,
+            tools: agentTools,
+            tool_choice: 'auto'
         });
 
-        // 5. Check if the response mentions a token and set the context card.
-        const mentionedToken = intelBank.find(
-          intel =>
-            intel.token &&
-            agentResponseText.toLowerCase().includes(intel.token.toLowerCase()),
-        );
-        if (mentionedToken) {
-          setChatContextToken(mentionedToken);
+        let responseMessage = response.choices[0].message;
+
+        while (responseMessage.tool_calls) {
+            textChatRef.current.messages.push(responseMessage);
+            for (const toolCall of responseMessage.tool_calls) {
+                // FIX: Add type guard to ensure toolCall is of type 'function' before accessing 'function' property.
+                if (toolCall.type !== 'function') continue;
+                const functionName = toolCall.function.name;
+                const functionArgs = JSON.parse(toolCall.function.arguments);
+                let toolContent = '';
+                
+                if (functionName === 'access_intel_bank') {
+                    const partnerName = functionArgs.partner_name;
+                    if (partnerName) {
+                        const allAgents = [...availablePersonal, ...availablePresets];
+                        const partner = getAgentByName(partnerName, allAgents);
+                        const history = partner ? agentConversations[currentAgent.id]?.[partner.id] : undefined;
+                        toolContent = history ? `Conversation with ${partnerName}:\n${history.map(h => `${h.agentName}: ${h.text}`).join('\n')}` : `I haven't talked to ${partnerName} yet.`;
+                    } else {
+                        // FIX: Use 'market' and 'content' properties from BettingIntel type instead of 'token' and 'summary'.
+                        toolContent = intelBank.length > 0 ? `General Intel:\n${intelBank.map(item => `- ${item.market}: ${item.content || 'Research pending.'}`).join('\n')}` : 'My intel bank is currently empty.';
+                    }
+                }
+                
+                // FIX: The 'name' property is not part of ChatCompletionToolMessageParam in OpenAI SDK v4+.
+                // It is not needed as the tool_call_id links the response to the call.
+                textChatRef.current.messages.push({
+                    tool_call_id: toolCall.id,
+                    role: 'tool',
+                    content: toolContent,
+                });
+            }
+
+            response = await textChatRef.current.openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: textChatRef.current.messages,
+                tools: agentTools,
+                tool_choice: 'auto'
+            });
+            responseMessage = response.choices[0].message;
         }
+
+        const agentResponseText = responseMessage.content;
+        if (agentResponseText) {
+            textChatRef.current.messages.push({ role: 'assistant', content: agentResponseText });
+            addConversationTurn(currentAgent.id, USER_ID, {
+                agentId: currentAgent.id,
+                agentName: currentAgent.name,
+                text: agentResponseText,
+                timestamp: Date.now(),
+            });
+
+            const mentionedToken = intelBank.find(
+                // FIX: Use 'market' property from BettingIntel type instead of 'token'.
+                intel => intel.market && agentResponseText.toLowerCase().includes(intel.market.toLowerCase()),
+            );
+            if (mentionedToken) {
+                setChatContextToken(mentionedToken);
+            }
+        }
+      } catch (error) {
+          console.error("Error communicating with OpenAI:", error);
+           addConversationTurn(currentAgent.id, USER_ID, {
+              agentId: 'system',
+              agentName: 'System',
+              text: 'Sorry, there was an error processing your request.',
+              timestamp: Date.now(),
+            });
       }
     };
 

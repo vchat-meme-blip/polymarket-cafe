@@ -8,7 +8,7 @@ import {
   SecurityAnalysis,
   SocialSentiment,
 } from '../types/index.js';
-import { GoogleGenAI } from '@google/genai';
+import OpenAI from 'openai';
 import { solscanService } from './solscan.service.js';
 
 class AlphaService {
@@ -67,12 +67,11 @@ class AlphaService {
   }
 
   public async synthesizeIntelWithAI(intel: Partial<Intel>, apiKey: string): Promise<string> {
-    // FIX: Add a check for a valid API key before initializing the client.
     if (!apiKey) {
       console.error(`[AlphaService] Attempted to synthesize intel for ${intel.token} without an API key.`);
       return "AI analysis requires a valid API key. Please configure it in your settings.";
     }
-    const ai = new GoogleGenAI({ apiKey });
+    const openai = new OpenAI({ apiKey });
     const prompt = `
       You are a crypto analyst. Synthesize the following data into a short, one-sentence "Vibe Check" for the token ${intel.token}.
       Be concise and direct. Example: "Bullish sentiment and strong volume, but watch for high holder concentration."
@@ -87,13 +86,11 @@ class AlphaService {
     `;
 
     try {
-      const response = await ai.models.generateContent({
-        // FIX: Corrected model name from deprecated 'gemini-1.5-flash' to 'gemini-2.5-flash'.
-        model: 'gemini-2.5-flash',
-        contents: prompt,
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
       });
-      // FIX: The `response.text` property can be undefined. Use nullish coalescing to prevent a runtime error on `.trim()`.
-      return (response.text ?? '').trim();
+      return completion.choices[0].message.content?.trim() ?? "AI analysis failed to generate a response.";
     } catch (error) {
         console.error(`[AlphaService] Failed to synthesize intel with AI for ${intel.token}:`, error);
         return "AI analysis failed. Please check token data manually.";

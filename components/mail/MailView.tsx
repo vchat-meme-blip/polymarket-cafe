@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { useMemo, useState } from 'react';
-import { useAgent } from '../../lib/state';
+// FIX: Fix import for `useAgent` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useAgent } from '../../lib/state/index.js';
 import { useArenaStore } from '../../lib/state/arena';
 import { Agent } from '../../lib/types/index.js';
 import ConversationList from './ConversationList';

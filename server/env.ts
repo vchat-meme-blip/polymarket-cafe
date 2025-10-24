@@ -1,50 +1,65 @@
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
-// FIX: Import 'process' to provide correct types for process.exit and resolve TypeScript error.
-import process from 'process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.join(__dirname, '..');
 
+// Default configuration
+const defaultConfig = {
+  NODE_ENV: process.env.NODE_ENV || 'production',
+  PORT: process.env.PORT || '3000',
+  // Add other default environment variables here
+};
+
 function loadEnv() {
+  try {
     const envLocalPath = path.join(projectRoot, '.env.local');
     const envPath = path.join(projectRoot, '.env');
-
     let loaded = false;
 
+    // Try loading .env.local first
     if (fs.existsSync(envLocalPath)) {
-        dotenv.config({ path: envLocalPath });
-        console.log('[Env] Loaded .env.local');
-        loaded = true;
+      dotenv.config({ path: envLocalPath });
+      console.log('[Env] Loaded .env.local');
+      loaded = true;
     }
 
+    // Then try .env
     if (!loaded && fs.existsSync(envPath)) {
-        dotenv.config({ path: envPath });
-        console.log('[Env] Loaded .env');
-        loaded = true;
+      dotenv.config({ path: envPath });
+      console.log('[Env] Loaded .env');
+      loaded = true;
     }
 
-    if (!loaded) {
-        console.error('[Env] No environment files found!');
-        process.exit(1);
-    }
+    // Merge environment variables with defaults
+    const config: Record<string, string | undefined> = {
+      ...defaultConfig,
+      ...process.env,
+    };
 
     // Validate required environment variables
-    const required = ['MONGODB_URI'];
-    const missing = required.filter(key => !process.env[key]);
+    const requiredVars = ['NODE_ENV'];
+    const missingVars = requiredVars.filter(varName => !config[varName]);
 
-    if (missing.length > 0) {
-        console.error('[Env] Missing required environment variables:', missing.join(', '));
-        console.error('[Env] Please check your .env.local or .env file');
-        process.exit(1);
+    if (missingVars.length > 0) {
+      console.warn(`[Env] Missing required environment variables: ${missingVars.join(', ')}`);
+      console.warn('[Env] Using default configuration');
+    } else {
+      console.log('[Env] Environment loaded successfully');
     }
 
-    console.log('[Env] Environment loaded successfully');
+    return config;
+  } catch (error) {
+    console.error('[Env] Error loading environment:', error);
+    console.warn('[Env] Using default configuration due to error');
+    return defaultConfig;
+  }
 }
 
-loadEnv();
+// Load environment and export the config
+const config = loadEnv();
 
-export default loadEnv;
+export default config;

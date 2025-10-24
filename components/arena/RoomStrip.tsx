@@ -20,24 +20,29 @@ const RoomPreview = ({ room, isFocused, onSelect }: { room: Room; isFocused: boo
     
     return (
         <button
-            className={c(styles.roomStripPreview, { [styles.focused]: isFocused })}
+            className={c(styles.roomStripPreview, { 
+                [styles.focused]: isFocused,
+                [styles.owned]: room.isOwned,
+            })}
             onClick={onSelect}
+            data-room-id={room.id}
         >
+            {room.isOwned && <span className={`icon ${styles.ownedRoomIcon}`}>crown</span>}
             <div className={styles.roomStripIcon}>
                 <span className="icon">{agentCount > 0 ? 'meeting_room' : 'no_meeting_room'}</span>
             </div>
             <div className={styles.roomStripInfo}>
-                <p className={styles.roomStripName}>Room {room?.id?.split('-')[1] || '?'}</p>
+                <p className={styles.roomStripName}>{room.name || `Room ${room?.id?.split('-')[1] || '?'}`}</p>
                 <p className={styles.roomStripOccupants}>{agentCount} / 2 Occupants</p>
             </div>
         </button>
     );
 };
 
-export default function RoomStrip({ rooms, focusedRoomId, onRoomSelect }: RoomStripProps) {
+const RoomStrip = React.forwardRef<HTMLDivElement, RoomStripProps>(({ rooms, focusedRoomId, onRoomSelect }, ref) => {
     return (
         <div className={styles.roomStripContainer}>
-            <div className={styles.roomStripScroll}>
+            <div className={styles.roomStripScroll} ref={ref}>
                 {rooms.map(room => (
                     <RoomPreview
                         key={room.id}
@@ -49,4 +54,6 @@ export default function RoomStrip({ rooms, focusedRoomId, onRoomSelect }: RoomSt
             </div>
         </div>
     );
-}
+});
+
+export default RoomStrip;

@@ -2,28 +2,23 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useAgent } from '../../lib/state';
+import { useAgent, useUI } from '../../lib/state/index.js';
 import { useArenaStore } from '../../lib/state/arena';
 import { useAutonomyStore } from '../../lib/state/autonomy';
-import { apiService } from '../../lib/services/api.service';
+import { apiService } from '../../lib/services/api.service.js';
 import styles from './Dashboard.module.css';
 
 export default function AgentActionsPanel() {
   const { current: userAgent } = useAgent();
   const { setActivity } = useAutonomyStore();
   const { agentLocations } = useArenaStore();
+  const { openCreateRoomModal } = useUI();
 
   const isAgentInCafe = agentLocations[userAgent.id] !== null;
 
-  // This is now an event-driven API call, not a client-side state change.
   const handleSendToCafe = () => {
     setActivity('WANDERING_IN_CAFE');
     apiService.sendAgentToCafe(userAgent.id);
-  };
-
-  const handleCreateRoom = () => {
-    setActivity('IN_CAFE', 'Creating a new room...');
-    apiService.createAndHostRoom(userAgent.id);
   };
 
   return (
@@ -43,7 +38,7 @@ export default function AgentActionsPanel() {
       </button>
       <button
         className="button"
-        onClick={handleCreateRoom}
+        onClick={openCreateRoomModal}
         disabled={isAgentInCafe}
          title={isAgentInCafe ? 'Your agent is already in the Café' : 'Create a new room with your agent as the host'}
       >

@@ -117,7 +117,7 @@
 .landingForm {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.5rem; /* Reduced gap to bring feedback closer */
   width: 100%;
   max-width: 360px;
   margin-top: 2rem;
@@ -146,6 +146,21 @@
   box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
 }
 
+.handleFeedbackContainer {
+  min-height: 20px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.handleFeedbackChecking {
+  color: var(--brand-yellow);
+}
+.handleFeedbackAvailable {
+  color: var(--brand-green);
+}
+.handleFeedbackTaken {
+  color: var(--brand-red);
+}
+
 .landingButton {
   background: white;
   color: #333;
@@ -162,6 +177,15 @@
   box-shadow: 0 6px 15px rgba(0,0,0,0.25);
 }
 
+.recoverButton {
+    color: var(--Neutral-80);
+    font-size: 14px;
+    margin-top: 8px;
+}
+.recoverButton:hover {
+    color: white;
+    text-decoration: underline;
+}
 
 /* --- NEW TOP NAV BAR --- */
 .topNav {

@@ -2,6 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
+// FIX: Added missing 'React' import to resolve namespace errors.
+import React from 'react';
 import c from 'classnames';
 
 type ChatBubbleProps = {

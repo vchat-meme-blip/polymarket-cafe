@@ -11,7 +11,10 @@ import { DEFAULT_VRM_URL } from '../../lib/presets/agents';
 import { VrmModel, VrmPlaceholder } from '../agents/VrmAvatar';
 
 type DashboardAgentProps = {
-  agent: Partial<Agent>;
+  agent: {
+    id: string;
+    modelUrl?: string; // Make modelUrl explicitly optional
+  };
   isSpeaking: boolean;
 };
 
@@ -30,7 +33,7 @@ function getIdleAnimation(agent: Partial<Agent>): string {
 }
 
 export default function DashboardAgent({ agent, isSpeaking }: DashboardAgentProps) {
-  const urlToLoad = agent.modelUrl || DEFAULT_VRM_URL;
+  const urlToLoad = agent.modelUrl ?? DEFAULT_VRM_URL;
   const [animationTriggerKey, setAnimationTriggerKey] = useState(0);
   const agentIdRef = useRef<string | null>(null);
 
@@ -60,7 +63,7 @@ export default function DashboardAgent({ agent, isSpeaking }: DashboardAgentProp
               disableAutoGrounding={true}
               verticalOffset={-0.2}
               idleUrl={getIdleAnimation(agent)}
-              triggerAnimationUrl="/animations/gesture_greeting.vrma"
+              triggerAnimationUrl="/animations/gesture_ready.vrma"
               triggerKey={animationTriggerKey}
               talkAnimationUrl="/animations/gesture_shoot.vrma"
             />

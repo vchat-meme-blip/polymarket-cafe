@@ -8,15 +8,18 @@
 // application is running in a production or development build.
 // https://vitejs.dev/guide/env-and-mode.html
 
-// FIX: Replaced `process.env.NODE_ENV` with Vite's standard `import.meta.env.PROD`
-// to correctly determine the production environment and resolve a TypeScript error.
-const isProduction = import.meta.env.PROD;
+// FIX: Reverted to using `process.env.NODE_ENV` for better compatibility
+// between client (Vite) and server (Node.js) environments.
+const isProduction = process.env.NODE_ENV === 'production';
 
 // Use the production domain if in production, otherwise use the local server.
+// `process.env.VITE_PUBLIC_APP_URL` is supplied by Vite on the client and dotenv on the server.
+const PROD_DOMAIN = process.env.VITE_PUBLIC_APP_URL || 'https://quants.sliplane.app';
+
 export const API_BASE_URL = isProduction
-  ? 'https://placeholder.digitalocean.com'
+  ? `${PROD_DOMAIN}`
   : 'http://localhost:3001';
 
 export const SOCKET_URL = isProduction
-  ? 'https://placeholder.digitalocean.com'
+  ? `${PROD_DOMAIN}`
   : 'http://localhost:3001';

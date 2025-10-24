@@ -2,7 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useAgent, useUI } from '../../lib/state';
+// FIX: Fix imports for `useAgent` and `useUI` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useAgent, useUI } from '../../lib/state/index.js';
 import { useArenaStore } from '../../lib/state/arena';
 import Modal from '../Modal';
 import { Agent } from '../../lib/types/index.js';

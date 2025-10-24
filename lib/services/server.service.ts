@@ -5,7 +5,8 @@
 
 // FIX: Changed import for the 'Agent' type from '../presets/agents' to its correct source file '../types/index.js' to resolve the module export error.
 import { Agent } from '../types/index.js';
-import { useAgent } from '../state';
+// FIX: Fix import for `useAgent` by changing the path from `../state` to `../state/index.js`.
+import { useAgent } from '../state/index.js';
 
 /**
  * A placeholder service that simulates a remote server/database.

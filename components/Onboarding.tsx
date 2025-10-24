@@ -2,13 +2,16 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
+// FIX: Added missing 'React' import to resolve namespace errors.
+import React from 'react';
 import { useState } from 'react';
 // FIX: The 'Agent' type is not exported from 'presets'. It is now imported from its correct source file 'lib/types/index.js'.
 import type { Agent } from '../lib/types/index.js';
 import { PRESET_AGENTS } from '../lib/presets/agents';
 import { useUser, createNewAgent } from '../lib/state';
 import c from 'classnames';
-import { apiService } from '../lib/services/api.service';
+// FIX: Add .js extension for ES module compatibility.
+import { apiService } from '../lib/services/api.service.js';
 import styles from './onboarding/Onboarding.module.css';
 import { VrmAvatarCanvas } from './agents/VrmAvatar';
 

@@ -3,53 +3,83 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-// This file contains shared type definitions used by both the client and server.
-// It should not contain any runtime code or imports from client/server-specific libraries.
+// Notification Settings
+export type NotificationSettings = {
+  agentResearch: boolean;
+  agentTrades: boolean;
+  newMarkets: boolean;
+  agentEngagements: boolean;
+};
 
+// User type
+export type User = {
+  _id?: string;
+  name: string;
+  info: string;
+  handle: string;
+  hasCompletedOnboarding: boolean;
+  lastSeen: number | null;
+  userApiKey: string | null;
+  solanaWalletAddress: string | null;
+  createdAt: number;
+  updatedAt: number;
+  currentAgentId?: string;
+  ownedRoomId?: string;
+  phone?: string;
+  notificationSettings?: NotificationSettings;
+};
+
+// FIX: Define and export AgentMode type to be used across the application.
+export type AgentMode = 'Safe' | 'Degen' | 'Mag7';
+
+// Agent types
 export type Agent = {
   id: string;
   name: string;
   personality: string;
   instructions: string;
-  voice: string; // Stored as a string, validated against VoiceID on the client
+  voice: string;
   topics: string[];
   wishlist: string[];
   reputation: number;
-  copiedFromId?: string;
   ownerHandle?: string;
-  isShilling?: boolean;
-  shillInstructions?: string;
-  modelUrl?: string;
-  templateId?: string; // Used when creating a new agent from a preset template
+  isShilling: boolean;
+  shillInstructions: string;
+  modelUrl: string;
+  bettingHistory: Bet[];
+  currentPnl: number;
+  bettingIntel: BettingIntel[];
+  marketWatchlists: MarketWatchlist[];
+  // New autonomy controls
+  isProactive?: boolean; 
+  trustedRoomIds?: string[];
+  operatingHours?: string;
+  // FIX: Add optional 'mode' property to the Agent type.
+  mode?: AgentMode;
+  // Deprecated, but keep for now for data consistency
+  boxBalance: number;
+  portfolio: Record<string, number>;
+  templateId?: string;
+  copiedFromId?: string;
 };
 
-export interface User {
-  _id?: any; // MongoDB uses ObjectId
-  handle: string;
-  name: string;
-  info: string;
-  hasCompletedOnboarding: boolean;
-  lastSeen: number | null;
-  solanaWalletAddress: string | null;
-  userApiKey: string | null;
-  createdAt: number;
-  updatedAt: number;
-}
-
+// Arena types
 export type Room = {
   id: string;
+  name?: string; // Optional custom name for owned rooms
   agentIds: string[];
   hostId: string | null;
   topics: string[];
   warnFlags: number;
   rules: string[];
-  activeOffer: {
-    fromAgentId: string;
-    toAgentId: string;
-    token: string;
-    price: number;
-  } | null;
+  activeOffer: Offer | null;
   vibe: string;
+  isOwned?: boolean;
+  ownerHandle?: string;
+  roomBio?: string;
+  twitterUrl?: string;
+  isRevenuePublic?: boolean;
+  bannedAgentIds?: string[];
 };
 
 export type Interaction = {
@@ -57,53 +87,44 @@ export type Interaction = {
   agentName: string;
   text: string;
   timestamp: number;
-  roomId?: any; // Can be string on client, ObjectId on server
+  markets?: MarketIntel[];
 };
 
-export type AgentActivity =
-  | 'IDLE'
-  | 'IN_CAFE'
-  | 'WANDERING_IN_CAFE'
-  | 'GATHERING_INTEL'
-  | 'RESEARCHING_INTEL'
-  | 'CHATTING_WITH_USER'
-  | 'HUNTING_BOUNTY';
-
-export type SocialSentiment = {
-  overallSentiment: 'Bullish' | 'Bearish' | 'Neutral';
-  tweets: { author: string; text: string; sentiment: string }[];
+export type Offer = {
+  fromId: string;
+  toId: string;
+  type: 'intel' | 'watchlist';
+  // for intel
+  intelId?: string; // Should be the primary identifier
+  market?: string; // Kept for context
+  // for watchlist
+  watchlistId?: string;
+  // common
+  price: number;
+  status: 'pending' | 'accepted' | 'rejected';
 };
 
-export type SecurityAnalysis = {
-  isHoneypot: boolean;
-  isContractRenounced: boolean;
-  holderConcentration: { top10Percent: number };
-};
-
-export type MarketData = {
-  mintAddress: string;
-  name: string;
-  priceUsd?: number;
-  marketCap?: number;
-  liquidityUsd?: number;
-  priceChange24h?: number;
-};
-
-export type Intel = {
-  id: string;
-  token: string;
-  source: string;
-  summary?: string;
+export type TradeRecord = {
+  fromId: string;
+  toId: string;
+  type: 'intel';
+  market: string;
+  intelId?: string;
+  price: number;
+  quantity?: number;
   timestamp: number;
-  bountyId?: string;
-  acquiredFrom?: string;
-  price?: number;
-  sellerHandle?: string;
-  marketData?: MarketData;
-  socialSentiment?: SocialSentiment;
-  securityAnalysis?: SecurityAnalysis;
-  ownerHandle?: string;
+  roomId: string;
 };
+
+// Autonomy types
+export type AgentActivity = 
+  | 'IDLE' 
+  | 'IN_CAFE' 
+  | 'WANDERING_IN_CAFE' 
+  | 'HUNTING_BOUNTY' 
+  | 'GATHERING_INTEL' 
+  | 'RESEARCHING_INTEL'
+  | 'CHATTING_WITH_USER';
 
 export type Bounty = {
   id: string;
@@ -113,13 +134,123 @@ export type Bounty = {
   ownerHandle?: string;
 };
 
-export type TransactionType = 'claim' | 'send' | 'receive' | 'stipend';
+export type DailySummary = {
+    agentId: string;
+    date: string; // YYYY-MM-DD format
+    summary: string;
+};
+
+// Wallet types
+export type TransactionType = 'send' | 'receive' | 'claim' | 'stipend' | 'escrow' | 'room_purchase';
 
 export type Transaction = {
   id: string;
+  timestamp: number;
   type: TransactionType;
   amount: number;
   description: string;
+};
+
+// Prediction Market types
+export type MarketIntel = {
+  id: string;
+  eventId?: string;
+  title: string;
+  platform: 'Polymarket' | 'Kalshi';
+  marketUrl: string;
+  eventSlug?: string;
+  marketSlug?: string;
+  outcomes: { name: string; price: number }[];
+  odds: { yes: number; no: number }; // Derived for convenience
+  volume: number;
+  liquidity: number;
+  endsAt: number;
+  imageUrl?: string;
+  description?: string;
+  category?: string;
+  active?: boolean;
+  closed?: boolean;
+  tags?: string[];
+};
+
+export type Bet = {
+  id: string;
+  agentId: string;
+  marketId: string;
+  outcome: 'yes' | 'no';
+  amount: number;
+  price: number; // The odds at which the bet was placed (0-1)
   timestamp: number;
-  ownerHandle?: string;
+  status: 'pending' | 'resolved'; // Changed from active/won/lost to pending/resolved
+  pnl?: number; // Profit or Loss
+  sourceIntelId?: string; // ID of the BettingIntel that influenced this bet
+};
+
+export type BettingIntel = {
+    id: string;
+    ownerAgentId: string; // The agent who created/owns this intel
+    market: string; // The market question
+    content: string; // The actual intel
+    sourceDescription: string;
+    isTradable: boolean;
+    createdAt: number;
+    pnlGenerated: { // Track the profit generated by this intel
+        amount: number;
+        currency: string;
+    };
+    sourceAgentId?: string;
+    pricePaid?: number;
+    bountyId?: string;
+    ownerHandle?: string;
+    sourceUrls?: string[];
+    rawResearchData?: { url: string; markdown: string; }[];
+}
+
+export type MarketWatchlist = {
+    id: string;
+    name: string;
+    markets: string[]; // List of market IDs or questions
+    wallets?: string[]; // List of wallet addresses
+    createdAt: number;
+}
+
+// Notification type for logging
+export type Notification = {
+    id: string;
+    userId: string;
+    agentId?: string;
+    type: 'agentResearch' | 'agentTrade' | 'newMarkets' | 'agentEngagement';
+    message: string;
+    timestamp: number;
+    wasSent: boolean;
+};
+
+
+// FIX: Added missing type definitions for 'Intel', 'MarketData', 'SecurityAnalysis', and 'SocialSentiment' to resolve import errors in `lib/services/alpha.service.ts`.
+export type MarketData = {
+  mintAddress: string;
+  name: string;
+  priceUsd: number;
+  marketCap: number;
+  liquidityUsd: number;
+  priceChange24h: number;
+};
+
+export type SecurityAnalysis = {
+  isHoneypot: boolean;
+  isContractRenounced: boolean;
+  holderConcentration: { top10Percent: number };
+};
+
+export type SocialSentiment = {
+  overallSentiment: 'Bullish' | 'Bearish' | 'Neutral';
+  tweets: { author: string; text: string; sentiment: 'BULLISH' | 'NEUTRAL' | 'BEARISH' }[];
+};
+
+export type Intel = {
+  id: string;
+  token: string;
+  marketData: MarketData;
+  securityAnalysis: SecurityAnalysis;
+  socialSentiment: SocialSentiment;
 };

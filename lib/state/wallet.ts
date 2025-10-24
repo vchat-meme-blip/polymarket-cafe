@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { isToday, startOfToday } from 'date-fns';
+// FIX: Imported `TransactionType` and `Transaction` from the canonical types file.
 import { TransactionType, Transaction } from '../types/index.js';
 
 interface ServerHydrationData {

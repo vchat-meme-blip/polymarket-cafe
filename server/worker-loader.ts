@@ -1,20 +1,10 @@
 import { Worker, WorkerOptions } from 'node:worker_threads';
 import path from 'node:path';
-// FIX: Import 'process' to provide correct types for process.platform and resolve TypeScript error.
-import process from 'process';
+import { fileURLToPath } from 'node:url';
 
 // Get the directory name in an ESM-compatible way
-const currentDir = (() => {
-  const fileUrl = new URL(import.meta.url).pathname;
-  // On Windows, the path might start with a forward slash
-  const normalizedPath = process.platform === 'win32' && fileUrl.startsWith('/')
-    ? fileUrl.slice(1)
-    : fileUrl;
-  return path.dirname(normalizedPath);
-})();
-
-// For compatibility with code that expects __dirname
-const __dirname = currentDir;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export function createWorker(workerPath: string, options?: WorkerOptions) {
   // In development, use ts-node to run TypeScript files directly

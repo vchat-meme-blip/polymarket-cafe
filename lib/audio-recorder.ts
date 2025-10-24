@@ -18,12 +18,11 @@
  * limitations under the License.
  */
 
-import { audioContext } from './utils';
-import AudioRecordingWorklet from './worklets/audio-processing';
-import VolMeterWorket from './worklets/vol-meter';
-
-import { createWorketFromSrc } from './audioworklet-registry';
-import EventEmitter from 'eventemitter3';
+import { audioContext } from './utils.js';
+import AudioRecordingWorklet from './worklets/audio-processing.js';
+import VolMeterWorket from './worklets/vol-meter.js';
+import { createWorketFromSrc } from './audioworklet-registry.js';
+import { EventEmitter } from 'eventemitter3';
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
   var binary = '';

@@ -1,202 +1,274 @@
-.tradingFloorView {
+.predictionHubView {
   padding: 40px;
   height: 100%;
-  overflow-y: auto;
-  max-width: 1600px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow: hidden; /* Prevent main view from scrolling */
 }
-.tradingFloorView h2 {
+.header h2 {
   font-size: 32px;
   font-weight: 500;
   color: var(--brand-cyan);
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--Neutral-30);
 }
-
-.sectionHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 32px 0 16px;
-}
-
-.sectionTitle {
-  font-size: 24px;
-  font-weight: 500;
-  color: var(--Neutral-90);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-}
-
-.sectionTitle .icon {
-  font-size: 28px;
-  color: var(--brand-cyan);
-}
-
-.refreshButton {
-  background: var(--Neutral-20);
-  color: var(--Neutral-80);
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.refreshButton:hover {
-  background: var(--Neutral-30);
-  transform: rotate(30deg);
-}
-
-.refreshButton .icon {
-  font-size: 20px;
-}
-.offerGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 24px;
-}
-.offerCard {
-  background: var(--Neutral-10);
-  border: 1px solid var(--Neutral-30);
-  border-radius: 16px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  transition: all 0.2s ease-in-out;
-}
-.offerCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-  border-color: var(--brand-primary);
-}
-.offerHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.offerToken {
-  font-size: 24px;
-  font-weight: bold;
-  color: var(--brand-cyan);
-}
-.offerPrice {
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--brand-yellow);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.offerSellerInfo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  color: var(--Neutral-80);
-}
-.sellerAvatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background-color: var(--Neutral-20);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-}
-.offerCardFooter {
-  margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px solid var(--Neutral-20);
-}
-.offerCardFooter .button {
-  width: 100%;
-  justify-content: center;
-}
-.emptyState {
-  text-align: center;
-  padding: 80px 20px;
+.header p {
+  font-size: 16px;
   color: var(--Neutral-60);
-}
-.emptyState .icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-.emptyState p {
-  font-size: 18px;
+  margin-top: 4px;
 }
 
-/* Trade History Styles */
-.tradeHistoryContainer {
-  margin-top: 16px;
-  overflow-x: auto;
+.hubGrid {
+    flex-grow: 1;
+    display: grid;
+    grid-template-columns: minmax(400px, 1fr) 2fr;
+    gap: 24px;
+    min-height: 0;
 }
 
-.tradeHistoryTable {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--Neutral-10);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+.agentConsoleWrapper {
+    background: var(--Neutral-10);
+    border: 1px solid var(--Neutral-30);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative; /* For ControlTray positioning */
 }
 
-.tradeHistoryTable th,
-.tradeHistoryTable td {
-  padding: 12px 16px;
-  text-align: left;
-  border-bottom: 1px solid var(--Neutral-20);
+.panelHeader {
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--Neutral-20);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+.panelHeader h3 {
+    font-size: 20px;
+    font-weight: 500;
 }
 
-.tradeHistoryTable th {
-  background: var(--Neutral-15);
-  font-weight: 500;
-  color: var(--Neutral-80);
-  font-size: 14px;
+/* Agent Mode Selector */
+.agentModeSelector {
+    display: flex;
+    background-color: var(--Neutral-15);
+    border-radius: 8px;
+    padding: 4px;
+}
+.modeButton {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--Neutral-60);
+}
+.modeButton.active {
+    background-color: var(--brand-primary);
+    color: white;
+    box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
 }
 
-.tradeHistoryTable tr:last-child td {
-  border-bottom: none;
+.chatInterface {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden; /* Contains the chat log and control tray */
+}
+/* The DirectChatLog will now fill this space */
+.chatInterface > div:first-child {
+    flex-grow: 1;
+    position: relative;
+    overflow: hidden;
+}
+/* The ControlTray will be positioned at the bottom */
+.chatInterface > section {
+    position: absolute;
+    bottom: -24px; /* Adjust to align with parent padding */
+    left: -24px;
+    right: -24px;
+    background: var(--Neutral-10); /* Match parent bg */
+    padding: 16px 24px;
+    border-top: 1px solid var(--Neutral-30);
 }
 
-.tradeHistoryTable tr:hover {
-  background: var(--Neutral-15);
+
+.marketExplorer {
+    background: var(--Neutral-10);
+    border: 1px solid var(--Neutral-30);
+    border-radius: 16px;
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    overflow: hidden;
 }
 
-.tokenCell {
-  font-weight: bold;
-  color: var(--brand-cyan);
+.explorerFilters {
+    padding: 20px;
+    border-right: 1px solid var(--Neutral-30);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.filterCategory {
+    width: 100%;
+    padding: 10px;
+    text-align: left;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--Neutral-80);
+    border-radius: 6px;
+}
+.filterCategory:hover {
+    background-color: var(--Neutral-15);
+}
+.filterCategory.active {
+    background-color: var(--brand-primary-dark);
+    color: white;
+}
+.filterCategory[disabled] {
+    color: var(--Neutral-50);
+    cursor: not-allowed;
+}
+.filterCategory[disabled]:hover {
+    background-color: transparent;
+}
+.filterDivider {
+    height: 1px;
+    background-color: var(--Neutral-30);
+    margin: 12px 0;
 }
 
-.priceCell {
-  font-weight: 500;
-  color: var(--brand-yellow);
+
+.explorerContent {
+    padding: 20px;
+    overflow-y: auto;
 }
 
-.agentCell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.marketGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
 }
 
-.agentAvatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 12px;
-  color: white;
+.marketPlaceholder {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--Neutral-60);
+    gap: 16px;
+    grid-column: 1 / -1; /* Span all columns */
+}
+.marketPlaceholder .icon {
+    font-size: 64px;
+    opacity: 0.7;
+}
+.errorMessage {
+    color: var(--Red-400);
+}
+
+/* Market Card */
+.marketCard {
+    background: var(--Neutral-15);
+    border-radius: 12px;
+    border: 1px solid var(--Neutral-20);
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* For image */
+}
+.marketCard:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    border-color: var(--brand-cyan);
+}
+.marketImage {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+}
+.marketTitle {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.4;
+    height: 64px; /* Approx 3 lines */
+    overflow: hidden;
+    padding: 12px 12px 0;
+}
+.marketOdds {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+}
+.odd {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    font-weight: 500;
+    background-color: var(--Neutral-20);
+    padding: 6px 8px;
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+}
+.odd::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: var(--bar-width, 50%);
+    background-color: var(--brand-primary-dark);
+    opacity: 0.5;
+    transition: width 0.3s ease-in-out;
+}
+.marketMeta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--Neutral-60);
+    margin-top: auto; /* Push to bottom */
+    padding: 12px;
+    border-top: 1px solid var(--Neutral-20);
+}
+
+
+/* Liquidity Panel */
+.liquidityExplainer {
+    background-color: var(--Neutral-15);
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+.liquidityExplainer h4 { font-size: 18px; color: var(--brand-cyan); }
+.liquidityExplainer p { font-size: 14px; color: var(--Neutral-80); margin-top: 4px; }
+
+@media (max-width: var(--breakpoint-md)) {
+    .predictionHubView {
+        padding: 24px;
+    }
+   .hubGrid {
+    grid-template-columns: 1fr;
+    grid-template-rows: 60vh auto;
+  }
+  .marketExplorer {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .explorerFilters {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--Neutral-30);
+    padding: 8px;
+  }
+  .filterCategory {
+    flex-shrink: 0;
+  }
 }

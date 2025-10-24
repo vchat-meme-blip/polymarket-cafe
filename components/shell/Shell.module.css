@@ -415,8 +415,17 @@
 }
 .toastIcon {
     font-size: 28px;
+}
+.toast.intel .toastIcon {
     color: var(--brand-cyan);
 }
+.toast.system .toastIcon {
+    color: var(--brand-purple);
+}
+.toast.error .toastIcon {
+    color: var(--brand-red);
+}
+
 .toastContent p {
     font-weight: 500;
 }
@@ -440,4 +449,69 @@
 .toast .button.secondary:hover {
     background: var(--Neutral-30);
     color: white;
+}
+
+/* --- NEW: Mobile Responsive Sidebar --- */
+@media (max-width: var(--breakpoint-sm)) {
+  .appShell {
+    flex-direction: column-reverse; /* Stack nav bar below content */
+  }
+
+  .appContent {
+    height: calc(100% - 60px); /* Full height minus nav bar */
+  }
+
+  .sidebar {
+    width: 100%;
+    height: 60px; /* Standard mobile nav height */
+    flex-direction: row;
+    justify-content: space-around; /* Space out main nav and settings */
+    padding: 0 8px;
+    border-right: none;
+    border-top: 1px solid var(--Neutral-30);
+  }
+
+  .sidebarTop, .sidebarBottom {
+    flex-direction: row;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    align-items: center;
+  }
+
+  .sidebarButton {
+    width: 44px;
+    height: 44px;
+    background-color: transparent;
+    border: none;
+  }
+  
+  .sidebarButton:hover {
+    background-color: var(--Neutral-15);
+  }
+
+  .sidebarButton .icon {
+    font-size: 28px;
+  }
+
+  .sidebarButton::after {
+    display: none; /* Hide tooltips on mobile */
+  }
+
+  /* Hide less critical buttons on mobile to save space */
+  .sidebarButton[data-tooltip="Bounty Board"],
+  .sidebarButton[data-tooltip="Letter Box"],
+  .sidebarButton[data-tooltip="Leaderboard"] {
+    display: none;
+  }
+  
+  .sidebarBottom {
+    gap: 16px;
+  }
+
+  /* Hide wallet info from nav bar; it's in the profile modal */
+  .walletBalance, .walletButtonContainer {
+    display: none;
+  }
 }

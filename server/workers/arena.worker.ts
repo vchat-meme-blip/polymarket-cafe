@@ -1,8 +1,9 @@
+/// <reference types="node" />
+
 import { parentPort } from 'worker_threads';
 import { connectDB } from '../db.js';
 import { ArenaDirector } from '../directors/arena.director.js';
 import { apiKeyProvider } from '../services/apiKey.provider.js';
-import process from 'process';
 
 // System pause state
 let systemPaused = false;
@@ -64,6 +65,15 @@ async function main() {
         case 'registerNewAgent':
           arenaDirector.registerNewAgent(message.payload.agent);
           break;
+        case 'roomUpdated':
+          arenaDirector.handleRoomUpdate(message.payload.room);
+          break;
+        case 'roomDeleted':
+          arenaDirector.handleRoomDelete(message.payload.roomId);
+          break;
+        case 'kickAgent':
+            arenaDirector.kickAgent(message.payload);
+            break;
         default:
           console.warn('[ArenaWorker] Received unknown message type for director:', message.type);
       }
@@ -75,5 +85,5 @@ async function main() {
 
 main().catch(err => {
   console.error('[ArenaWorker] Failed to start:', err);
-  process.exit(1);
+  // FIX: The global `process` object is not available in a worker context in this way. Let the thread exit on its own.
 });

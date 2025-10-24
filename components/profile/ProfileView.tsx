@@ -4,14 +4,16 @@
 */
 import { useState } from 'react';
 import Modal from '../Modal';
-import { useUI } from '../../lib/state';
+// FIX: Fix import for `useUI` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useUI } from '../../lib/state/index.js';
 import c from 'classnames';
 import ProfileTab from './ProfileTab';
 import WalletTab from './WalletTab';
 import SecurityTab from './SecurityTab';
+import NotificationsTab from './NotificationsTab';
 import styles from '../modals/Modals.module.css';
 
-type Tab = 'profile' | 'wallet' | 'security';
+type Tab = 'profile' | 'wallet' | 'security' | 'notifications';
 
 export default function ProfileView() {
   const { setShowProfileView } = useUI();
@@ -46,11 +48,18 @@ export default function ProfileView() {
           >
             Security
           </button>
+          <button
+            className={c(styles.tabButton, { [styles.active]: activeTab === 'notifications' })}
+            onClick={() => setActiveTab('notifications')}
+          >
+            Notifications
+          </button>
         </div>
         <div className={styles.modalContent}>
           {activeTab === 'profile' && <ProfileTab onSave={onClose} />}
           {activeTab === 'wallet' && <WalletTab />}
           {activeTab === 'security' && <SecurityTab />}
+          {activeTab === 'notifications' && <NotificationsTab onSave={onClose} />}
         </div>
       </div>
     </Modal>

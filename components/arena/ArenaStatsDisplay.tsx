@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import React, { useEffect, useState } from 'react';
-import { useAgent } from '../../lib/state';
+// FIX: Fix import for `useAgent` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useAgent } from '../../lib/state/index.js';
 import { useArenaStore } from '../../lib/state/arena';
-import { useWalletStore } from '../../lib/state/wallet';
 import styles from './Arena.module.css';
 
 const StatPanel = ({ icon, label, value }: { icon: string; label: string; value: number }) => {
@@ -46,12 +46,8 @@ const StatPanel = ({ icon, label, value }: { icon: string; label: string; value:
 
 export default function ArenaStatsDisplay() {
     const { availablePresets, availablePersonal } = useAgent();
-    const { rooms, activeConversations, lastSyncTimestamp } = useArenaStore();
-    const { transactions } = useWalletStore();
+    const { rooms, activeConversations } = useArenaStore();
     
-    // Use lastSyncTimestamp in the dependency array to ensure this component
-    // re-renders when the world state is updated
-
     const totalAgents = availablePresets.length + availablePersonal.length;
     const activeRooms = rooms.filter(r => r?.agentIds?.length > 0).length;
     // Count rooms with recent activity (within the last 30 seconds) as "live conversations"
@@ -61,16 +57,16 @@ export default function ArenaStatsDisplay() {
         if (!room || !room.agentIds || room.agentIds.length !== 2) return false;
         
         // Consider a conversation "live" if there was activity in the last 30 seconds
-        return Date.now() - timestamp < 30000;
+        return Date.now() - Number(timestamp) < 30000;
     }).length;
-    const totalTransactions = transactions.filter(tx => tx.type === 'send').length; // Count only send transactions for trades
+    const totalBets = 0; // Placeholder until bet history is implemented
 
     return (
         <div className={styles.arenaStatsDisplay}>
             <StatPanel icon="groups" label="Total Quants" value={totalAgents} />
             <StatPanel icon="meeting_room" label="Active Rooms" value={activeRooms} />
             <StatPanel icon="forum" label="Live Conversations" value={liveConversations} />
-            <StatPanel icon="swap_horiz" label="BOX Trades" value={totalTransactions} />
+            <StatPanel icon="paid" label="Bets Placed" value={totalBets} />
         </div>
     );
 }

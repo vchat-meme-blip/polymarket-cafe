@@ -4,7 +4,8 @@
 */
 import { useState, useRef, useCallback } from 'react';
 import { AudioRecorder } from '../lib/audio-recorder';
-import { apiService } from '../lib/services/api.service';
+// FIX: Add .js extension for ES module compatibility.
+import { apiService } from '../lib/services/api.service.js';
 
 type UseAudioInputProps = {
   onTranscription: (text: string) => void;

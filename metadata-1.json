@@ -1,0 +1,7 @@
+{
+  "name": "PolyAI Betting Arena",
+  "description": "A virtual AI-powered copilot for prediction markets. Design, test, and banter with custom AI agents to discover, make, and manage bets on Polymarket and Kalshi.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

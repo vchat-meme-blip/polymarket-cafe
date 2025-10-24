@@ -5,10 +5,11 @@
 import { useMemo, useEffect } from 'react';
 import { formatDistanceStrict } from 'date-fns';
 import Modal from '../Modal';
-import { useAgent, useUI } from '../../lib/state';
+// FIX: Fix imports for `useAgent` and `useUI` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useAgent, useUI } from '../../lib/state/index.js';
 import { simulateOfflineActivity } from '../../lib/state/autonomy';
 // FIX: The 'Intel' type is not exported from the autonomy store. It is now imported from its correct source file 'lib/types/index.js'.
-import { Intel } from '../../lib/types/index.js';
+import { BettingIntel } from '../../lib/types/index.js';
 import styles from '../modals/Modals.module.css';
 
 type WelcomeBackModalProps = {
@@ -21,7 +22,6 @@ export default function WelcomeBackModal({
   onClose,
 }: WelcomeBackModalProps) {
   const { current: agent } = useAgent();
-  const { openIntelDossier } = useUI();
 
   const summary = useMemo(() => {
     return simulateOfflineActivity(timeAwayMs);
@@ -38,9 +38,9 @@ export default function WelcomeBackModal({
     return null;
   }
 
-  const handleIntelClick = (intel: Partial<Intel>) => {
+  const handleIntelClick = (intel: Partial<BettingIntel>) => {
     onClose();
-    openIntelDossier(intel as Intel);
+    // No dossier to open for betting intel yet
   };
 
   return (
@@ -89,7 +89,7 @@ export default function WelcomeBackModal({
           {summary.intelFound.map((intel, i) => (
              <div className={styles.summaryItem} key={i} style={{paddingLeft: '32px'}}>
                 <button className={styles.intelButton} onClick={() => handleIntelClick(intel)}>
-                    <strong>${intel.token}</strong> - {intel.summary?.slice(0, 50) || 'New Alpha'}...
+                    <strong>{intel.market}</strong> - {intel.content?.slice(0, 50) || 'New Alpha'}...
                 </button>
              </div>
           ))}

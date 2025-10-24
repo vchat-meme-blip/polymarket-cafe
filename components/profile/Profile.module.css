@@ -169,3 +169,72 @@
 .button.danger:hover {
   background-color: var(--Red-700);
 }
+
+/* --- Notifications Tab --- */
+.notificationsTabContent form {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.notificationToggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background-color: var(--Neutral-10);
+    border: 1px solid var(--Neutral-20);
+    border-radius: 8px;
+}
+
+.notificationToggle label {
+    font-weight: 500;
+    color: var(--Neutral-90);
+    flex-direction: row;
+    align-items: center;
+}
+
+.notificationToggle .toggleSwitch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.notificationToggle .toggleSwitch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.notificationToggle .toggleSwitch label {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--Neutral-40);
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.notificationToggle .toggleSwitch label:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+.notificationToggle .toggleSwitch input:checked + label {
+    background-color: var(--brand-primary);
+}
+
+.notificationToggle .toggleSwitch input:checked + label:before {
+    transform: translateX(20px);
+}

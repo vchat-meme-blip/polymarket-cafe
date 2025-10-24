@@ -4,6 +4,8 @@
 */
 // FIX: Added '@react-three/fiber' import to augment the JSX namespace and resolve TypeScript errors for 3D components.
 import '@react-three/fiber';
+// FIX: Added missing 'React' import to resolve namespace errors.
+import React from 'react';
 import { useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useScroll, Html } from '@react-three/drei';

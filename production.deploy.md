@@ -6,7 +6,7 @@ This guide provides step-by-step instructions for deploying the Quants Café app
 
 1.  A server (e.g., a DigitalOcean Droplet, AWS EC2 instance) running a recent version of Linux (e.g., Ubuntu 22.04).
 2.  **Docker** installed on the server.
-3.  A domain name (`placeholder.digitalocean.com` in this guide) pointing to your server's IP address.
+3.  A domain name (`quants.sliplane.app/` in this guide) pointing to your server's IP address.
 4.  **Nginx** installed on the server to act as a reverse proxy.
 
 ---
@@ -94,12 +94,12 @@ Use Nginx to handle incoming traffic on the standard web ports (80 for HTTP, 443
     sudo nano /etc/nginx/sites-available/quants-cafe
     ```
 
-2.  **Paste the following configuration.** Replace `placeholder.digitalocean.com` with your actual domain name. **The `Upgrade` and `Connection` headers are essential for WebSockets.**
+2.  **Paste the following configuration.** Replace `quants.sliplane.app/` with your actual domain name. **The `Upgrade` and `Connection` headers are essential for WebSockets.**
 
     ```nginx
     server {
         listen 80;
-        server_name placeholder.digitalocean.com;
+        server_name quants.sliplane.app/;
 
         location / {
             proxy_pass http://localhost:3001;
@@ -123,4 +123,4 @@ Use Nginx to handle incoming traffic on the standard web ports (80 for HTTP, 443
     sudo systemctl restart nginx
     ```
 
-Your application should now be accessible at `http://placeholder.digitalocean.com`.
+Your application should now be accessible at `http://quants.sliplane.app/`.

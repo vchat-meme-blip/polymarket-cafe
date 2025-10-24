@@ -2,222 +2,197 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useAgent, useUser, useUI } from '../state.js';
-import { Agent, User, Room, Interaction, Bounty, Intel, Transaction } from '../types/index.js';
-import { useArenaStore } from '../state/arena.js';
-import { useAutonomyStore } from '../state/autonomy.js';
-import { useWalletStore } from '../state/wallet.js';
 import { API_BASE_URL } from '../config.js';
-
-interface ChatResponse {
-  agentMessage: Interaction;
-  contextToken?: Intel;
-}
-
-interface BootstrapResponse {
-    user: User;
-    agents: Agent[];
-    rooms: Room[];
-    conversations: Interaction[];
-    bounties: Bounty[];
-    intel: Intel[];
-    transactions: Transaction[];
-}
+// FIX: Import types from canonical source to avoid circular dependencies and resolve type errors.
+import type { Agent, User, Bet, MarketIntel, Room, Interaction } from '../types/index.js';
+// FIX: Add missing imports for state stores.
+import { useAgent, useUser, useArenaStore, useAutonomyStore, useWalletStore } from '../state/index.js';
 
 class ApiService {
-  // FIX: Changed visibility of request method from private to public to allow access from other components.
-  public async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-        ...options,
-      });
+  // FIX: Make request method public for generic use.
+  public async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const handle = useUser.getState().handle;
+    
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+      // Include user handle for authentication on the backend
+      'X-User-Handle': handle || '',
+    };
 
+    try {
+      const response = await fetch(url, { ...options, headers });
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        const errorData: unknown = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+        const errorMessage = (typeof errorData === 'object' && errorData !== null && 'message' in errorData && typeof (errorData as any).message === 'string')
+          ? (errorData as any).message
+          : `Request failed with status ${response.status}`;
+        throw new Error(errorMessage);
       }
-      return response.json();
+      // Handle cases where the response body might be empty (e.g., for a 204 No Content)
+      const text = await response.text();
+      return text ? JSON.parse(text) : ({} as T);
     } catch (error) {
       console.error(`API request to ${endpoint} failed:`, error);
       throw error;
     }
   }
 
-  public async bootstrap(handle: string): Promise<{ success: boolean }> {
-    try {
-      const response = await this.request<BootstrapResponse>('/bootstrap', {
-        method: 'POST',
-        body: JSON.stringify({ handle }),
-      });
-
-      useUser.setState(response.user);
-      // Intelligently merge agents to prevent race conditions where a bootstrap
-      // overwrites a newly created agent before it's in the DB.
-      useAgent.setState(state => {
-        const newAgents = response.agents;
-        const existingAgentMap = new Map(state.availablePersonal.map(agent => [agent.id, agent]));
-        newAgents.forEach(agent => existingAgentMap.set(agent.id, agent));
-        return { availablePersonal: Array.from(existingAgentMap.values()) };
-      });
-      useArenaStore.getState().hydrate(response);
-      useAutonomyStore.getState().hydrate(response);
-      useWalletStore.getState().hydrate(response);
+  // --- User & Auth ---
+  async bootstrap(handle: string): Promise<{ success: boolean }> {
+      const data = await this.request<any>(`/api/bootstrap/${handle}`);
       
-      useUI.getState().setIsSignedIn(true);
+      // Hydrate all stores with server data
+      useUser.getState()._setHandle(data.user.handle);
+      useUser.setState(data.user);
+      useAgent.setState({
+          availablePersonal: data.agents,
+          current: data.agents.find((a: Agent) => a.id === data.user.currentAgentId) || data.agents[0] || useAgent.getState().current,
+      });
+      useAutonomyStore.getState().hydrate(data.autonomy);
+      useWalletStore.getState().hydrate(data.wallet);
 
-      console.log(`[ApiService] Bootstrapped and hydrated all data for ${handle}`);
       return { success: true };
-    } catch (error) {
-      useUI.getState().setIsSignedIn(false);
-      return { success: false };
-    }
-  }
-
-  public async connectWallet(address: string): Promise<{ success: boolean; address?: string }> {
-     const signatureRequest = window.confirm(
-      'Please sign this message to verify ownership of your wallet.\n\n(This is a simulation. No real transaction will occur.)'
-    );
-    if (!signatureRequest) {
-      return { success: false };
-    }
-    
-    const handle = useUser.getState().handle;
-    const updatedUser = await this.request<User>('/user', {
-        method: 'PUT',
-        body: JSON.stringify({ handle, updates: { solanaWalletAddress: address } }),
-    });
-    useUser.setState(updatedUser);
-    return { success: true, address };
-  }
-
-  public async disconnectWallet(): Promise<{ success: boolean }> {
-    const handle = useUser.getState().handle;
-    const updatedUser = await this.request<User>('/user', {
-        method: 'PUT',
-        body: JSON.stringify({ handle, updates: { solanaWalletAddress: null } }),
-    });
-    useUser.setState(updatedUser);
-    return { success: true };
-  }
-
-  public async saveApiKey(apiKey: string): Promise<{ success: boolean }> {
-    const handle = useUser.getState().handle;
-    const updatedUser = await this.request<User>('/user', {
-        method: 'PUT',
-        body: JSON.stringify({ handle, updates: { userApiKey: apiKey } }),
-    });
-    useUser.setState(updatedUser);
-    return { success: true };
-  }
-
-  public async saveNewAgent(agent: Agent): Promise<{ success: boolean, agent: Agent }> {
-    const newAgent = await this.request<Agent>('/agents', {
-        method: 'POST',
-        body: JSON.stringify(agent),
-    });
-    // The server is now the source of truth. The client state will update via
-    // the response from this call and subsequent WebSocket events.
-    // Instead of just adding, we merge to prevent race conditions
-    // where a bootstrap might temporarily overwrite the new agent.
-    useAgent.setState(state => {
-      // Remove any existing agent with the same ID to avoid duplicates
-      const filteredAgents = state.availablePersonal.filter(a => a.id !== newAgent.id);
-      return { availablePersonal: [...filteredAgents, newAgent] };
-    });
-    // The server will handle registering the agent in its own simulation state.
-    // registerAgentInArena(newAgent.id);
-    return { success: true, agent: newAgent };
-  }
-
-  public async updateAgent(agentId: string, updates: Partial<Agent>): Promise<{ success: boolean, agent: Agent }> {
-    const updatedAgent = await this.request<Agent>(`/agents/${agentId}`, {
-        method: 'PUT',
-        body: JSON.stringify(updates),
-    });
-    // Perform an atomic update to prevent race conditions.
-    useAgent.setState(state => ({
-      availablePersonal: state.availablePersonal.map(a => a.id === agentId ? updatedAgent : a),
-      current: state.current.id === agentId ? updatedAgent : state.current,
-    }));
-    return { success: true, agent: updatedAgent };
-  }
-
-  public async syncOnboardingComplete(handle: string): Promise<void> {
-    try {
-      const updatedUser = await this.request<User>('/user', {
-        method: 'PUT',
-        body: JSON.stringify({
-          handle,
-          updates: { hasCompletedOnboarding: true },
-        }),
-      });
-      useUser.setState(updatedUser);
-    } catch (error) {
-      console.error('Failed to sync onboarding completion with server:', error);
-    }
-  }
-
-  public async sendDirectMessage(message: string): Promise<ChatResponse> {
-    const { handle } = useUser.getState();
-    const { current: agent } = useAgent.getState();
-    if (!handle || !agent) throw new Error("User or agent not set");
-
-    return this.request<ChatResponse>('/chat', {
-        method: 'POST',
-        body: JSON.stringify({ handle, agentId: agent.id, message }),
-    });
   }
   
-  public async transcribeAudio(audioBase64: string): Promise<{ text: string }> {
-     return this.request<{ text: string }>('/transcribe', {
-        method: 'POST',
-        body: JSON.stringify({ audio: audioBase64 }),
-    });
+  async checkHandle(handle: string): Promise<{ available: boolean; isNewUser: boolean; }> {
+    return this.request<{ available: boolean; isNewUser: boolean; }>(`/api/users/check-handle/${handle}`);
   }
 
-  public async getAgentActivity(agentId: string): Promise<any[]> {
-    return this.request<any[]>(`/agents/${agentId}/activity`);
-  }
-
-  public async getAgentActivitySummary(agentId: string): Promise<{ summary: string; logs: any[]; stats: any }> {
-    return this.request<{ summary: string; logs: any[]; stats: any }>(`/agents/${agentId}/activity-summary`);
-  }
-  
-  public async scoutToken(query: string): Promise<Intel> {
-    const { handle } = useUser.getState();
-    return this.request<Intel>('/scout', {
-      method: 'POST',
-      body: JSON.stringify({ query, handle }),
-    });
-  }
-
-  public async sendAgentToCafe(agentId: string): Promise<{ success: boolean }> {
-    return this.request<{ success: boolean }>(`/agents/${agentId}/join-cafe`, {
-        method: 'POST',
-    });
-  }
-
-  public async createAndHostRoom(agentId: string): Promise<{ success: boolean }> {
-      return this.request<{ success: boolean }>(`/agents/${agentId}/create-room`, {
+  async registerUser(handle: string): Promise<{ user: User }> {
+      return this.request<{ user: User }>('/api/users/register', {
           method: 'POST',
+          body: JSON.stringify({ handle }),
       });
   }
 
-  public async brainstormPersonality(keywords: string): Promise<{ personality: string }> {
-    return this.request<{ personality: string }>('/brainstorm', {
+  async connectWallet(address: string): Promise<void> {
+    await this.request<void>('/api/users/wallet/connect', {
+      method: 'POST',
+      body: JSON.stringify({ address }),
+    });
+  }
+  
+  async disconnectWallet(): Promise<void> {
+    await this.request<void>('/api/users/wallet/disconnect', { method: 'POST' });
+  }
+  
+  async recoverByWallet(address: string): Promise<{ handle: string }> {
+      return this.request<{ handle: string }>(`/api/users/recover/${address}`);
+  }
+
+  // --- Agents ---
+  async saveNewAgent(agent: Agent): Promise<{ agent: Agent }> {
+    return this.request<{ agent: Agent }>('/api/agents', {
+      method: 'POST',
+      body: JSON.stringify(agent),
+    });
+  }
+
+  async updateAgent(agentId: string, updates: Partial<Agent>): Promise<{ agent: Agent }> {
+    return this.request<{ agent: Agent }>(`/api/agents/${agentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  // --- Agent Actions & AI ---
+  async brainstormPersonality(keywords: string): Promise<{ personality: string }> {
+    return this.request<{ personality: string }>('/api/ai/brainstorm-personality', {
       method: 'POST',
       body: JSON.stringify({ keywords }),
     });
   }
 
-  public async startResearch(agentId: string): Promise<{ success: boolean }> {
-    return this.request<{ success: boolean }>(`/agents/${agentId}/start-research`, {
+  async sendDirectMessage(message: string, history: Interaction[]): Promise<{ agentMessage: Interaction }> {
+    const agentId = useAgent.getState().current.id;
+    return this.request<{ agentMessage: Interaction }>('/api/ai/direct-message', {
         method: 'POST',
+        body: JSON.stringify({ agentId, message, history }),
     });
+  }
+  
+  async transcribeAudio(audioBase64: string): Promise<{ text: string }> {
+      return this.request<{ text: string }>('/api/ai/transcribe', {
+          method: 'POST',
+          body: JSON.stringify({ audio: audioBase64 }),
+      });
+  }
+  
+  async startResearch(agentId: string, handle: string): Promise<void> {
+      await this.request<void>('/api/autonomy/start-research', {
+          method: 'POST',
+          body: JSON.stringify({ agentId, handle }),
+      });
+  }
+
+  async sendAgentToCafe(agentId: string): Promise<void> {
+      await this.request<void>('/api/arena/send-to-cafe', {
+          method: 'POST',
+          body: JSON.stringify({ agentId }),
+      });
+  }
+
+  async createAndHostRoom(agentId: string): Promise<void> {
+      await this.request<void>('/api/arena/create-room', {
+          method: 'POST',
+          body: JSON.stringify({ agentId }),
+      });
+  }
+
+  async purchaseRoom(details: { name: string }): Promise<{ room: Room }> {
+    return this.request<{ room: Room }>('/api/rooms/purchase', {
+      method: 'POST',
+      body: JSON.stringify(details),
+    });
+  }
+
+  async updateRoom(roomId: string, updates: Partial<Room>): Promise<{ room: Room }> {
+    return this.request<{ room: Room }>(`/api/rooms/${roomId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteRoom(roomId: string): Promise<void> {
+    await this.request<void>(`/api/rooms/${roomId}`, {
+      method: 'DELETE',
+    });
+  }
+  
+  async getAgentActivitySummary(agentId: string): Promise<{ summary: string }> {
+      return this.request<{ summary: string }>(`/api/agents/${agentId}/activity`);
+  }
+
+  async addBettingIntel(agentId: string, intel: any): Promise<void> {
+      await this.request<void>(`/api/agents/${agentId}/intel`, {
+          method: 'POST',
+          body: JSON.stringify(intel),
+      });
+  }
+
+  // --- Markets & Betting ---
+  async getLiveMarkets(): Promise<{ markets: MarketIntel[], hasMore: boolean }> {
+      return this.request<{ markets: MarketIntel[], hasMore: boolean }>('/api/markets/live');
+  }
+
+  async placeBet(agentId: string, bet: Partial<Bet>): Promise<void> {
+      await this.request<void>('/api/bets', {
+          method: 'POST',
+          body: JSON.stringify({ agentId, ...bet }),
+      });
+  }
+
+  async resetDatabase(): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/api/system/reset-database', {
+      method: 'POST',
+    });
+  }
+
+  // Make the generic request method public for one-off calls
+  public async get<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint);
   }
 }
 

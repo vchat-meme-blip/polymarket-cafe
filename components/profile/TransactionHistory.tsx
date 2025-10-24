@@ -2,6 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
+// FIX: Added missing React import to ensure JSX is correctly interpreted.
+import React from 'react';
 import { useWalletStore } from '../../lib/state/wallet';
 // FIX: The 'Transaction' type is not exported from the wallet store. It is now imported from its correct source file 'lib/types/index.js'.
 import { Transaction } from '../../lib/types/index.js';

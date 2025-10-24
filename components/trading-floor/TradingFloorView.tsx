@@ -1,184 +1,216 @@
-import { useMemo, useEffect, useState } from 'react';
-import { useArenaStore, TradeRecord } from '../../lib/state/arena';
-import { useAgent, useUI } from '../../lib/state';
-import { format } from 'date-fns';
-import styles from './TradingFloor.module.css';
 
-const AGENT_COLORS = [
-  '#e74c3c', '#3498db', '#2ecc71', '#f1c40f', 
-  '#9b59b6', '#e67e22', '#1abc9c', '#e84393'
-];
+import { useState, useEffect } from 'react';
+import { useAgent, useUI } from '../../lib/state/index.js';
+import { apiService } from '../../lib/services/api.service.js';
+import styles from './PredictionHub.module.css';
+import { MarketIntel, AgentMode } from '../../lib/types/index.js';
+import ControlTray from '../console/control-tray/ControlTray.js';
+import DirectChatLog from '../dashboard/DirectChatLog.js';
+import c from 'classnames';
 
-export default function TradingFloorView() {
-    const { rooms, tradeHistory, lastSyncTimestamp } = useArenaStore();
-    const { availablePersonal, availablePresets } = useAgent();
-    const { setView, setInitialArenaFocus } = useUI();
-    const allAgents = useMemo(() => [...availablePersonal, ...availablePresets], [availablePersonal, availablePresets]);
-    
-    // Force component to update when rooms change
-    const [updateTrigger, setUpdateTrigger] = useState(Date.now());
-    
-    // Update trigger when lastSyncTimestamp changes
-    useEffect(() => {
-        setUpdateTrigger(Date.now());
-        console.log('[TradingFloor] Detected world state update, refreshing offers');
-    }, [lastSyncTimestamp]);
+type HubTab = 'Markets' | 'Arbitrage' | 'Liquidity' | 'Bookmarks';
 
-    const activeOffers = useMemo(() => {
-        console.log('[TradingFloor] Recalculating active offers, found:', rooms.filter(room => room.activeOffer).length);
-        return rooms
-            .filter(room => room.activeOffer)
-            .map(room => {
-                const seller = allAgents.find(a => a.id === room.activeOffer!.fromAgentId);
-                return {
-                    room,
-                    offer: room.activeOffer!,
-                    seller,
-                };
-            });
-    }, [rooms, allAgents, updateTrigger]); // Include updateTrigger to force recalculation
-    
-    const handleGoToRoom = (roomId: string) => {
-        setInitialArenaFocus(roomId);
-        setView('arena');
-    };
+const MARKET_CATEGORIES = ['All', 'Sports', 'Crypto', 'Politics', 'Business', 'News'];
 
-    // Process trade history to get agent names
-    const processedTradeHistory = useMemo(() => {
-        console.log('[TradingFloor] Recalculating trade history, found:', tradeHistory.length);
-        return tradeHistory.map(trade => {
-            const seller = allAgents.find(a => a.id === trade.fromId);
-            const buyer = allAgents.find(a => a.id === trade.toId);
-            return {
-                ...trade,
-                sellerName: seller?.name || 'Unknown Agent',
-                buyerName: buyer?.name || 'Unknown Agent',
-                sellerColor: seller ? AGENT_COLORS[seller.name.charCodeAt(0) % AGENT_COLORS.length] : '#888',
-                buyerColor: buyer ? AGENT_COLORS[buyer.name.charCodeAt(0) % AGENT_COLORS.length] : '#888',
-            };
-        }).sort((a, b) => b.timestamp - a.timestamp); // Sort by most recent first
-    }, [tradeHistory, allAgents, updateTrigger]); // Include updateTrigger to force recalculation
+const MarketCard = ({ market, onSelect }: { market: MarketIntel, onSelect: (market: MarketIntel) => void }) => (
+    <div className={styles.marketCard} onClick={() => onSelect(market)}>
+        {market.imageUrl && <img src={market.imageUrl} alt={market.title} className={styles.marketImage} />}
+        <p className={styles.marketTitle}>{market.title}</p>
+        <div className={styles.marketOdds}>
+            <div className={styles.odd} style={{ '--bar-width': `${market.odds.yes * 100}%` } as React.CSSProperties}>
+                <span>Yes</span>
+                <span>{(market.odds.yes * 100).toFixed(0)}¢</span>
+            </div>
+            <div className={styles.odd} style={{ '--bar-width': `${market.odds.no * 100}%` } as React.CSSProperties}>
+                <span>No</span>
+                <span>{(market.odds.no * 100).toFixed(0)}¢</span>
+            </div>
+        </div>
+        <div className={styles.marketMeta}>
+            <span>Vol: ${market.volume.toLocaleString()}</span>
+            <span>Liq: ${market.liquidity.toLocaleString()}</span>
+        </div>
+    </div>
+);
+
+const AgentModeSelector = () => {
+    const { current: currentAgent, setCurrentAgentMode } = useAgent();
+    const activeMode = currentAgent.mode;
+
+    const modes: { name: AgentMode; description: string }[] = [
+        { name: 'Safe', description: 'Prioritize high-probability, low-return bets with high liquidity.' },
+        { name: 'Degen', description: 'Look for high-risk, high-reward opportunities on new markets.' },
+        { name: 'Mag7', description: 'Simulate top trader behavior by focusing on high-volume markets.' }
+    ];
 
     return (
-        <div className={styles.tradingFloorView}>
-            <h2>Trading Floor</h2>
-            
-            {/* Active Offers Section */}
-            <div className={styles.sectionHeader}>
-                <h3 className={styles.sectionTitle}>
-                    <span className="icon">storefront</span>
-                    Active Offers
-                </h3>
+        <div className={styles.agentModeSelector}>
+            {modes.map(mode => (
                 <button 
-                    className={styles.refreshButton} 
-                    onClick={() => setUpdateTrigger(Date.now())}
-                    aria-label="Refresh offers"
+                    key={mode.name}
+                    className={`${styles.modeButton} ${activeMode === mode.name ? styles.active : ''}`}
+                    onClick={() => setCurrentAgentMode(mode.name)}
+                    title={mode.description}
                 >
-                    <span className="icon">refresh</span>
+                    {mode.name}
                 </button>
+            ))}
+        </div>
+    );
+};
+
+
+const LiquidityPanel = () => {
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [markets, setMarkets] = useState<MarketIntel[]>([]);
+    const { openMarketDetailModal } = useUI();
+
+    useEffect(() => {
+        const fetchLiquidity = async () => {
+            setIsLoading(false);
+            setError(null);
+            try {
+                const fetchedMarkets = await apiService.get<MarketIntel[]>('/api/markets/liquidity');
+                setMarkets(fetchedMarkets);
+            } catch (err) {
+                 setError('Could not load liquidity opportunities.');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchLiquidity();
+    }, []);
+
+    return (
+        <div className={styles.liquidityPanel}>
+            <div className={styles.liquidityExplainer}>
+                <h4>Provide Liquidity</h4>
+                <p>Earn fees and rewards by providing liquidity to markets. This is a higher-risk, higher-reward strategy for advanced users.</p>
             </div>
-            {activeOffers.length === 0 ? (
-                <div className={styles.emptyState}>
-                    <span className="icon">storefront</span>
-                    <p>No active offers in the Café right now. The market is quiet.</p>
+             {isLoading ? (
+                <div className={styles.marketPlaceholder}><p>Loading liquidity opportunities...</p></div>
+            ) : error ? (
+                <div className={styles.marketPlaceholder}><p className={styles.errorMessage}>{error}</p></div>
+            ) : markets.length > 0 ? (
+                <div className={styles.marketGrid}>
+                    {markets.map(market => (
+                        <MarketCard key={market.id} market={market} onSelect={openMarketDetailModal} />
+                    ))}
                 </div>
             ) : (
-                <div className={styles.offerGrid}>
-                    {activeOffers.map(({ room, offer, seller }) => {
-                       const color = seller ? AGENT_COLORS[seller.name.charCodeAt(0) % AGENT_COLORS.length] : '#888';
-                       return (
-                            <div key={`${room.id}-${offer.token}`} className={styles.offerCard}>
-                                <div className={styles.offerHeader}>
-                                    <span className={styles.offerToken}>${offer.token}</span>
-                                    <span className={styles.offerPrice}>
-                                        <span className="icon">redeem</span>
-                                        {offer.price.toLocaleString()} BOX
-                                    </span>
-                                </div>
-                                {seller && (
-                                    <div className={styles.offerSellerInfo}>
-                                        <div className={styles.sellerAvatar} style={{ backgroundColor: color }}>
-                                            {seller.name.charAt(0)}
-                                        </div>
-                                        <div>
-                                            <p>Offered by <strong>{seller.name}</strong></p>
-                                            <p>In Room {room.id.split('-')[1]}</p>
-                                        </div>
-                                    </div>
-                                )}
-                                <div className={styles.offerCardFooter}>
-                                    <button className="button primary" onClick={() => handleGoToRoom(room.id)}>
-                                        <span className="icon">login</span>
-                                        Go to Room
-                                    </button>
-                                </div>
-                            </div>
-                       )
-                    })}
+                 <div className={styles.marketPlaceholder}>
+                    <span className="icon">liquidity</span>
+                    <p>No special liquidity opportunities found right now.</p>
                 </div>
             )}
-            
-            {/* Trade History Section */}
-            <div className={styles.sectionHeader}>
-                <h3 className={styles.sectionTitle}>
-                    <span className="icon">history</span>
-                    Recent Trades
-                </h3>
-                <button 
-                    className={styles.refreshButton} 
-                    onClick={() => setUpdateTrigger(Date.now())}
-                    aria-label="Refresh trades"
-                >
-                    <span className="icon">refresh</span>
-                </button>
+        </div>
+    );
+};
+
+
+/**
+ * The main view for discovering prediction markets and interacting with an AI agent for analysis and betting.
+ */
+export default function PredictionHubView() {
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [markets, setMarkets] = useState<MarketIntel[]>([]);
+    const [activeCategory, setActiveCategory] = useState('All');
+    const [activeTab, setActiveTab] = useState<HubTab>('Markets');
+    const { openMarketDetailModal } = useUI();
+    const { current: currentAgent } = useAgent();
+
+    useEffect(() => {
+        if (activeTab !== 'Markets') return;
+
+        const fetchMarkets = async () => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                const categoryQuery = activeCategory === 'All' ? '' : activeCategory;
+                const modeQuery = currentAgent.mode;
+                const fetchedMarkets = await apiService.get<MarketIntel[]>(`/api/markets/live?category=${categoryQuery}&mode=${modeQuery}`);
+                setMarkets(fetchedMarkets);
+            } catch (err) {
+                console.error(`Failed to fetch markets for category ${activeCategory}`, err);
+                setError('Could not load markets. Please try again later.');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchMarkets();
+    }, [activeCategory, currentAgent.mode, activeTab]);
+
+    const renderMarketContent = () => {
+        if (isLoading) return <div className={styles.marketPlaceholder}><p>Loading markets...</p></div>;
+        if (error) return <div className={styles.marketPlaceholder}><p className={styles.errorMessage}>{error}</p></div>;
+        if (markets.length > 0) {
+            return (
+                 <div className={styles.marketGrid}>
+                    {markets.map(market => (
+                        <MarketCard key={market.id} market={market} onSelect={openMarketDetailModal} />
+                    ))}
+                </div>
+            );
+        }
+        return (
+            <div className={styles.marketPlaceholder}>
+               <span className="icon">storefront</span>
+               <p>No markets found for this filter combination.</p>
             </div>
-            {processedTradeHistory.length === 0 ? (
-                <div className={styles.emptyState}>
-                    <span className="icon">history</span>
-                    <p>No trades have been completed yet. Check back later!</p>
+        );
+    };
+
+    const tabConfig: { name: HubTab; title: string; disabled?: boolean }[] = [
+        { name: 'Markets', title: 'Browse live prediction markets' },
+        { name: 'Liquidity', title: 'Find opportunities to earn rewards as a liquidity provider' },
+        { name: 'Arbitrage', title: 'Arbitrage scanner (coming soon)'},
+        { name: 'Bookmarks', title: 'View your saved markets (coming soon)', disabled: true }
+    ];
+
+    return (
+        <div className={styles.predictionHubView}>
+            <header className={styles.header}>
+                <h2>Prediction Hub</h2>
+                <p>Discover markets, get AI-powered intel, and manage your bets.</p>
+            </header>
+
+            <main className={styles.hubGrid}>
+                <div className={styles.agentConsoleWrapper}>
+                    <div className={styles.panelHeader}>
+                        <h3>Agent Console</h3>
+                        <AgentModeSelector />
+                    </div>
+                    <div className={styles.chatInterface}>
+                        <DirectChatLog />
+                        <ControlTray />
+                    </div>
                 </div>
-            ) : (
-                <div className={styles.tradeHistoryContainer}>
-                    <table className={styles.tradeHistoryTable}>
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Token</th>
-                                <th>Price</th>
-                                <th>Seller</th>
-                                <th>Buyer</th>
-                                <th>Room</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {processedTradeHistory.map((trade, index) => (
-                                <tr key={`trade-${index}-${trade.timestamp}`}>
-                                    <td>{format(trade.timestamp, 'MMM d, h:mm a')}</td>
-                                    <td className={styles.tokenCell}>${trade.token}</td>
-                                    <td className={styles.priceCell}>{trade.price.toLocaleString()} BOX</td>
-                                    <td>
-                                        <div className={styles.agentCell}>
-                                            <div className={styles.agentAvatar} style={{ backgroundColor: trade.sellerColor }}>
-                                                {trade.sellerName.charAt(0)}
-                                            </div>
-                                            <span>{trade.sellerName}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div className={styles.agentCell}>
-                                            <div className={styles.agentAvatar} style={{ backgroundColor: trade.buyerColor }}>
-                                                {trade.buyerName.charAt(0)}
-                                            </div>
-                                            <span>{trade.buyerName}</span>
-                                        </div>
-                                    </td>
-                                    <td>Room {trade.roomId.split('-')[1]}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+
+                <div className={styles.marketExplorer}>
+                    <div className={styles.explorerFilters}>
+                        {tabConfig.map(tab => (
+                             <button key={tab.name} className={c(styles.filterCategory, { [styles.active]: activeTab === tab.name })} onClick={() => setActiveTab(tab.name)} disabled={tab.disabled}>
+                                {tab.name}
+                            </button>
+                        ))}
+                        <div className={styles.filterDivider}></div>
+                        {MARKET_CATEGORIES.map(cat => (
+                            <button key={cat} className={c(styles.filterCategory, { [styles.active]: activeCategory === cat })} onClick={() => setActiveCategory(cat)}>
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className={styles.explorerContent}>
+                        {activeTab === 'Markets' && renderMarketContent()}
+                        {activeTab === 'Liquidity' && <LiquidityPanel />}
+                        {activeTab === 'Arbitrage' && <div className={styles.marketPlaceholder}><span className="icon">compare_arrows</span><p>Arbitrage scanner coming soon: Find price discrepancies between Polymarket and Kalshi.</p></div>}
+                        {activeTab === 'Bookmarks' && <div className={styles.marketPlaceholder}><p>Bookmarked markets will appear here.</p></div>}
+                    </div>
                 </div>
-            )}
+            </main>
         </div>
     );
 }

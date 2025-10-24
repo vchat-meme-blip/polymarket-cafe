@@ -4,17 +4,18 @@
 */
 import { create } from 'zustand';
 import { useWalletStore } from './wallet.js';
-import { AgentActivity, Intel, Bounty } from '../types/index.js';
+// FIX: Imported types from the canonical types file.
+import { AgentActivity, BettingIntel, Bounty } from '../types/index.js';
 
 interface ServerHydrationData {
     bounties: Bounty[];
-    intel: Intel[];
+    intel: BettingIntel[];
 }
 
 export type AutonomyState = {
   activity: AgentActivity;
   statusMessage: string;
-  intelBank: Intel[];
+  intelBank: BettingIntel[];
   bounties: Bounty[];
   lastActivity: Record<string, number>;
   isAutonomyEnabled: boolean;
@@ -24,12 +25,12 @@ export type AutonomyState = {
   setActivity: (activity: AgentActivity, message?: string) => void;
   setLastActivity: (activity: AgentActivity, timestamp: number) => void;
   addIntelFromConversation: (
-    intel: Partial<Intel>,
+    intel: Partial<BettingIntel>,
     bountyId?: string,
   ) => void;
-  addIntelFromSocket: (intel: Intel) => void;
-  addIntelBatch: (intelItems: Partial<Intel>[]) => void;
-  updateIntel: (intelId: string, updates: Partial<Intel>) => void;
+  addIntelFromSocket: (intel: BettingIntel) => void;
+  addIntelBatch: (intelItems: Partial<BettingIntel>[]) => void;
+  updateIntel: (intelId: string, updates: Partial<BettingIntel>) => void;
   toggleAutonomy: () => void;
   setGatherIntelCooldown: (cooldown: number) => void;
   setResearchIntelCooldown: (cooldown: number) => void;
@@ -69,10 +70,10 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
           statusMessage = 'In the Café, hunting for bounty intel.';
           break;
         case 'GATHERING_INTEL':
-          statusMessage = 'Scanning for new tokens...';
+          statusMessage = 'Scanning prediction markets...';
           break;
         case 'RESEARCHING_INTEL':
-          statusMessage = 'Running due diligence on a new token...';
+          statusMessage = 'Analyzing betting intel...';
           break;
         case 'CHATTING_WITH_USER':
           statusMessage = 'Engaged in a direct conversation.';
@@ -91,26 +92,27 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
   },
 
   addIntelFromConversation: (
-    intel: Partial<Intel>,
+    intel: Partial<BettingIntel>,
     bountyId,
   ) => {
     set(state => {
       if (
         state.intelBank.some(
-          item => item.id === `intel-${intel.marketData?.mintAddress}`,
+          item => item.id === intel.id,
         )
       ) {
         return state;
       }
 
-      const newIntel: Intel = {
-        id: `intel-${intel.marketData?.mintAddress}`,
-        timestamp: Date.now(),
-        token: intel.token || 'UNKNOWN',
-        source: intel.source || 'Conversation',
+      const newIntel: BettingIntel = {
+        id: `bettingintel-${Math.random().toString(36).substring(2, 9)}`,
+        createdAt: Date.now(),
+        market: intel.market || 'UNKNOWN',
+        content: intel.content || '',
+        sourceDescription: intel.sourceDescription || 'Conversation',
         ...intel,
         bountyId: bountyId,
-      } as Intel;
+      } as BettingIntel;
 
       if (bountyId) {
         get().completeBounty(bountyId);
@@ -119,7 +121,7 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
     });
   },
 
-  addIntelFromSocket: (intel: Intel) => {
+  addIntelFromSocket: (intel: BettingIntel) => {
     set(state => {
        if (state.intelBank.some(item => item.id === intel.id)) {
         return state; // Avoid duplicates
@@ -128,18 +130,18 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
     });
   },
 
-  addIntelBatch: (intelItems: Partial<Intel>[]) => {
+  addIntelBatch: (intelItems: Partial<BettingIntel>[]) => {
     set(state => {
       const existingIds = new Set(state.intelBank.map(item => item.id));
       const newItems = intelItems.filter(
         item => item.id && !existingIds.has(item.id),
       );
       if (newItems.length === 0) return state;
-      return { intelBank: [...(newItems as Intel[]), ...state.intelBank] };
+      return { intelBank: [...(newItems as BettingIntel[]), ...state.intelBank] };
     });
   },
 
-  updateIntel: (intelId: string, updates: Partial<Intel>) => {
+  updateIntel: (intelId: string, updates: Partial<BettingIntel>) => {
     set(state => ({
       intelBank: state.intelBank.map(item =>
         item.id === intelId ? { ...item, ...updates } : item,
@@ -157,7 +159,8 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
   addBounty: (objective, reward) => {
     const { balance, addTransaction } = useWalletStore.getState();
     if (balance < reward) {
-      alert("You don't have enough BOX to fund this bounty.");
+      console.error("Attempted to add bounty with insufficient funds.");
+      // The UI component calling this should handle the user feedback (e.g., alert).
       return;
     }
 
@@ -211,7 +214,7 @@ export function simulateOfflineActivity(timeAwayMs: number) {
 
     let boxChange = 0;
     let repChange = 0;
-    const intelFound: Partial<Intel>[] = [];
+    const intelFound: Partial<BettingIntel>[] = [];
     const existingIntel = useAutonomyStore.getState().intelBank;
 
     for (let i = 0; i < ticks; i++) {

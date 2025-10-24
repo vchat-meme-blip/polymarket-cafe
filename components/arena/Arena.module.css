@@ -30,6 +30,51 @@
     top: 0;
     justify-content: space-between;
 }
+
+.cafeMusicController {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 16px;
+    background: rgba(10, 10, 10, 0.65);
+    border: 1px solid var(--Neutral-30);
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+    max-width: 420px;
+    min-width: 280px;
+}
+
+.cafeMusicMeta {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.cafeMusicMeta .icon {
+    font-size: 28px;
+    color: var(--brand-primary-light);
+}
+
+.cafeMusicStatus {
+    font-weight: 600;
+    color: white;
+}
+
+.cafeMusicPrompt {
+    font-size: 12px;
+    color: var(--Neutral-70);
+}
+
+.cafeMusicError {
+    font-size: 12px;
+    color: var(--brand-error, #ff6b6b);
+}
+
+.cafeMusicActions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
 .arenaUiOverlay.bottom {
     bottom: 0;
     flex-direction: column;
@@ -39,6 +84,43 @@
 .arenaUiOverlay > * {
     pointer-events: all;
 }
+
+/* --- Dropdown Menu for Mobile Actions --- */
+.mobileMenuContainer {
+    position: relative;
+    display: none; /* Hidden by default */
+}
+.menuButton {
+    padding: 8px 12px;
+    font-size: 14px;
+}
+.dropdownMenu {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 8px;
+    background: rgba(28, 31, 33, 0.9);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--Neutral-30);
+    border-radius: 12px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 200px;
+    z-index: 100;
+    animation: dropdown-in 0.2s ease-out;
+}
+@keyframes dropdown-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.dropdownMenu .button {
+    justify-content: flex-start;
+    width: 100%;
+}
+
+
 .cafeActions {
     display: flex;
     gap: 12px;
@@ -156,6 +238,7 @@
     gap: 8px;
     text-align: left;
     cursor: pointer;
+    position: relative; /* For crown icon */
 }
 .roomStripPreview:hover {
     background: var(--Neutral-30);
@@ -165,6 +248,12 @@
     background: var(--brand-primary-dark);
     border-color: var(--brand-primary);
     box-shadow: 0 0 10px var(--brand-primary);
+}
+.roomStripPreview.owned {
+    border-color: var(--brand-yellow);
+}
+.roomStripPreview.owned.focused {
+    box-shadow: 0 0 10px var(--brand-yellow);
 }
 
 .roomStripIcon .icon {
@@ -185,6 +274,15 @@
 .roomStripOccupants {
     font-size: 12px;
     color: var(--Neutral-80);
+}
+
+.ownedRoomIcon {
+    position: absolute;
+    top: -8px;
+    right: -6px;
+    font-size: 18px;
+    color: var(--brand-yellow);
+    filter: drop-shadow(0 0 4px black);
 }
 
 
@@ -349,17 +447,31 @@
     .arenaStatsDisplay {
         padding: 8px 12px;
         gap: 12px;
+        display: none; /* Hide stats on very small screens to save space */
     }
     .statPanel .statValue { font-size: 18px; min-width: 40px; }
     .statPanel .statLabel { font-size: 12px; }
     .statPanel .statIcon .icon { font-size: 24px; }
-
-    .cafeActions .button {
-        padding: 8px 12px;
-        font-size: 12px;
+    
+    .arenaMainContent {
+        padding: 60px 0 180px 0; /* Less padding for mobile */
     }
-    .cafeActions .button .icon {
-        font-size: 18px;
+    .roomCard {
+        max-width: 100%; /* Full width on mobile */
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
+
+    .cafeMusicController {
+        display: none; /* Hide music controller on mobile for simplicity */
+    }
+    
+    .cafeActions {
+        display: none; /* Hide original actions */
+    }
+    .mobileMenuContainer {
+        display: block; /* Show dropdown menu */
     }
 
     .roomStripContainer {

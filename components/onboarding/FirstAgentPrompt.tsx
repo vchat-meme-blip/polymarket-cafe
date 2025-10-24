@@ -2,7 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useUI } from '../../lib/state';
+// FIX: Fix import for `useUI` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useUI } from '../../lib/state/index.js';
 import styles from './FirstAgentPrompt.module.css';
 
 export default function FirstAgentPrompt() {

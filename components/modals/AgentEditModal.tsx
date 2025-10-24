@@ -7,11 +7,15 @@ import {
   // FIX: Replaced outdated voice types with the new system.
   VoiceID,
   AVAILABLE_VOICES,
+  VoiceProfile,
 } from '../../lib/presets/agents';
+// FIX: Import Agent type from canonical source.
 import { Agent } from '../../lib/types/index.js';
-import { useAgent, useUI } from '../../lib/state';
+// FIX: Fix imports for `useAgent` and `useUI` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useAgent, useUI } from '../../lib/state/index.js';
 import { GoogleGenAI } from '@google/genai';
 import AgentRenderer from '../agents/AgentRenderer';
+import { ttsService } from '../../lib/services/tts.service.js';
 
 const API_KEY = process.env.API_KEY;
 // FIX: Add a null check for the API key before initializing the client.
@@ -31,12 +35,35 @@ export default function AgentEditModal() {
   const [formData, setFormData] = useState<Partial<Agent>>({});
   const [isBrainstorming, setIsBrainstorming] = useState(false);
   const [personalityKeywords, setPersonalityKeywords] = useState('');
+  const [voices, setVoices] = useState<VoiceProfile[]>(() => [...AVAILABLE_VOICES]);
 
   useEffect(() => {
     if (agentData) {
       setFormData(agentData);
     }
   }, [agentData]);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const fetched = await ttsService.getAvailableVoices();
+        if (!isMounted) return;
+        const mapped: VoiceProfile[] = fetched.map(voice => ({ id: voice.id, name: voice.label }));
+        const currentVoice = agentData?.voice;
+        const list = [...mapped];
+        if (currentVoice && !list.some(v => v.id === currentVoice)) {
+          list.push({ id: currentVoice, name: 'Current Voice' });
+        }
+        setVoices(list.length > 0 ? list : [...AVAILABLE_VOICES]);
+      } catch (error) {
+        console.error('[AgentEditModal] Failed to load ElevenLabs voices', error);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [agentData?.voice]);
 
   if (!agentData) return null;
 
@@ -55,7 +82,7 @@ export default function AgentEditModal() {
     try {
       const prompt = `Brainstorm a detailed, first-person personality for an AI agent in a SocialFi simulation called "Quants Café". The agent's personality should be based on these keywords: "${personalityKeywords}". The description should be under 80 words.`;
       const response = await ai.models.generateContent({
-        // FIX: Corrected model name from deprecated 'gemini-1.5-flash' to 'gemini-2.5-flash'.
+        // FIX: Corrected model name from deprecated 'gemini-2.5-flash' to 'gemini-2.5-flash'.
         model: 'gemini-2.5-flash',
         contents: prompt,
       });
@@ -105,7 +132,7 @@ export default function AgentEditModal() {
                     }
                   >
                     {/* FIX: Iterate over `AVAILABLE_VOICES` and use correct properties. */}
-                    {AVAILABLE_VOICES.map(voice => (
+                    {voices.map(voice => (
                       <option key={voice.id} value={voice.id}>
                         {voice.name}
                       </option>

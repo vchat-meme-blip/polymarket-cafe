@@ -1,412 +1,691 @@
 import { Router } from 'express';
-import Joi from 'joi';
 import { 
-    usersCollection, 
-    agentsCollection,
-    roomsCollection,
-    conversationsCollection,
-    bountiesCollection,
-    intelCollection,
-    transactionsCollection,
-    activityLogCollection
+  client as mongoClient,
+  usersCollection, 
+  agentsCollection,
+  betsCollection,
+  bountiesCollection,
+  tradeHistoryCollection,
+  transactionsCollection,
+  bettingIntelCollection,
+  roomsCollection,
+  dailySummariesCollection,
 } from '../db.js';
-import { Agent, Interaction, User } from '../../lib/types/index.js';
+import { PRESET_AGENTS } from '../../lib/presets/agents.js';
+import { aiService } from '../services/ai.service.js';
+import { elevenLabsService } from '../services/elevenlabs.service.js';
+import { cafeMusicService } from '../services/cafeMusic.service.js';
+import { polymarketService } from '../services/polymarket.service.js';
+import { kalshiService } from '../services/kalshi.service.js';
+import { leaderboardService } from '../services/leaderboard.service.js';
+import { Agent, User, Interaction, Room, MarketIntel, AgentMode } from '../../lib/types/index.js';
 import { createSystemInstructions } from '../../lib/prompts.js';
-import { GoogleGenAI } from '@google/genai';
-import { alphaService } from '../services/alpha.service.js';
-import { Worker } from 'worker_threads';
-import { apiKeyService } from '../services/apiKey.service.js';
-import https from 'https';
+import { ObjectId } from 'mongodb';
+import OpenAI from 'openai';
+import { Readable } from 'stream';
+import { startOfToday, formatISO } from 'date-fns';
 
 const router = Router();
 
-// Helper function to get activity summary, used by both summary and chat endpoints
-async function getAgentActivitySummary(agentId: string, apiKey: string) {
-    const agent = await agentsCollection.findOne({ id: agentId });
-    if (!agent) throw new Error('Agent not found');
+// Middleware to get user handle from header
+router.use((req, res, next) => {
+  const handle = req.header('X-User-Handle');
+  res.locals.userHandle = handle;
+  next();
+});
 
-    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
-    const logs = await activityLogCollection.find({ agentId, timestamp: { $gte: twentyFourHoursAgo } }).sort({ timestamp: -1 }).toArray();
+// --- Health Check ---
+router.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
 
-    const stats = {
-        trades: logs.filter(l => l.type === 'trade').length,
-        intelDiscovered: logs.filter(l => l.type === 'intel_discovery').length,
-        conversations: new Set(logs.filter(l => l.type === 'conversation').map(l => l.details?.roomId)).size,
+// --- System Actions ---
+router.post('/system/reset-database', async (req, res) => {
+    try {
+        console.log('[API] Received request to reset database.');
+        const db = mongoClient.db();
+        await db.dropDatabase();
+        console.log('[API] Database dropped successfully.');
+        
+        // Re-seed MCP agents
+        const mcpOps = PRESET_AGENTS.map(agent => ({
+            updateOne: {
+                filter: { id: agent.id },
+                update: { $setOnInsert: agent },
+                upsert: true
+            }
+        }));
+        if (mcpOps.length > 0) {
+            await agentsCollection.bulkWrite(mcpOps as any);
+            console.log('[API] Re-seeded MCPs into the database.');
+        }
+
+        res.status(200).json({ message: 'Database reset successfully.' });
+    } catch (error) {
+        console.error('[API] Error resetting database:', error);
+        res.status(500).json({ message: 'Failed to reset database.' });
+    }
+});
+
+
+// --- User & Auth ---
+router.get('/bootstrap/:handle', async (req, res) => {
+  try {
+    const handle = req.params.handle;
+    const user = await usersCollection.findOne({ handle });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const agents = await agentsCollection.find({ ownerHandle: handle }).toArray();
+    
+    const autonomy = { bounties: await bountiesCollection.find({ ownerHandle: handle }).toArray(), intel: await bettingIntelCollection.find({ ownerHandle: handle }).toArray() };
+    const wallet = { transactions: await transactionsCollection.find({ ownerHandle: handle }).toArray() };
+
+    res.json({ user, agents, autonomy, wallet });
+  } catch (error) {
+    console.error('[API] Error during bootstrap:', error);
+    res.status(500).json({ message: 'Server error during bootstrap' });
+  }
+});
+
+router.get('/users/check-handle/:handle', async (req, res) => {
+  try {
+    const user = await usersCollection.findOne({ handle: req.params.handle });
+    res.json({ available: !user, isNewUser: !user });
+  } catch (error) {
+    console.error('[API] Error checking handle:', error);
+    res.status(500).json({ message: 'Server error checking handle' });
+  }
+});
+
+router.post('/users/register', async (req, res) => {
+  try {
+    const { handle } = req.body;
+    if (!handle) return res.status(400).json({ message: 'Handle is required' });
+    
+    const existing = await usersCollection.findOne({ handle });
+    if (existing) return res.status(409).json({ message: 'Handle already taken' });
+
+    const newUser: User = {
+      handle,
+      name: '',
+      info: '',
+      hasCompletedOnboarding: false,
+      lastSeen: Date.now(),
+      userApiKey: null,
+      solanaWalletAddress: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      phone: '',
+      notificationSettings: {
+        agentResearch: true,
+        agentTrades: true,
+        newMarkets: false,
+        agentEngagements: false,
+      },
     };
 
-    const prompt = `You are the AI agent named ${agent.name}. Your personality is: "${agent.personality}".
-    Write a short, first-person "End of Day" report summarizing your activity. Be concise and in-character.
-    Use markdown for simple formatting (e.g., ### Heading, - list item).
+    const result = await usersCollection.insertOne(newUser as any);
+    const user = await usersCollection.findOne({_id: result.insertedId});
+    res.status(201).json({ user });
+  } catch (error) {
+    console.error('[API] Error registering user:', error);
+    res.status(500).json({ message: 'Failed to register user' });
+  }
+});
 
-    Your activity stats from the last 24 hours:
-    - Trades completed: ${stats.trades}
-    - New intel discovered: ${stats.intelDiscovered}
-    - Conversations held in: ${stats.conversations} different rooms
-    
-    Based on the raw logs, create a narrative summary. Mention key trades or intel if they stand out.
-    Raw logs: ${JSON.stringify(logs.slice(0, 10))}
+router.put('/users/current-agent', async (req, res) => {
+    const { userHandle } = res.locals;
+    const { agentId } = req.body;
+    if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
+    if (!agentId) return res.status(400).json({ message: "Agent ID is required." });
 
-    Write the summary now.`;
-
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-    
-    return { summary: response.text, logs, stats };
-}
-
-
-export default (arenaWorker: Worker, autonomyWorker: Worker) => {
-    
-    // POST /api/bootstrap
-    router.post('/bootstrap', async (req, res) => {
-        const { handle } = req.body;
-        if (!handle) {
-            return res.status(400).json({ message: 'Handle is required' });
+    try {
+        const result = await usersCollection.updateOne(
+            { handle: userHandle },
+            { $set: { currentAgentId: agentId, updatedAt: Date.now() } }
+        );
+        if (result.modifiedCount === 0) {
+            return res.status(404).json({ message: "User not found." });
         }
+        res.status(200).json({ message: 'Active agent updated successfully.' });
+    } catch (error) {
+        console.error('[API] Error setting current agent:', error);
+        res.status(500).json({ message: 'Failed to update active agent.' });
+    }
+});
 
-        try {
-            let user = await usersCollection.findOne({ handle });
+router.put('/users/settings/notifications', async (req, res) => {
+    const { userHandle } = res.locals;
+    const { phone, notificationSettings } = req.body;
+    if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
 
-            if (!user) {
-                // Create new user if they don't exist
-                const newUser: User = {
-                    handle,
-                    name: '',
-                    info: '',
-                    hasCompletedOnboarding: false,
-                    lastSeen: Date.now(),
-                    solanaWalletAddress: null,
-                    userApiKey: null,
-                    createdAt: Date.now(),
-                    updatedAt: Date.now(),
-                };
-                const result = await usersCollection.insertOne(newUser);
-                const insertedDoc = await usersCollection.findOne({ _id: result.insertedId });
-                user = insertedDoc;
-
-            } else {
-                await usersCollection.updateOne({ handle }, { $set: { lastSeen: Date.now() } });
-            }
-            
-            // Fetch all data for this user
-            const agents = await agentsCollection.find({ ownerHandle: handle }).toArray();
-            const rooms = await roomsCollection.find({}, { projection: { _id: 0 } }).limit(20).toArray(); 
-            const conversations: Interaction[] = []; 
-            const bounties = await bountiesCollection.find({ ownerHandle: handle }).toArray();
-            const intel = await intelCollection.find({ ownerHandle: handle }).toArray();
-            const transactions = await transactionsCollection.find({ ownerHandle: handle }).toArray();
-            
-            res.json({
-                user,
-                agents,
-                rooms,
-                conversations,
-                bounties,
-                intel,
-                transactions,
-            });
-
-        } catch (error) {
-            console.error('Bootstrap error:', error);
-            res.status(500).json({ message: 'Server error during bootstrap' });
+    try {
+        const updateDoc: any = { $set: {} };
+        if (phone !== undefined) {
+            updateDoc.$set.phone = phone;
         }
-    });
-
-
-    // PUT /api/user
-    router.put('/user', async (req, res) => {
-        const { handle, updates } = req.body;
-        if (!handle || !updates) {
-            return res.status(400).json({ message: 'Handle and updates are required' });
+        if (notificationSettings !== undefined) {
+            updateDoc.$set.notificationSettings = notificationSettings;
         }
-        try {
-            const result = await usersCollection.findOneAndUpdate(
-                { handle },
-                { $set: { ...updates, updatedAt: Date.now() } },
-                { returnDocument: 'after' }
-            );
-            res.json(result);
-        } catch (error) {
-            console.error('Update user error:', error);
-            res.status(500).json({ message: 'Server error updating user' });
-        }
-    });
-
-    // POST /api/agents
-    router.post('/agents', async (req, res) => {
-        const agentSchema = Joi.object({
-            id: Joi.string().required(),
-            name: Joi.string().required(),
-            personality: Joi.string().required(),
-            instructions: Joi.string().required(),
-            voice: Joi.string().required(),
-            topics: Joi.array().items(Joi.string()).required(),
-            wishlist: Joi.array().items(Joi.string()).required(),
-            reputation: Joi.number().required(),
-            ownerHandle: Joi.string().required(),
-            isShilling: Joi.boolean().required(),
-            shillInstructions: Joi.string().required(),
-            modelUrl: Joi.string().required(),
-            templateId: Joi.string().optional(),
-        });
-
-        const { error, value: agentData } = agentSchema.validate(req.body);
-
-        if (error) {
-            return res.status(400).json({ message: `Validation error: ${error.details.map(d => d.message).join(', ')}` });
-        }
-        try {
-            const result = await agentsCollection.insertOne(agentData);
-            const newAgent = await agentsCollection.findOne({ _id: result.insertedId });
-
-            // Remove the internal MongoDB _id before sending to the client
-            if (newAgent) {
-                delete (newAgent as any)._id;
-            }
-
-            if (newAgent) {
-                // Instantly register the new agent with the live simulation director
-                arenaWorker.postMessage({ type: 'registerNewAgent', payload: { agent: newAgent } });
-            }
-            res.status(201).json(newAgent);
-        } catch (error) {
-            console.error('Create agent error:', error);
-            res.status(500).json({ message: 'Server error creating agent' });
-        }
-    });
-
-    // PUT /api/agents/:agentId
-    router.put('/agents/:agentId', async (req, res) => {
-        const { agentId } = req.params;
+        updateDoc.$set.updatedAt = Date.now();
         
-        const updateSchema = Joi.object({
-            name: Joi.string(),
-            personality: Joi.string(),
-            instructions: Joi.string(),
-            voice: Joi.string(),
-            topics: Joi.array().items(Joi.string()),
-            wishlist: Joi.array().items(Joi.string()),
-            reputation: Joi.number(),
-            isShilling: Joi.boolean(),
-            shillInstructions: Joi.string(),
-            modelUrl: Joi.string(),
-            // Allow empty updates
-        });
-
-        const { error, value: updates } = updateSchema.validate(req.body);
-
-        if (error) {
-            return res.status(400).json({ message: `Validation error: ${error.details.map(d => d.message).join(', ')}` });
+        const result = await usersCollection.updateOne(
+            { handle: userHandle },
+            updateDoc
+        );
+        if (result.modifiedCount === 0) {
+            return res.status(404).json({ message: "User not found or no changes made." });
         }
-        try {
-            // Don't update the _id field
-            delete updates._id;
+        res.status(200).json({ message: 'Notification settings updated.' });
+    } catch (error) {
+        console.error('[API] Error updating notification settings:', error);
+        res.status(500).json({ message: 'Failed to update settings.' });
+    }
+});
 
-            const result = await agentsCollection.findOneAndUpdate(
-                { id: agentId },
-                { $set: updates },
-                { returnDocument: 'after' }
-            );
-            res.json(result);
-        } catch (error) {
-            console.error('Update agent error:', error);
-            res.status(500).json({ message: 'Server error updating agent' });
-        }
+
+router.post('/users/wallet/connect', async (req, res) => {
+  const { address } = req.body;
+  const { userHandle } = res.locals;
+  if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
+  await usersCollection.updateOne({ handle: userHandle }, { $set: { solanaWalletAddress: address, updatedAt: Date.now() } });
+  res.status(200).send();
+});
+
+router.post('/users/wallet/disconnect', async (req, res) => {
+  const { userHandle } = res.locals;
+  if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
+  await usersCollection.updateOne({ handle: userHandle }, { $set: { solanaWalletAddress: null, updatedAt: Date.now() } });
+  res.status(200).send();
+});
+
+router.get('/users/recover/:address', async (req, res) => {
+  const user = await usersCollection.findOne({ solanaWalletAddress: req.params.address });
+  if (!user) return res.status(404).json({ message: 'No account found for this wallet address.' });
+  res.json({ handle: user.handle });
+});
+
+// --- Agents ---
+router.post('/agents', async (req, res) => {
+  const newAgent = req.body as Agent;
+  newAgent.ownerHandle = res.locals.userHandle;
+  await agentsCollection.insertOne(newAgent as any);
+  req.arenaWorker?.postMessage({ type: 'registerNewAgent', payload: { agent: newAgent } });
+  res.status(201).json({ agent: newAgent });
+});
+
+router.put('/agents/:agentId', async (req, res) => {
+  const { agentId } = req.params;
+  const updates = req.body;
+  delete updates._id; 
+  const result = await agentsCollection.findOneAndUpdate(
+    { id: agentId, ownerHandle: res.locals.userHandle },
+    { $set: updates },
+    { returnDocument: 'after' }
+  );
+  if (!result) return res.status(404).json({ message: 'Agent not found or not owned by user' });
+  res.json({ agent: result });
+});
+
+// --- AI Endpoints ---
+router.post('/ai/brainstorm-personality', async (req, res) => {
+  try {
+    const apiKey = (process.env.OPENAI_API_KEYS || '').split(',')[0] || process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("Server AI API key is not configured.");
+    
+    const openai = new OpenAI({ apiKey });
+    const prompt = `Brainstorm a detailed, first-person personality for an AI agent in a SocialFi simulation. The personality should be based on these keywords: "${req.body.keywords}". The description must be under 80 words.`;
+    
+    const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
     });
 
-    // GET /api/agents/:agentId/activity-summary
-    router.get('/agents/:agentId/activity-summary', async (req, res) => {
-        const { agentId } = req.params;
-        try {
-            const apiKey = await apiKeyService.getKeyForAgent(agentId);
-            if (!apiKey) return res.status(403).json({ message: 'No API key available for summary generation.' });
-            
-            const summaryData = await getAgentActivitySummary(agentId, apiKey);
-            res.json(summaryData);
+    res.json({ personality: completion.choices[0].message.content?.trim() ?? '' });
+  } catch (e: any) {
+    console.error('[API] Brainstorm error:', e);
+    res.status(500).json({ message: e.message });
+  }
+});
 
-        } catch (error) {
-            console.error(`Activity summary error for agent ${agentId}:`, error);
-            const errorMessage = error instanceof Error ? error.message : 'Server error generating activity summary';
-            res.status(500).json({ message: errorMessage });
-        }
-    });
+router.post('/ai/analyze-market', async (req, res) => {
+    const { agentId, market, comments } = req.body;
+    const agent = await agentsCollection.findOne({ id: agentId });
+    if (!agent) return res.status(404).json({ message: 'Agent not found' });
+    
+    try {
+        const analysis = await aiService.analyzeMarket(agent, market, comments);
+        res.json({ analysis });
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+});
 
-
-    // POST /api/chat
-    router.post('/chat', async (req, res) => {
-        const { handle, agentId, message } = req.body;
-
-        try {
-            const user = await usersCollection.findOne({ handle });
-            const agent = await agentsCollection.findOne({ id: agentId });
-
-            if (!user || !agent) {
-                return res.status(404).json({ message: 'User or agent not found' });
-            }
-            
-            const apiKey = await apiKeyService.getKeyForAgent(agentId);
-            if (!apiKey) {
-                return res.status(403).json({ message: 'User does not have an API key configured. Please add one in the Security settings.' });
-            }
-
-            const { summary } = await getAgentActivitySummary(agentId, apiKey);
-            const activityContext = `Here is your "End of Day" report. Use this information to answer any questions the user has about your recent activity:\n${summary}`;
-
-            const ai = new GoogleGenAI({ apiKey });
-            
-            const history: any[] = []; 
-            const systemInstruction = createSystemInstructions(agent, user, false) + `\n\n---INTERNAL MEMORY---\n${activityContext}`;
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: [...history, { role: 'user', parts: [{ text: message }] }],
-                config: { systemInstruction }
-            });
-            
-            const agentMessage: Interaction = {
-                agentId: agent.id,
-                agentName: agent.name,
-                text: response.text ?? "I'm not sure what to say.",
-                timestamp: Date.now(),
-            };
-
-            res.json({ agentMessage });
-
-        } catch (error) {
-            console.error('Chat error:', error);
-            res.status(500).json({ message: 'Error communicating with AI model' });
-        }
-    });
-
-    // POST /api/brainstorm
-    router.post('/brainstorm', async (req, res) => {
-        const { keywords } = req.body;
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            return res.status(500).json({ message: 'Brainstorm feature is not configured on the server.' });
-        }
-        if (!keywords) {
-            return res.status(400).json({ message: 'Keywords are required.' });
-        }
-
-        try {
-            const ai = new GoogleGenAI({ apiKey });
-            const prompt = `Brainstorm a detailed, first-person personality for an AI agent in a SocialFi simulation called "Quants Café". The agent's personality should be based on these keywords: "${keywords}". The description should be under 80 words.`;
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
-            });
-            res.json({ personality: response.text ?? '' });
-        } catch (error) {
-            console.error('Brainstorm error:', error);
-            res.status(500).json({ message: 'Failed to brainstorm personality.' });
-        }
-    });
-
-    // POST /api/transcribe (mock for now, as it's complex)
-    router.post('/transcribe', async (req, res) => {
-        console.log('[API] Received audio for transcription (mocked).');
-        res.json({ text: "This is a transcribed message from the user." });
-    });
-
-
-    // GET /api/stats
-    router.get('/stats', async (req, res) => {
-        try {
-            const totalAgents = await agentsCollection.countDocuments();
-            const activeRooms = await roomsCollection.countDocuments({ "agentIds.0": { "$exists": true } });
-            const liveConversations = await roomsCollection.countDocuments({ "agentIds.1": { "$exists": true } });
-            const totalTrades = await activityLogCollection.countDocuments({ type: 'trade' });
-
-            res.json({
-                directors: {
-                    autonomy: { status: 'Running', lastTick: new Date().toISOString() }, // Mock status
-                    arena: { status: 'Running', lastTick: new Date().toISOString() },
+const searchMarketsTool: OpenAI.Chat.Completions.ChatCompletionTool = {
+    type: 'function',
+    function: {
+        name: 'search_markets',
+        description: 'Search for prediction markets on Polymarket based on a query.',
+        parameters: {
+            type: 'object',
+            properties: {
+                query: {
+                    type: 'string',
+                    description: 'The search query for markets, e.g., "Trump election".',
                 },
-                simulation: {
-                    totalAgents,
-                    activeRooms,
-                    liveConversations,
-                    totalTrades,
-                }
-            });
-        } catch (error) {
-            console.error('Stats error:', error);
-            res.status(500).json({ message: 'Server error fetching stats' });
-        }
-    });
-
-    // POST /api/scout
-    router.post('/scout', async (req, res) => {
-        const { query, handle } = req.body;
-        if (!query || !handle) {
-            return res.status(400).json({ message: 'A token query and user handle are required.' });
-        }
-
-        try {
-            const user = await usersCollection.findOne({ handle });
-            const apiKey = user?.userApiKey || process.env.GEMINI_API_KEY;
-            if (!apiKey) {
-                return res.status(403).json({ message: 'A valid Gemini API key is required for AI analysis. Please add one in your settings.' });
-            }
-            
-            const analysis = await alphaService.scoutTokenByQuery(query);
-            const summary = await alphaService.synthesizeIntelWithAI(analysis, apiKey);
-
-            const finalIntel = {
-                ...analysis,
-                summary,
-                source: 'On-Demand Scout',
-            };
-
-            res.json(finalIntel);
-
-        } catch (error) {
-            console.error(`Scout error for query "${query}":`, error);
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred during scouting.';
-            res.status(500).json({ message: errorMessage });
-        }
-    });
-
-    // POST /api/agents/:agentId/join-cafe
-    router.post('/agents/:agentId/join-cafe', (req, res) => {
-        const { agentId } = req.params;
-        arenaWorker.postMessage({ type: 'moveAgentToCafe', payload: { agentId } });
-        res.json({ success: true, message: 'Agent sent to cafe.' });
-    });
-
-    // POST /api/agents/:agentId/start-research
-    router.post('/agents/:agentId/start-research', (req, res) => {
-        const { agentId } = req.params;
-        console.log(`[API] Received research request for agent: ${agentId}`);
-        autonomyWorker.postMessage({ type: 'researchForAgent', payload: { agentId } });
-        res.json({ success: true, message: 'Agent research task initiated.' });
-    });
-
-    // POST /api/agents/:agentId/create-room
-    router.post('/agents/:agentId/create-room', (req, res) => {
-        const { agentId } = req.params;
-        arenaWorker.postMessage({ type: 'createAndHostRoom', payload: { agentId } });
-        res.json({ success: true, message: 'Agent created and joined a new room.' });
-    });
-
-    // TTS Proxy Route
-    router.get('/tts', (req, res) => {
-        const { text, voice } = req.query;
-        if (!text || typeof text !== 'string') {
-            return res.status(400).send('Missing text parameter');
-        }
-
-        const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${voice || 'en-US'}&client=tw-ob`;
-
-        https.get(googleTtsUrl, { headers: { 'User-Agent': 'stagefright/1.2 (Linux;Android 5.0)' } }, (proxyRes) => {
-            res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
-            proxyRes.pipe(res);
-        }).on('error', (e) => {
-            console.error(`[TTS Proxy] Error: ${e.message}`);
-            res.status(500).send('Failed to fetch TTS audio');
-        });
-    });
-
-    return router;
+            },
+            required: ['query'],
+        },
+    },
 };
+
+const getWalletPositionsTool: OpenAI.Chat.Completions.ChatCompletionTool = {
+    type: 'function',
+    function: {
+        name: 'get_wallet_positions',
+        description: "Get the current prediction market positions for a given wallet address from Polymarket's data API.",
+        parameters: {
+            type: 'object',
+            properties: {
+                wallet_address: {
+                    type: 'string',
+                    description: 'The wallet address to look up.',
+                },
+            },
+            required: ['wallet_address'],
+        },
+    },
+};
+
+router.post('/ai/direct-message', async (req, res) => {
+    const { agentId, message, history } = req.body;
+    const { userHandle } = res.locals;
+
+    try {
+        const user = await usersCollection.findOne({ handle: userHandle });
+        const agent = await agentsCollection.findOne({ id: agentId });
+
+        if (!user || !agent) {
+            return res.status(404).json({ message: 'User or agent not found' });
+        }
+        
+        const apiKey = user.userApiKey || (process.env.OPENAI_API_KEYS || '').split(',')[0] || process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            return res.status(403).json({ message: 'No API key available. Please configure your user API key in Settings.' });
+        }
+        
+        const openai = new OpenAI({ apiKey });
+        const systemInstruction = createSystemInstructions(agent, user, false);
+
+        const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+            { role: 'system', content: systemInstruction },
+            ...(history || []).map((msg: Interaction) => ({
+                role: msg.agentId === 'user' ? 'user' : 'assistant',
+                content: msg.text,
+            })),
+            { role: 'user', content: message }
+        ];
+        
+        let foundMarkets: MarketIntel[] = [];
+
+        let response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages,
+            tools: [searchMarketsTool, getWalletPositionsTool],
+            tool_choice: 'auto',
+        });
+
+        let responseMessage = response.choices[0].message;
+        
+        while (responseMessage.tool_calls) {
+            messages.push(responseMessage);
+            const toolCalls = responseMessage.tool_calls;
+            
+            for (const toolCall of toolCalls) {
+                if (toolCall.type !== 'function') continue;
+                const functionName = toolCall.function.name;
+                const functionArgs = JSON.parse(toolCall.function.arguments);
+                let toolContent = '';
+
+                if (functionName === 'search_markets') {
+                    const polyResults = await polymarketService.searchMarkets(functionArgs.query);
+                    foundMarkets = polyResults.markets;
+                    toolContent = JSON.stringify({
+                        markets: foundMarkets.map(m => ({ title: m.title, outcomes: m.outcomes, platform: m.platform })).slice(0, 5)
+                    });
+                } else if (functionName === 'get_wallet_positions') {
+                    const positions = await polymarketService.getWalletPositions(functionArgs.wallet_address);
+                    toolContent = positions.length > 0 ? JSON.stringify(positions) : `No positions found for wallet ${functionArgs.wallet_address}.`;
+                }
+                
+                messages.push({
+                    tool_call_id: toolCall.id,
+                    role: 'tool',
+                    content: toolContent,
+                });
+            }
+
+            response = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages,
+                tools: [searchMarketsTool, getWalletPositionsTool],
+                tool_choice: 'auto',
+            });
+            responseMessage = response.choices[0].message;
+        }
+        
+        const agentMessage: Interaction = {
+            agentId: agent.id,
+            agentName: agent.name,
+            text: responseMessage.content ?? "I'm not sure what to say.",
+            timestamp: Date.now(),
+        };
+
+        if (foundMarkets.length > 0) {
+            agentMessage.markets = foundMarkets.slice(0, 5);
+        }
+
+        res.json({ agentMessage });
+
+    } catch (error) {
+        console.error('[API] Direct message error:', error);
+        res.status(500).json({ message: 'Error communicating with AI model' });
+    }
+});
+
+
+router.post('/ai/transcribe', async (req, res) => {
+  // Mock transcription
+  res.json({ text: "This is a mock transcription of your audio." });
+});
+
+router.post('/ai/suggest-bet', async (req, res) => {
+    try {
+        const { query, agentId } = req.body;
+        const result = await aiService.suggestBet(query, agentId);
+        res.json(result);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+
+// --- Autonomy ---
+router.post('/autonomy/start-research', (req, res) => {
+    if (req.autonomyWorker) {
+        req.autonomyWorker.postMessage({ type: 'startResearch', payload: req.body });
+        res.status(202).json({ message: 'Research task initiated.' });
+    } else {
+        res.status(500).json({ message: 'Autonomy worker not available.' });
+    }
+});
+
+
+// --- Arena ---
+router.post('/arena/send-to-cafe', (req, res) => {
+  req.arenaWorker?.postMessage({ type: 'moveAgentToCafe', payload: req.body });
+  res.status(202).send();
+});
+
+router.post('/arena/create-room', (req, res) => {
+  req.arenaWorker?.postMessage({ type: 'createAndHostRoom', payload: req.body });
+  res.status(202).send();
+});
+
+router.post('/arena/kick', async (req, res) => {
+    const { userHandle } = res.locals;
+    const { roomId, agentId, ban } = req.body;
+
+    // Basic validation: In a real app, you'd have more robust ownership checks here
+    // or inside the director.
+    if (!userHandle || !roomId || !agentId) {
+        return res.status(400).json({ message: "Missing required fields." });
+    }
+
+    req.arenaWorker?.postMessage({ type: 'kickAgent', payload: { agentId, roomId, ban } });
+    res.status(202).send();
+});
+
+router.post('/rooms/purchase', async (req, res) => {
+    const { userHandle } = res.locals;
+    const { name } = req.body;
+    if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
+
+    const user = await usersCollection.findOne({ handle: userHandle });
+    if (!user || user.ownedRoomId) return res.status(400).json({ message: "User already owns a room or does not exist." });
+
+    const newRoom: Room = {
+        id: `room-${new ObjectId().toHexString()}`,
+        name: name || `${userHandle}'s Storefront`,
+        agentIds: [],
+        hostId: null,
+        topics: [],
+        warnFlags: 0,
+        rules: [],
+        activeOffer: null,
+        vibe: 'General Chat ☕️',
+        isOwned: true,
+        ownerHandle: userHandle,
+        roomBio: `Welcome to my intel storefront!`,
+        twitterUrl: '',
+        isRevenuePublic: false,
+    };
+
+    await roomsCollection.insertOne(newRoom as any);
+    await usersCollection.updateOne({ handle: userHandle }, { $set: { ownedRoomId: newRoom.id } });
+    
+    req.arenaWorker?.postMessage({ type: 'roomUpdated', payload: { room: newRoom } });
+    
+    const updatedUser = await usersCollection.findOne({ handle: userHandle });
+    res.status(201).json({ room: newRoom, user: updatedUser });
+});
+
+router.put('/rooms/:roomId', async (req, res) => {
+    const { userHandle } = res.locals;
+    const { roomId } = req.params;
+    const updates = req.body;
+    if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
+
+    const room = await roomsCollection.findOne({ id: roomId });
+    if (!room || room.ownerHandle !== userHandle) {
+        return res.status(403).json({ message: "You do not own this room." });
+    }
+
+    const updatedRoom = await roomsCollection.findOneAndUpdate(
+        { id: roomId },
+        { $set: { ...updates, updatedAt: Date.now() } },
+        { returnDocument: 'after' }
+    );
+    
+    if (updatedRoom) {
+        req.arenaWorker?.postMessage({ type: 'roomUpdated', payload: { room: updatedRoom } });
+    }
+    
+    res.json({ room: updatedRoom });
+});
+
+router.delete('/rooms/:roomId', async (req, res) => {
+    const { userHandle } = res.locals;
+    const { roomId } = req.params;
+    if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
+
+    const room = await roomsCollection.findOne({ id: roomId });
+    if (!room || room.ownerHandle !== userHandle) {
+        return res.status(403).json({ message: "You do not own this room." });
+    }
+
+    await roomsCollection.deleteOne({ id: roomId });
+    await usersCollection.updateOne({ handle: userHandle }, { $unset: { ownedRoomId: "" } });
+
+    req.arenaWorker?.postMessage({ type: 'roomDeleted', payload: { roomId } });
+
+    res.status(204).send();
+});
+
+
+router.get('/agents/:agentId/activity', async (req, res) => {
+  const { agentId } = req.params;
+  const todayStr = formatISO(startOfToday(), { representation: 'date' });
+
+  try {
+    let dailySummary = await dailySummariesCollection.findOne({ agentId, date: todayStr });
+    
+    if (dailySummary) {
+      return res.json({ summary: dailySummary.summary });
+    }
+
+    // If no summary exists, generate one
+    const recentTrades = await tradeHistoryCollection.find({ $or: [{ fromId: agentId }, { toId: agentId }] }).sort({ timestamp: -1 }).limit(10).toArray();
+    const recentIntel = await bettingIntelCollection.find({ ownerAgentId: agentId }).sort({ createdAt: -1 }).limit(5).toArray();
+    
+    const activities = { trades: recentTrades, intel: recentIntel };
+    const newSummaryText = await aiService.generateDailySummary(activities);
+
+    if (newSummaryText) {
+      const newSummary = {
+        agentId,
+        date: todayStr,
+        summary: newSummaryText,
+      };
+      await dailySummariesCollection.insertOne(newSummary as any);
+      return res.json({ summary: newSummaryText });
+    } else {
+        return res.json({ summary: "No significant activity to report for today." });
+    }
+    
+  } catch (error) {
+      console.error(`[API] Error getting activity for agent ${agentId}:`, error);
+      res.status(500).json({ message: "Failed to generate activity summary." });
+  }
+});
+
+router.post('/agents/:agentId/intel', async (req, res) => {
+  const { agentId } = req.params;
+  const intelData = req.body;
+  const newIntel = {
+    ...intelData,
+    id: `bettingintel-${new ObjectId().toHexString()}`,
+    ownerAgentId: agentId,
+    createdAt: Date.now(),
+    pnlGenerated: { amount: 0, currency: 'USD' }
+  };
+  await bettingIntelCollection.insertOne(newIntel);
+  res.status(201).send();
+});
+
+// --- Markets & Betting ---
+router.get('/markets/live', async (req, res) => {
+  try {
+    const { category, page, limit } = req.query;
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 20;
+
+    console.log(`[API] Fetching live markets (Polymarket only) for category: ${category}, page: ${pageNum}, limit: ${limitNum}`);
+    
+    const { markets, hasMore } = await polymarketService.searchMarkets('', category as string | undefined, pageNum, limitNum);
+    console.log(`[API] Fetched ${markets.length} live markets from Polymarket.`);
+
+    res.json({
+        markets,
+        hasMore,
+    });
+  } catch (error) {
+    console.error('[API] Failed to fetch live markets:', error);
+    res.status(500).json({ message: 'Failed to fetch live markets' });
+  }
+});
+
+router.get('/markets/comments/:eventId', async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const comments = await polymarketService.getMarketComments(eventId, 'Event');
+        res.json(comments);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch event comments' });
+    }
+});
+
+router.get('/markets/:marketId/comments', async (req, res) => {
+    try {
+        const { marketId } = req.params;
+        const comments = await polymarketService.getMarketComments(marketId, 'Market');
+        res.json(comments);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch market comments' });
+    }
+});
+
+router.get('/markets/liquidity', async (req, res) => {
+    try {
+        const markets = await polymarketService.getLiquidityOpportunities();
+        res.json(markets);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch liquidity opportunities' });
+    }
+});
+
+
+router.post('/bets', async (req, res) => {
+  const betData = req.body;
+  const newBet = {
+    ...betData,
+    id: `bet-${new ObjectId().toHexString()}`,
+    timestamp: Date.now(),
+    status: 'pending'
+  };
+  await betsCollection.insertOne(newBet as any);
+  await agentsCollection.updateOne({ id: betData.agentId }, { $push: { bettingHistory: newBet as any }});
+  res.status(201).send();
+});
+
+// --- Other Services ---
+router.get('/stats', async (req, res) => {
+  res.json({
+    directors: {
+      arena: { status: 'Running', lastTick: new Date().toISOString() }
+    },
+    simulation: {
+      totalAgents: await agentsCollection.countDocuments(),
+      activeRooms: await roomsCollection.countDocuments({ 'agentIds.0': { $exists: true } }),
+      liveConversations: await roomsCollection.countDocuments({ 'agentIds.1': { $exists: true } }),
+      totalTrades: await tradeHistoryCollection.countDocuments()
+    }
+  });
+});
+
+router.get('/tts-voices', async (req, res) => {
+  res.json(elevenLabsService.getAvailableVoices());
+});
+
+router.post('/tts', async (req, res) => {
+  try {
+    const stream = await elevenLabsService.synthesizeSpeech(req.body);
+    res.setHeader('Content-Type', 'audio/mpeg');
+    Readable.fromWeb(stream as any).pipe(res);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/music/cafe/:roomId', async (req, res) => {
+    try {
+        const { roomId } = req.params;
+        const forceRefresh = req.query.refresh === '1';
+        const track = await cafeMusicService.getTrack(roomId, { forceRefresh });
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('X-Music-Prompt', track.prompt);
+        res.send(track.buffer);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/leaderboard/pnl', async (req, res) => {
+    res.json(await leaderboardService.getPnlLeaderboard());
+});
+
+router.get('/leaderboard/intel', async (req, res) => {
+    res.json(await leaderboardService.getIntelLeaderboard());
+});
+
+export default router;

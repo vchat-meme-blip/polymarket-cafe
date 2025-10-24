@@ -2,127 +2,39 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import {
-  Intel,
-  MarketData,
-  SecurityAnalysis,
-  SocialSentiment,
-} from '../../lib/types/index.js';
-import { GoogleGenAI } from '@google/genai';
-import { solscanService } from './solscan.service.js';
+import { Agent, MarketIntel, BettingIntel } from '../../lib/types/index.js';
+import { aiService } from '../services/ai.service.js';
+import { polymarketService } from '../services/polymarket.service.js';
 
 class AlphaService {
-  public async discoverNewTokens(): Promise<{ mintAddress: string; name: string; symbol: string }[]> {
-    const latestTokens = await solscanService.getLatestTokens(10);
-    if (!latestTokens) return [];
+  public async discoverAndAnalyzeMarkets(agent: Agent): Promise<Partial<BettingIntel> | null> {
+    const { markets: trendingMarkets } = await polymarketService.getLiveMarkets(10);
+    if (trendingMarkets.length === 0) {
+        console.log(`[AlphaService] No trending markets found for ${agent.name} to analyze.`);
+        return null;
+    }
+
+    const market = trendingMarkets[Math.floor(Math.random() * trendingMarkets.length)];
+    console.log(`[AlphaService] Agent ${agent.name} is researching market: "${market.title}"`);
+
+    // Use the new, powerful research function
+    const researchFindings = await aiService.conductResearchOnMarket(agent, market);
+    if (!researchFindings) {
+        console.log(`[AlphaService] AI failed to conduct research for market "${market.title}".`);
+        return null;
+    }
+
+    const newIntel: Partial<BettingIntel> = {
+      ownerAgentId: agent.id,
+      market: market.title,
+      isTradable: Math.random() > 0.5, // 50% chance to make intel tradable
+      createdAt: Date.now(),
+      pnlGenerated: { amount: 0, currency: 'USD' },
+      ownerHandle: agent.ownerHandle,
+      ...researchFindings, // Spread the content, sourceUrls, rawData, etc.
+    };
     
-    return latestTokens
-      .filter(token => token && token.address && token.symbol) // Ensure token and its key properties exist
-      .map(token => ({
-        mintAddress: token.address,
-        name: token.name,
-        symbol: token.symbol,
-      }));
-  }
-
-  public async scoutTokenByQuery(query: string): Promise<Partial<Intel>> {
-    const tokenDetails = await solscanService.fetchTokenDetails(query);
-    if (!tokenDetails) {
-        throw new Error(`Could not find token details for "${query}" on Solscan.`);
-    }
-    return this.performFullIntelAnalysis(tokenDetails);
-  }
-
-  public async performFullIntelAnalysis(solscanData: any): Promise<Partial<Intel>> {
-    const marketData: MarketData = {
-      mintAddress: solscanData.tokenAddress,
-      name: solscanData.name,
-      priceUsd: solscanData.priceUsd,
-      marketCap: solscanData.marketCap,
-      liquidityUsd: solscanData.liquidityUsd,
-      priceChange24h: solscanData.priceChange24h,
-    };
-
-    // Solscan doesn't provide this data, so we keep it mocked for now.
-    const securityAnalysis: SecurityAnalysis = {
-      isHoneypot: Math.random() > 0.9,
-      isContractRenounced: Math.random() > 0.5,
-      holderConcentration: { top10Percent: Math.random() * 25 },
-    };
-
-    // Solscan doesn't provide this data, so we keep it mocked for now.
-    const socialSentiment: SocialSentiment = {
-      overallSentiment: ['Bullish', 'Bearish', 'Neutral'][Math.floor(Math.random() * 3)] as any,
-      tweets: [
-        { author: '@CryptoChad', text: `This $${solscanData.symbol} is about to go parabolic! 🚀`, sentiment: 'BULLISH' },
-        { author: '@SmartTrader', text: `Watching the chart on $${solscanData.symbol}, looks like a good entry.`, sentiment: 'NEUTRAL' },
-      ],
-    };
-
-    return {
-      id: `intel-${solscanData.tokenAddress}`,
-      token: solscanData.symbol,
-      marketData,
-      securityAnalysis,
-      socialSentiment,
-    };
-  }
-
-  public async synthesizeIntelWithAI(intel: Partial<Intel>, apiKey: string): Promise<string> {
-    if (!apiKey) {
-      console.error(`[AlphaService] Attempted to synthesize intel for ${intel.token} without an API key.`);
-      return "AI analysis requires a valid API key. Please configure it in your settings.";
-    }
-    const ai = new GoogleGenAI({ apiKey });
-    const prompt = `
-      You are a crypto analyst. Synthesize the following data into a short, one-sentence "Vibe Check" for the token ${intel.token}.
-      Be concise and direct. Example: "Bullish sentiment and strong volume, but watch for high holder concentration."
-      
-      Data:
-      - Market Cap: $${intel.marketData?.marketCap?.toLocaleString()}
-      - 24h Price Change: ${intel.marketData?.priceChange24h?.toFixed(2)}%
-      - Liquidity: $${intel.marketData?.liquidityUsd?.toLocaleString()}
-      - Honeypot Risk: ${intel.securityAnalysis?.isHoneypot ? 'Yes' : 'No'}
-      - Top 10 Holders: ${intel.securityAnalysis?.holderConcentration.top10Percent.toFixed(1)}%
-      - Social Sentiment: ${intel.socialSentiment?.overallSentiment}
-    `;
-
-        let attempts = 0;
-    const maxAttempts = 3;
-
-    while (attempts < maxAttempts) {
-      try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-        });
-        return (response.text ?? '').trim();
-      } catch (error: any) {
-        attempts++;
-                        if (error.status === 429 && attempts < maxAttempts) {
-          try {
-            const errorData = JSON.parse(error.message);
-            const details = errorData?.error?.details;
-            if (details) {
-              const retryDetails = details.find((d: any) => d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo');
-              if (retryDetails && retryDetails.retryDelay) {
-                const delaySeconds = parseInt(retryDetails.retryDelay.replace('s', ''), 10);
-                const delayMs = (delaySeconds * 1000) + Math.random() * 1000; // Add jitter
-                console.log(`[AlphaService] Rate limit hit for ${intel.token}. Retrying in ${Math.round(delayMs / 1000)}s (Attempt ${attempts}/${maxAttempts}).`);
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-                continue; // Retry the loop
-              }
-            }
-          } catch (parseError) {
-            console.error(`[AlphaService] Failed to parse API error message for ${intel.token}.`, parseError);
-          }
-        }
-        // For non-retryable errors or if max attempts are reached
-        console.error(`[AlphaService] Failed to synthesize intel with AI for ${intel.token} after ${attempts} attempts:`, error);
-        return "AI analysis failed. Please check token data manually.";
-      }
-    }
-    return "AI analysis failed after multiple retries.";
+    return newIntel;
   }
 }
 

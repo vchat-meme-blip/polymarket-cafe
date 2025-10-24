@@ -1,0 +1,388 @@
+:root {
+  --brand-purple: #9b59b6;
+  --brand-blue: #3498db;
+  --brand-cyan: #1abc9c;
+  --brand-green: #2ecc71;
+  --brand-yellow: #f1c40f;
+  --brand-red: #e74c3c;
+  
+  --bg-dark: #0a0f1e;
+  --bg-medium: #13151a;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --text-primary: #e1e2e3;
+  --text-secondary: #888d8f;
+  --font-display: 'Annie Use Your Telescope', cursive;
+  --font-body: 'Google Sans Display', sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    scroll-behavior: smooth;
+    overflow: hidden; /* Prevent body scroll, container will handle it */
+    height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  animation: fadeIn 1s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.container {
+  max-width: 1200px; /* Wider container for better layout */
+  margin: 0 auto;
+  padding: 0 2rem;
+  width: 100%;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  line-height: 1.2;
+  margin-bottom: 1rem;
+}
+
+h1 { font-size: clamp(3rem, 7vw, 6rem); color: white; text-shadow: 0 0 30px rgba(255,255,255,0.4); }
+h2 { font-size: clamp(2.5rem, 5vw, 4rem); color: var(--brand-cyan); text-align: center; margin-bottom: 3rem; }
+h3 { font-size: 1.75rem; color: var(--brand-blue); text-shadow: none; }
+h4 { font-size: 1.25rem; color: var(--text-primary); margin-bottom: 0.5rem; }
+
+p {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+p.section-subtitle {
+    max-width: 800px;
+    margin: -2rem auto 3rem auto;
+    text-align: center;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+}
+
+.icon {
+    font-family: 'Material Symbols Outlined';
+    font-weight: 300;
+    line-height: 1;
+    vertical-align: middle;
+    margin-right: 0.75rem;
+}
+
+/* --- Presentation & Slide Structure --- */
+.presentation-container {
+    height: 100vh;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+}
+.slide {
+    height: 100vh;
+    width: 100vw;
+    scroll-snap-align: start;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 4rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+.slide:last-of-type {
+    border-bottom: none;
+}
+
+.slide-number {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    font-size: 1rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+#download-pdf {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+#download-pdf:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+#download-pdf .icon {
+    font-size: 24px;
+    margin: 0;
+}
+
+
+/* --- Slide 1: Title --- */
+.title-slide {
+    text-align: center;
+    overflow: hidden;
+}
+.hero-content {
+    position: relative;
+    z-index: 2;
+}
+.tagline {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-top: -1rem;
+}
+#vrm-canvas-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    height: 800px;
+    z-index: 1;
+    opacity: 0.4;
+}
+
+
+/* --- Particle Background --- */
+#particle-container {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: linear-gradient(180deg, rgba(10, 15, 30, 0) 0%, #0A0F1E 100%), linear-gradient(160deg, #1e0c3b 0%, #0d1a3b 100%);
+}
+.particle {
+    position: absolute;
+    background-color: var(--brand-cyan);
+    border-radius: 50%;
+    opacity: 0;
+    width: 3px;
+    height: 3px;
+    animation: move-particle linear infinite;
+}
+@keyframes move-particle {
+    0% { transform: translateY(0) translateX(0); opacity: 0; }
+    20% { opacity: 0.3; }
+    80% { opacity: 0.3; }
+    100% { transform: translateY(-100vh) translateX(20vw); opacity: 0; }
+}
+
+/* --- Shared Card Styles ("Glassmorphism") --- */
+.card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 2.5rem;
+    transition: all 0.3s ease;
+}
+.card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--brand-cyan);
+    transform: translateY(-5px);
+    box-shadow: 0 0 30px rgba(26, 188, 156, 0.1);
+}
+
+/* --- Slide 2: Problem/Solution --- */
+.problem-solution-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: stretch; /* Make cards same height */
+}
+.problem-solution-grid .card h3 { font-size: 2rem; }
+.problem-solution-grid .card p { font-size: 1.1rem; }
+.problem { border-left: 4px solid var(--brand-red); }
+.solution { border-left: 4px solid var(--brand-green); }
+
+
+/* --- Slide 3: Value Props --- */
+.value-props {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+}
+.value-prop-card {
+    padding: 2rem;
+    text-align: left;
+    width: 100%; /* Wider cards */
+}
+.value-prop-card h3 {
+    display: flex;
+    align-items: center;
+}
+.value-prop-card h3 .icon {
+    color: var(--brand-cyan);
+    font-size: 1.8rem;
+}
+
+/* --- Slide 4: Tech --- */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2rem;
+}
+.card .card-icon {
+    font-size: 2.5rem;
+    color: var(--brand-purple);
+    margin-bottom: 1rem;
+    display: block;
+}
+.disclaimer {
+    text-align: center;
+    margin-top: 3rem;
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+/* Slide 5: Product in Action */
+.screenshots-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+    height: 400px;
+}
+.screenshot-placeholder {
+    background-color: var(--bg-medium);
+    border: 2px dashed var(--border-color);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 1rem;
+    color: var(--text-secondary);
+}
+.screenshot-placeholder p {
+    font-weight: bold;
+    color: var(--text-primary);
+    font-size: 1.2rem;
+}
+.screenshot-placeholder span {
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+/* --- Slide 6: Vision --- */
+.vision-points {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+}
+.vision-point h4 { color: var(--brand-yellow); }
+.vision-point.card {
+    background-color: transparent;
+    border: none;
+    backdrop-filter: none;
+    padding: 2rem;
+}
+
+
+/* --- Slide 7: Roadmap --- */
+.feature-status-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+    text-align: left;
+    align-items: stretch;
+}
+.status-column {
+    display: flex;
+    flex-direction: column;
+}
+.status-column h3 {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+}
+.status-column ul {
+    list-style: none;
+}
+.status-column li {
+    margin-bottom: 0.75rem;
+    color: var(--text-secondary);
+}
+
+
+/* --- Responsive --- */
+@media (max-width: 900px) {
+    .problem-solution-grid, .value-props, .card-grid, .feature-status-grid, .vision-points, .screenshots-grid {
+        grid-template-columns: 1fr;
+    }
+    .screenshots-grid {
+        height: auto;
+    }
+    .screenshot-placeholder {
+        min-height: 200px;
+    }
+    #vrm-canvas-container {
+        width: 100%;
+        height: 60%;
+        opacity: 0.2;
+    }
+}
+@media (max-width: 768px) {
+    .container {
+        padding: 0 1rem;
+    }
+    .slide {
+        padding: 4rem 0;
+    }
+    h1 { font-size: 3rem; }
+    h2 { font-size: 2.5rem; }
+}
+
+
+/* --- Print Styles for PDF Export --- */
+@media print {
+    html, body {
+        overflow: visible;
+        background: var(--bg-dark);
+        color: var(--text-primary);
+    }
+    .presentation-container {
+        overflow: visible;
+        height: auto;
+        scroll-snap-type: none;
+    }
+    .slide {
+        height: 100vh;
+        page-break-after: always;
+        page-break-inside: avoid;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+    }
+    #download-pdf, .slide-number {
+        display: none;
+    }
+    #particle-container, #vrm-canvas-container {
+        display: none; /* Hide heavy animations for print */
+    }
+    .card, .value-prop-card, .status-column {
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: #1a1e2a; /* Solid color for PDF */
+    }
+}

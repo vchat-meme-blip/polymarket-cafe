@@ -1,4 +1,2 @@
-declare module '*.module.css' {
-  const classes: { [key: string]: string };
-  export default classes;
-}
+// This file is intentionally left blank.
+// The CSS module declaration has been moved to vite-env.d.ts to avoid conflicts.

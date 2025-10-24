@@ -4,8 +4,10 @@
 */
 import { useState, useEffect, useRef } from 'react';
 import Modal from '../Modal';
-import { useUI, useSystemLogStore, LogEntry } from '../../lib/state';
-import { apiService } from '../../lib/services/api.service';
+// FIX: Fix imports for `useUI`, `useSystemLogStore`, and `LogEntry` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useUI, useSystemLogStore, LogEntry } from '../../lib/state/index.js';
+// FIX: Add .js extension for ES module compatibility.
+import { apiService } from '../../lib/services/api.service.js';
 import { format } from 'date-fns';
 import c from 'classnames';
 import styles from './Modals.module.css';
@@ -91,7 +93,7 @@ export default function ServerHealthModal() {
         const fetchStats = async () => {
             try {
                 // FIX: Use the centralized apiService to ensure the correct endpoint is called.
-                const data = await apiService.request<ServerStats>('/stats');
+                const data = await apiService.get<ServerStats>('/api/stats');
                 setStats(data);
             } catch (error) {
                 console.error("Error fetching server health:", error);

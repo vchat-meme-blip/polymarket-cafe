@@ -2,7 +2,10 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useUI, useUser } from '../../lib/state';
+// FIX: Fix imports for `useUI` and `useUser` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useUI, useUser } from '../../lib/state/index.js';
+// FIX: Added missing 'React' import to resolve namespace errors.
+import React from 'react';
 import { useState } from 'react';
 import styles from './Profile.module.css';
 

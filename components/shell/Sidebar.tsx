@@ -2,9 +2,9 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useUI, useUser } from '../../lib/state';
+// FIX: Fix imports for `useUI` and `useUser` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import { useUI, useUser } from '../../lib/state/index.js';
 import c from 'classnames';
-import WalletBalance from './WalletBalance';
 import { useState } from 'react';
 import styles from './Shell.module.css';
 
@@ -82,20 +82,28 @@ export default function Sidebar() {
           <span className="icon">groups</span>
         </button>
         <button
-          className={c(styles.sidebarButton, { [styles.active]: view === 'arena' })}
-          onClick={() => setView('arena')}
-          aria-label="Café"
-          data-tooltip="Café"
+          className={c(styles.sidebarButton, { [styles.active]: view === 'prediction-hub' })}
+          onClick={() => setView('prediction-hub')}
+          aria-label="Prediction Hub"
+          data-tooltip="Prediction Hub"
         >
-          <span className="icon">coffee</span>
+          <span className="icon">insights</span>
         </button>
         <button
-          className={c(styles.sidebarButton, { [styles.active]: view === 'trading-floor' })}
-          onClick={() => setView('trading-floor')}
-          aria-label="Trading Floor"
-          data-tooltip="Trading Floor"
+          className={c(styles.sidebarButton, { [styles.active]: view === 'leaderboard' })}
+          onClick={() => setView('leaderboard')}
+          aria-label="Leaderboard"
+          data-tooltip="Leaderboard"
         >
-          <span className="icon">storefront</span>
+          <span className="icon">leaderboard</span>
+        </button>
+        <button
+          className={c(styles.sidebarButton, { [styles.active]: view === 'intel-exchange' })}
+          onClick={() => setView('intel-exchange')}
+          aria-label="Intel Exchange"
+          data-tooltip="Intel Exchange"
+        >
+          <span className="icon">coffee</span>
         </button>
         <button
           className={c(styles.sidebarButton, { [styles.active]: view === 'bounty' })}
@@ -116,7 +124,6 @@ export default function Sidebar() {
       </div>
       <div className={styles.sidebarBottom}>
         <ConnectWalletButton />
-        <WalletBalance />
         <button
           className={styles.sidebarButton}
           onClick={() => setShowProfileView(true)}
