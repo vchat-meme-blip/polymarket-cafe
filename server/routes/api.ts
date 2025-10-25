@@ -1,31 +1,42 @@
-import { Router, type Request, type Response, type NextFunction } from 'express';
-import mongoose from 'mongoose';
+import { Router } from 'express';
+import mongoose, { Collection } from 'mongoose';
+import { TradeRecord, BettingIntel } from '../../lib/types/shared.js';
 import { 
   usersCollection, 
   agentsCollection,
+  betsCollection,
+  bountiesCollection,
+  tradeHistoryCollection,
+  transactionsCollection,
+  bettingIntelCollection,
   roomsCollection,
+  dailySummariesCollection,
 } from '../db.js';
+import { PRESET_AGENTS } from '../../lib/presets/agents.js';
 import { aiService } from '../services/ai.service.js';
 import { elevenLabsService } from '../services/elevenlabs.service.js';
+import { cafeMusicService } from '../services/cafeMusic.service.js';
 import { polymarketService } from '../services/polymarket.service.js';
+import { kalshiService } from '../services/kalshi.service.js';
 import { leaderboardService } from '../services/leaderboard.service.js';
-import { User } from '../../lib/types/index.js';
+import { Agent, User, Interaction, Room, MarketIntel, AgentMode, Bet } from '../../lib/types/index.js';
 import { createSystemInstructions } from '../../lib/prompts.js';
 import { ObjectId } from 'mongodb';
 import OpenAI from 'openai';
+import { Readable } from 'stream';
 import { startOfToday, formatISO } from 'date-fns';
 
-const router: Router = Router();
+const router = Router();
 
 // Middleware to get user handle from header
-router.use((req: Request, res: Response, next: NextFunction) => {
+router.use((req, res, next) => {
   const handle = req.header('X-User-Handle');
   res.locals.userHandle = handle;
   next();
 });
 
 // --- Health Check ---
-router.get('/health', (_req: Request, res: Response) => {
+router.get('/health', (req, res) => {
     res.status(200).send('OK');
 });
 

@@ -1,48 +1,23 @@
 # ---- Build Stage ----
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies and MongoDB tools
-RUN apk add --no-cache python3 make g++ \
-    # Add MongoDB tools and dependencies
-    && apk add --no-cache mongodb-tools \
-    # Install MongoDB client libraries and build tools
-    && apk add --no-cache --virtual .build-deps \
-        build-base \
-        python3-dev \
-        libffi-dev \
-        openssl-dev \
-        libc6-compat \
-        git
+# Install build dependencies
+RUN apk add --no-cache python3 make g++
 
 # Copy package files and install all dependencies
 COPY package*.json ./
-# Copy pnpm-lock.yaml if it exists, otherwise don't fail
-COPY pnpm-lock.yaml* ./
 COPY tsconfig*.json ./
 # FIX: Copy jsconfig.json as it might be used by some tools
 COPY jsconfig.json ./
 
-# Install pnpm using npm with full path to ensure it's available
-RUN npm install -g pnpm@8.15.4 --no-fund --no-audit && \
-    # Install TypeScript and type definitions locally
-    npm install -g typescript@5.3.3 @types/node@20.11.19 --no-fund --no-audit && \
-    # Ensure pnpm is in PATH
-    ln -s /usr/local/bin/pnpm /usr/bin/pnpm
-# Install root dependencies and update lockfile if needed
-RUN pnpm install --no-frozen-lockfile
-
+# Install dependencies and development tools
+RUN npm install -g typescript@5.3.3 && \
+    npm install --save-dev @types/node@22.14.0 && \
+    npm ci --legacy-peer-deps
 # Copy the rest of the application
 COPY . .
-
-# Install server dependencies
-RUN echo "Installing server dependencies..." && \
-    # Install mongoose and its types at the root level
-    pnpm add mongoose@8.2.0 @types/mongoose@5.11.97 && \
-    cd server && \
-    pnpm install --production=false && \
-    cd ..
 
 # Build the application
 RUN echo "Building client..." && \
@@ -55,11 +30,8 @@ RUN echo "Building server and workers..." && \
     npm run postbuild:server && \
     npm run postbuild:workers
 
-# Fix worker extensions
-RUN node scripts/fix-worker-extensions.js
-
 # ---- Production Stage ----
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Install runtime dependencies
 RUN apk add --no-cache libusb udev curl
@@ -75,17 +47,9 @@ ENV NODE_ENV=production
 # FIX: Set a default PORT for consistency, although docker-compose overrides it
 ENV PORT=3001
 
-# Copy package files and lockfile if it exists
+# Copy package files and install only production dependencies
 COPY package*.json ./
-COPY pnpm-lock.yaml* ./
-
-# Install pnpm in production stage
-RUN npm install -g pnpm@8.15.4 --no-fund --no-audit && \
-    # Ensure pnpm is in PATH
-    ln -s /usr/local/bin/pnpm /usr/bin/pnpm
-
-# Install production dependencies and update lockfile if needed
-RUN pnpm install --prod --no-frozen-lockfile
+RUN npm ci --only=production --legacy-peer-deps
 
 # Create necessary directories
 RUN mkdir -p /app/dist/server/workers /app/dist/client /app/logs
@@ -97,19 +61,13 @@ COPY --from=builder /app/dist/ /app/dist/
 RUN mkdir -p /app/dist/client /public /app/logs
 
 # Copy package files and configs
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/node_modules ./
-COPY --from=builder /app/scripts ./
+COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/ecosystem.config.* ./
 COPY --from=builder /app/.env* ./
 
 # Copy public assets if they exist
 RUN if [ -d "/app/public" ]; then cp -r /app/public/* /public/; fi
 
-# FIX: Removed symlink creation - no longer necessary with corrected build output
-# The tsconfig.server.json 'rootDir' fix ensures workers are compiled directly to /app/dist/server/workers
-
-# Verify the build output
 # Verify the build output
 RUN echo "Build output verification:" && \
     echo "\nServer files in /app/dist/:" && ls -la /app/dist/ && \
@@ -244,8 +202,5 @@ log " Starting application..."
 exec node --no-warnings "$ENTRYPOINT_PATH"
 EOF
 
-# Set NODE_OPTIONS to enable ES modules
-ENV NODE_OPTIONS="--experimental-modules --es-module-specifier-resolution=node"
-
 # Start the application using the resolved entry point
-CMD ["node", "--experimental-modules", "--es-module-specifier-resolution=node", "/app/dist/server/server/index.js"]
+CMD ["sh", "-c", "node /app/dist/server/server/index.js"]
