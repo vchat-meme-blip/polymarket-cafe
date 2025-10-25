@@ -10,11 +10,11 @@
       "DOM.Iterable"
     ],
     "skipLibCheck": true,
-    "types": ["node", "mongodb"],
+    "types": ["node", "mongodb", "mongoose"],
     "typeRoots": [
       "./node_modules/@types",
+      "./node_modules/mongoose/types",
       "./src/types",
-      "./server/node_modules/@types",
       "."
     ],
     "moduleResolution": "bundler",

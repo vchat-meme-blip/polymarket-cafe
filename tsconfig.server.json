@@ -11,7 +11,7 @@
     "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "types": ["node", "mongoose"],
+    "types": ["node", "mongoose", "mongodb"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
@@ -40,10 +40,8 @@
   ],
   "typeRoots": [
     "./node_modules/@types",
-    "./server/node_modules/@types",
-    "./src/types",
-    "./server/types",
-    "."
+    "./node_modules/mongoose/types",
+    "./src/types"
   ],
   "exclude": [
     "node_modules",

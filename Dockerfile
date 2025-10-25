@@ -27,7 +27,7 @@ COPY jsconfig.json ./
 # Install pnpm and core dependencies
 RUN npm install -g pnpm@8.15.4 && \
     # Install TypeScript and type definitions
-    pnpm add -g typescript@5.3.3 @types/node@20.11.19 @types/mongoose@5.11.97
+    pnpm add -g typescript@5.3.3 @types/node@20.11.19
 # Only use --frozen-lockfile if pnpm-lock.yaml exists
 # Install root dependencies
 RUN if [ -f "pnpm-lock.yaml" ]; then \
@@ -41,9 +41,10 @@ COPY . .
 
 # Install server dependencies
 RUN echo "Installing server dependencies..." && \
+    # Install mongoose and its types at the root level
+    pnpm add mongoose@8.2.0 @types/mongoose@5.11.97 && \
     cd server && \
     pnpm install --production=false && \
-    pnpm add -D @types/mongoose && \
     cd ..
 
 # Build the application
