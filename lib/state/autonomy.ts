@@ -111,6 +111,7 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
         content: intel.content || '',
         sourceDescription: intel.sourceDescription || 'Conversation',
         ...intel,
+        pnlGenerated: { amount: 0, currency: 'USD' },
         bountyId: bountyId,
       } as BettingIntel;
 

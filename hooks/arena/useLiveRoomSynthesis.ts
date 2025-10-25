@@ -30,8 +30,8 @@ export const useLiveConversationSynthesis = (roomId: string | null) => {
 
   const allAgents = useMemo(
     () => [
-      ...useAgent.getState().availablePresets,
-      ...useAgent.getState().availablePersonal
+      ...useAgent.getState().availablePersonal,
+      ...useAgent.getState().availablePresets
     ],
     []
   );

@@ -18,6 +18,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fs from 'fs';
 
+// FIX: Remove explicit 'default' as api.ts has a default export and `import apiRouter from './routes/api.js'` is correct.
 import apiRouter from './routes/api.js';
 import { usersCollection, agentsCollection } from './db.js';
 import { ApiKeyManager } from './services/apiKey.service.js';
@@ -190,11 +191,12 @@ function setupWorkers() {
 
 // FIX: Use explicitly imported Request, Response, and NextFunction types.
 const attachWorkers = (req: Request, res: Response, next: NextFunction) => {
-  req.arenaWorker = arenaWorker;
-  req.resolutionWorker = resolutionWorker;
-  req.dashboardWorker = dashboardWorker;
-  req.autonomyWorker = autonomyWorker;
-  req.marketWatcherWorker = marketWatcherWorker;
+  // FIX: Access worker properties directly on 'req' after type augmentation.
+  (req as any).arenaWorker = arenaWorker;
+  (req as any).resolutionWorker = resolutionWorker;
+  (req as any).dashboardWorker = dashboardWorker;
+  (req as any).autonomyWorker = autonomyWorker;
+  (req as any).marketWatcherWorker = marketWatcherWorker;
   next();
 };
 
@@ -241,8 +243,10 @@ export async function startServer() {
       app.get('*', (req: Request, res: Response) => {
         const indexPath = path.join(clientPath, 'index.html');
         if (fs.existsSync(indexPath)) {
+          // FIX: Use 'res.sendFile' (available on augmented Response type)
           res.sendFile(indexPath);
         } else {
+          // FIX: Use 'res.status' (available on augmented Response type)
           res.status(404).send('Client files not found');
         }
       });

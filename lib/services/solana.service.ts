@@ -11,6 +11,53 @@
 
 class SolanaService {
   /**
+   * Simulates connecting to a Solana wallet.
+   * In a real scenario, this would open a wallet provider (e.g., Phantom)
+   * and request connection.
+   * @returns A promise that resolves with the simulated wallet address.
+   */
+  public async connectWallet(): Promise<string> {
+    console.log('[SolanaService (SIMULATED)] Connecting wallet...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Return a dummy address for simulation
+    return '4p4h2h1q8z2z8z8y8f8e8d8c8b8a898887868584'; 
+  }
+
+  /**
+   * Simulates disconnecting a Solana wallet.
+   */
+  public async disconnectWallet(): Promise<void> {
+    console.log('[SolanaService (SIMULATED)] Disconnecting wallet...');
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  /**
+   * Simulates signing a message with the connected wallet.
+   * @param message The message to sign.
+   * @returns A promise that resolves with a simulated signature.
+   */
+  public async signMessage(message: string): Promise<string> {
+    console.log(`[SolanaService (SIMULATED)] Signing message: "${message}"`);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Return a dummy signature
+    return `sim_sig_${btoa(message).substring(0, 30)}`;
+  }
+
+  /**
+   * Simulates recovering an address from a signed message.
+   * @param message The original message.
+   * @param signature The signature.
+   * @returns A promise that resolves with the simulated wallet address.
+   */
+  public async recoverAddress(message: string, signature: string): Promise<string> {
+    console.log(`[SolanaService (SIMULATED)] Recovering address from message "${message}" and signature "${signature}"`);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    // In a real app, this would use a crypto library to verify and recover.
+    // For simulation, we'll just return the predefined dummy address.
+    return '4p4h2h1q8z2z8z8y8f8e8d8c8b8a898887868584'; 
+  }
+
+  /**
    * Verifies a transaction on the Solana network.
    * @param transactionId The signature of the transaction to verify.
    * @returns A promise that resolves to true if the transaction is confirmed, false otherwise.

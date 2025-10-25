@@ -38,35 +38,41 @@ export interface UserDocument extends Omit<SharedUser, '_id' | 'currentAgentId' 
   currentAgentId?: ObjectId;
   ownedRoomId?: ObjectId;
   // Convert MongoDB document to shared type
-  toShared(): SharedUser;
+  toShared?(): SharedUser;
 }
 
 export interface AgentDocument extends Omit<SharedAgent, 
-  '_id' | 'bettingHistory' | 'currentRoomId' | 'bets' | 'lastActiveAt' | 'createdAt' | 'updatedAt'
+  '_id' | 'bettingHistory' | 'currentRoomId' | 'bets' | 'lastActiveAt' | 'createdAt' | 'updatedAt' | 'bettingIntel' | 'marketWatchlists' | 'boxBalance' | 'portfolio'
 > {
   _id: ObjectId;
-  bettingHistory: ObjectId[];
+  bettingHistory?: ObjectId[]; // Change to ObjectId[]
   currentRoomId?: ObjectId;
-  bets: ObjectId[];
-  lastActiveAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  bets?: ObjectId[]; // Change to ObjectId[]
+  lastActiveAt?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+  bettingIntel?: ObjectId[]; // Add this
+  marketWatchlists?: ObjectId[]; // Add this
+  boxBalance?: number; // Add this
+  portfolio?: Record<string, number>; // Add this
   // Convert MongoDB document to shared type
-  toShared(): SharedAgent;
+  toShared?(): SharedAgent;
 }
 
-export interface RoomDocument extends Omit<SharedRoom, 'id' | 'agentIds' | 'hostId' | 'bannedAgentIds'> {
-  _id: ObjectId;
-  agentIds: ObjectId[];
+// FIX: Update RoomDocument to correctly extend SharedRoom and declare MongoDB specific fields.
+export interface RoomDocument extends SharedRoom { // Keep 'id' from SharedRoom
+  _id: ObjectId; // Add MongoDB's _id
+  id: string; // Ensure id is explicitly declared as string, matching shared type
+  agentIds: ObjectId[]; // These are ObjectIds in Mongo
   hostId: ObjectId | null;
-  bannedAgentIds: ObjectId[];
-  // Convert MongoDB document to shared type
-  toShared(): SharedRoom;
+  bannedAgentIds?: ObjectId[];
+  toShared?(): SharedRoom;
 }
 
 export interface BountyDocument extends WithObjectId<Omit<SharedBounty, 'id'>> {
+  ownerHandle: string; // Add ownerHandle to the document
   // Convert MongoDB document to shared type
-  toShared(): SharedBounty;
+  toShared?(): SharedBounty;
 }
 
 export interface BetDocument extends Omit<SharedBet, 'id' | 'agentId' | 'sourceIntelId' | 'timestamp'> {
@@ -74,8 +80,9 @@ export interface BetDocument extends Omit<SharedBet, 'id' | 'agentId' | 'sourceI
   agentId: ObjectId;
   sourceIntelId?: ObjectId;
   timestamp: Date;
+  ownerHandle?: string; // Add ownerHandle to the document
   // Convert MongoDB document to shared type
-  toShared(): SharedBet;
+  toShared?(): SharedBet;
 }
 
 export interface BettingIntelDocument extends Omit<SharedBettingIntel, 
@@ -86,47 +93,58 @@ export interface BettingIntelDocument extends Omit<SharedBettingIntel,
   sourceAgentId?: ObjectId;
   bountyId?: ObjectId;
   createdAt: Date;
+  updatedAt?: Date; // Add this, to match schema
   // Convert MongoDB document to shared type
-  toShared(): SharedBettingIntel;
+  toShared?(): SharedBettingIntel;
 }
 
 export interface MarketWatchlistDocument extends WithObjectId<Omit<SharedMarketWatchlist, 'id'>> {
+  ownerAgentId: ObjectId;
   // Convert MongoDB document to shared type
-  toShared(): SharedMarketWatchlist;
+  toShared?(): SharedMarketWatchlist;
 }
 
 export interface DailySummaryDocument extends Omit<SharedDailySummary, 'agentId' | 'date' | 'id'> {
   _id: ObjectId;
   agentId: ObjectId;
-  date: Date;
+  date: string; // YYYY-MM-DD format
+  createdAt?: Date; // Add createdAt to match schema
+  updatedAt?: Date; // Add updatedAt to match schema
   // Convert MongoDB document to shared type
-  toShared(): SharedDailySummary;
+  toShared?(): SharedDailySummary;
 }
 
 export interface NotificationDocument extends Omit<SharedNotification, 'id' | 'userId' | 'agentId' | 'timestamp'> {
   _id: ObjectId;
-  userId: ObjectId;
+  userId: string; // User handle for notifications
   agentId?: ObjectId;
   timestamp: Date;
+  createdAt?: Date; // Add createdAt to match schema
+  updatedAt?: Date; // Add updatedAt to match schema
   // Convert MongoDB document to shared type
-  toShared(): SharedNotification;
+  toShared?(): SharedNotification;
 }
 
 export interface TransactionDocument extends Omit<SharedTransaction, 'id' | 'timestamp'> {
   _id: ObjectId;
   timestamp: Date;
+  ownerHandle: string; // User handle for transactions
+  createdAt?: Date; // Add createdAt to match schema
+  updatedAt?: Date; // Add updatedAt to match schema
   // Convert MongoDB document to shared type
-  toShared(): SharedTransaction;
+  toShared?(): SharedTransaction;
 }
 
-export interface TradeRecordDocument extends Omit<SharedTradeRecord, 'fromId' | 'toId' | 'roomId' | 'timestamp'> {
+// FIX: Update TradeRecordDocument to correctly use ObjectId for refs and Date for timestamps.
+export interface TradeRecordDocument extends SharedTradeRecord {
   _id: ObjectId;
   fromId: ObjectId;
   toId: ObjectId;
   roomId: ObjectId;
   timestamp: Date;
-  // Convert MongoDB document to shared type
-  toShared(): SharedTradeRecord;
+  createdAt: Date; // Add createdAt to match schema
+  updatedAt: Date; // Add updatedAt to match schema
+  toShared?(): SharedTradeRecord;
 }
 
 // Helper functions to convert between MongoDB and shared types
@@ -135,40 +153,139 @@ export function toSharedUser(doc: UserDocument): SharedUser {
     ...doc,
     _id: doc._id.toString(),
     currentAgentId: doc.currentAgentId?.toString(),
-    ownedRoomId: doc.ownedRoomId?.toString()
-  };
+    ownedRoomId: doc.ownedRoomId?.toString(),
+    createdAt: doc.createdAt?.getTime(),
+    updatedAt: doc.updatedAt?.getTime(),
+  } as SharedUser;
 }
 
 export function toSharedAgent(doc: AgentDocument): SharedAgent {
-  // Create a new object with only the properties that exist in SharedAgent
   const agent: any = { ...doc };
   
-  // Convert ObjectId to string for the _id field
   agent.id = doc._id.toString();
   
-  // Convert other ObjectId fields
   if (doc.currentRoomId) {
     agent.currentRoomId = doc.currentRoomId.toString();
   }
   
-  // Convert dates to timestamps
-  agent.lastActiveAt = doc.lastActiveAt.getTime();
-  agent.createdAt = doc.createdAt.getTime();
-  agent.updatedAt = doc.updatedAt.getTime();
+  agent.lastActiveAt = doc.lastActiveAt?.getTime() || 0;
+  agent.createdAt = doc.createdAt?.getTime() || 0;
+  agent.updatedAt = doc.updatedAt?.getTime() || 0;
   
-  // Initialize arrays that will be populated by the database layer
-  agent.bettingHistory = [];
-  agent.bets = [];
+  agent.bettingHistory = doc.bettingHistory?.map((id: ObjectId) => id.toString()) || [];
+  agent.bets = doc.bets?.map((id: ObjectId) => id.toString()) || [];
+  agent.bettingIntel = doc.bettingIntel?.map((id: ObjectId) => id.toString()) || []; // Add this
+  agent.marketWatchlists = doc.marketWatchlists?.map((id: ObjectId) => id.toString()) || []; // Add this
   
-  // Remove MongoDB-specific properties
   delete agent._id;
   delete agent.__v;
   
-  return agent as unknown as SharedAgent;
+  return agent as SharedAgent;
 }
 
-// Add similar conversion functions for other document types
-// ...
+export function toSharedRoom(doc: RoomDocument): SharedRoom {
+  const room: any = { ...doc };
+  room.id = doc._id.toString(); // Map _id to id for shared type
+  room.agentIds = doc.agentIds?.map((id: ObjectId) => id.toString()) || [];
+  room.hostId = doc.hostId?.toString() || null;
+  room.bannedAgentIds = doc.bannedAgentIds?.map((id: ObjectId) => id.toString()) || [];
+  delete room._id;
+  delete room.__v;
+  return room as SharedRoom;
+}
+
+export function toSharedBet(doc: BetDocument): SharedBet {
+  const bet: any = { ...doc };
+  bet.id = doc._id.toString();
+  bet.agentId = doc.agentId.toString();
+  bet.sourceIntelId = doc.sourceIntelId?.toString();
+  bet.timestamp = doc.timestamp.getTime();
+  delete bet._id;
+  delete bet.__v;
+  return bet as SharedBet;
+}
+
+export function toSharedBounty(doc: BountyDocument): SharedBounty {
+  const bounty: any = { ...doc };
+  bounty.id = doc._id.toString();
+  bounty.createdAt = doc.createdAt?.getTime(); // Add this
+  bounty.updatedAt = doc.updatedAt?.getTime(); // Add this
+  delete bounty._id;
+  delete bounty.__v;
+  return bounty as SharedBounty;
+}
+
+export function toSharedBettingIntel(doc: BettingIntelDocument): SharedBettingIntel {
+  const intel: any = { ...doc };
+  intel.id = doc._id.toString();
+  intel.ownerAgentId = doc.ownerAgentId.toString();
+  intel.sourceAgentId = doc.sourceAgentId?.toString();
+  intel.bountyId = doc.bountyId?.toString();
+  intel.createdAt = doc.createdAt.getTime();
+  intel.updatedAt = doc.updatedAt?.getTime(); // Add this
+  delete intel._id;
+  delete intel.__v;
+  return intel as SharedBettingIntel;
+}
+
+export function toSharedMarketWatchlist(doc: MarketWatchlistDocument): SharedMarketWatchlist {
+  const watchlist: any = { ...doc };
+  watchlist.id = doc._id.toString();
+  watchlist.ownerAgentId = doc.ownerAgentId.toString();
+  watchlist.createdAt = doc.createdAt?.getTime(); // Add this
+  watchlist.updatedAt = doc.updatedAt?.getTime(); // Add this
+  delete watchlist._id;
+  delete watchlist.__v;
+  return watchlist as SharedMarketWatchlist;
+}
+
+export function toSharedDailySummary(doc: DailySummaryDocument): SharedDailySummary {
+  const summary: any = { ...doc };
+  summary.id = doc._id.toString();
+  summary.agentId = doc.agentId.toString();
+  summary.createdAt = doc.createdAt?.getTime(); // Add this
+  summary.updatedAt = doc.updatedAt?.getTime(); // Add this
+  delete summary._id;
+  delete summary.__v;
+  return summary as SharedDailySummary;
+}
+
+export function toSharedNotification(doc: NotificationDocument): SharedNotification {
+  const notification: any = { ...doc };
+  notification.id = doc._id.toString();
+  notification.agentId = doc.agentId?.toString();
+  notification.timestamp = doc.timestamp.getTime();
+  notification.createdAt = doc.createdAt?.getTime(); // Add this
+  notification.updatedAt = doc.updatedAt?.getTime(); // Add this
+  delete notification._id;
+  delete notification.__v;
+  return notification as SharedNotification;
+}
+
+export function toSharedTransaction(doc: TransactionDocument): SharedTransaction {
+  const transaction: any = { ...doc };
+  transaction.id = doc._id.toString();
+  transaction.timestamp = doc.timestamp.getTime();
+  transaction.createdAt = doc.createdAt?.getTime(); // Add this
+  transaction.updatedAt = doc.updatedAt?.getTime(); // Add this
+  delete transaction._id;
+  delete transaction.__v;
+  return transaction as SharedTransaction;
+}
+
+export function toSharedTradeRecord(doc: TradeRecordDocument): SharedTradeRecord {
+  const trade: any = { ...doc };
+  trade.id = doc._id.toString();
+  trade.fromId = doc.fromId.toString();
+  trade.toId = doc.toId.toString();
+  trade.roomId = doc.roomId.toString();
+  trade.timestamp = doc.timestamp.getTime();
+  trade.createdAt = doc.createdAt?.getTime(); // Add this
+  trade.updatedAt = doc.updatedAt?.getTime(); // Add this
+  delete trade._id;
+  delete trade.__v;
+  return trade as SharedTradeRecord;
+}
 
 // Re-export shared types for convenience
 export type {

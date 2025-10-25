@@ -16,6 +16,7 @@ class ApiKeyProvider {
       
       // Clear any timeout for this request
       if (this.requestTimeouts.has(requestId)) {
+        // FIX: Ensure clearTimeout is called with the correct NodeJS.Timeout type.
         clearTimeout(this.requestTimeouts.get(requestId)!);
         this.requestTimeouts.delete(requestId);
       }
@@ -48,7 +49,7 @@ class ApiKeyProvider {
     return new Promise((resolve) => {
       // Set a timeout to prevent indefinite waiting
       // FIX: Use `global.setTimeout` to resolve type conflict between Node.js (returns NodeJS.Timeout) and browser (returns number) environments.
-      const timeout = global.setTimeout(() => {
+      const timeout: NodeJS.Timeout = global.setTimeout(() => {
         console.warn(`[ApiKeyProvider] Request for API key timed out after ${this.MAX_WAIT_TIME/1000}s`);
         if (this.pendingRequests.has(requestId)) {
           this.pendingRequests.delete(requestId);

@@ -41,6 +41,10 @@ const agentDefaults = {
   // Deprecated fields, kept for type conformity until full removal
   boxBalance: 0,
   portfolio: {},
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  lastActiveAt: Date.now(),
+  mode: 'Safe' as const,
 };
 
 export const TonyPump: Agent = { ...agentDefaults, id: 'tony-pump', name: 'Tony Pump', personality: "I'm not just in the room, I am the room. I've got diamond hands and a platinum wallet. If a token's got less than 2000 holders, I'm not interested. I don't follow trends, I set them. Call me a shiller? I call it predicting the future.", instructions: "My goal is to find and promote top-tier tokens with strong communities (over 2000 holders). I'll use my influence and capital to pump my bags. I will also autonomously perform web research to find new opportunities and may visit the Intel Exchange to trade alpha.", voice: 'TxGEqnHWrfWFTfGW9XjX', topics: ['AI', 'DePIN', 'RWA', 'Tech'], wishlist: ['New AI Tokens', 'Seed-stage DePIN'], reputation: 150, modelUrl: '/models/ironman.vrm', isShilling: false, shillInstructions: '' };

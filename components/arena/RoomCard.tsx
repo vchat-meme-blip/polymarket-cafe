@@ -55,7 +55,8 @@ const HolographicOffer = ({ offer }: { offer: Offer }) => {
   if (offer.type === 'intel') {
       text = `INTEL ON\n${offer.market}\n@ ${offer.price} BOX`;
   } else if (offer.type === 'watchlist') {
-      text = `WATCHLIST\n@ ${offer.price} BOX`;
+      // FIX: Access 'watchlistName' property on the Offer type, which has been added.
+      text = `WATCHLIST\n${offer.watchlistName}\n@ ${offer.price} BOX`;
   }
 
   return (
@@ -115,6 +116,7 @@ function RoomScene({ room }: RoomSceneProps) {
             if (activeOffer.type === 'intel') {
                 newOfferKey = `${activeOffer.type}-${activeOffer.market}-${activeOffer.price}-${Date.now()}`;
             } else if (activeOffer.type === 'watchlist') {
+                // FIX: Use watchlistId for the key when the offer type is watchlist.
                 newOfferKey = `${activeOffer.type}-${activeOffer.watchlistId}-${activeOffer.price}-${Date.now()}`;
             }
             setOfferKey(newOfferKey);
