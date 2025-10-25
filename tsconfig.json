@@ -3,7 +3,7 @@
     "target": "ES2020",
     "experimentalDecorators": true,
     "useDefineForClassFields": true,
-    "module": "ESNext",
+    "module": "NodeNext",
     "lib": [
       "ES2020",
       "DOM",
@@ -15,10 +15,9 @@
       "./node_modules/@types",
       "./src/types"
     ],
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
+    "moduleResolution": "NodeNext",
     "resolveJsonModule": true,
-    "isolatedModules": true,
+    "isolatedModules": false,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
