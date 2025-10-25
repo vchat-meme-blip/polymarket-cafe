@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
     return {
         // Define environment variables for client-side code
         define: {
+            // FIX: Ensure `process.env` is correctly typed by making sure Node.js types are loaded via `/// <reference types="node" />` at the top of the file.
             'process.env': JSON.stringify(clientEnv),
             '__APP_ENV__': JSON.stringify(mode)
         },

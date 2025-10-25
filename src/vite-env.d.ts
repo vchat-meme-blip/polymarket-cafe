@@ -1,9 +1,5 @@
+/// <reference types="node" />
 /// <reference types="vite/client" />
-
-declare module '*.module.css' {
-  const classes: { [key: string]: string };
-  export default classes;
-}
 
 interface ImportMetaEnv {
   readonly PROD: boolean;
@@ -19,6 +15,11 @@ interface ImportMeta {
 }
 
 
+declare module '*.module.css' {
+  const classes: { readonly [key: string]: string };
+  export default classes;
+}
+
 // FIX: Moved Express Request type augmentation here to ensure it's applied globally.
 // This resolves errors related to custom properties on the Request object and
 // incorrect type inference for Express middleware.
@@ -28,8 +29,9 @@ declare global {
       arenaWorker?: import('worker_threads').Worker;
       resolutionWorker?: import('worker_threads').Worker;
       autonomyWorker?: import('worker_threads').Worker;
-      // FIX: Added missing dashboardWorker property to the Express Request interface.
       dashboardWorker?: import('worker_threads').Worker;
+      // FIX: Added missing marketWatcherWorker property to the Express Request interface.
+      marketWatcherWorker?: import('worker_threads').Worker;
     }
   }
 }

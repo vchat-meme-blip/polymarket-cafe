@@ -14,6 +14,7 @@ async function checkFileExists(filePath: string): Promise<boolean> {
 
 async function verifyBuild() {
   try {
+    // FIX: Ensure `process.cwd()` is correctly typed by including `/// <reference types="node" />` at the top of the file.
     const distDir = path.join(process.cwd(), 'dist');
     const serverDir = path.join(distDir, 'server');
     
@@ -75,6 +76,7 @@ async function verifyBuild() {
   } catch (error) {
     console.error('\n❌ Build verification failed:');
     console.error(error instanceof Error ? error.message : error);
+    // FIX: The `process` object is available globally in Node.js.
     process.exit(1);
   }
 }

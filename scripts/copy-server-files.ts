@@ -15,6 +15,7 @@ async function ensureDirectoryExists(dir: string) {
 
 async function copyFileWithDir(src: string, dest: string) {
   await ensureDirectoryExists(path.dirname(dest));
+  // FIX: Ensure `process.cwd()` is correctly typed by including `/// <reference types="node" />` at the top of the file.
   await fs.copyFile(src, dest);
   console.log(`Copied ${path.relative(process.cwd(), src)} to ${path.relative(process.cwd(), dest)}`);
 }
@@ -65,7 +66,9 @@ async function copyDirRecursive(src: string, dest: string, exclude: string[] = [
 
 async function copyServerFiles() {
   try {
+    // FIX: Ensure `process.cwd()` is correctly typed by including `/// <reference types="node" />` at the top of the file.
     const srcDir = path.join(process.cwd(), 'server');
+    // FIX: Ensure `process.cwd()` is correctly typed by including `/// <reference types="node" />` at the top of the file.
     const destDir = path.join(process.cwd(), 'dist', 'server');
 
     console.log(`Copying server files from ${srcDir} to ${destDir}`);
@@ -105,7 +108,9 @@ async function copyServerFiles() {
 
     // Copy compiled files from dist/server/server to dist/server
     for (const dir of compiledDirs) {
+      // FIX: Ensure `process.cwd()` is correctly typed by including `/// <reference types="node" />` at the top of the file.
       const srcPath = path.join(process.cwd(), 'dist', 'server', 'server', dir);
+      // FIX: Ensure `process.cwd()` is correctly typed by including `/// <reference types="node" />` at the top of the file.
       const destPath = path.join(process.cwd(), 'dist', 'server', dir);
       
       try {
@@ -120,6 +125,7 @@ async function copyServerFiles() {
 
     for (const file of rootFiles) {
       try {
+        // FIX: Ensure `process.cwd()` is correctly typed by including `/// <reference types="node" />` at the top of the file.
         const srcPath = path.join(process.cwd(), file);
         const destPath = path.join(destDir, file);
         await fs.copyFile(srcPath, destPath);
@@ -152,6 +158,7 @@ async function copyServerFiles() {
     console.log('✅ Server files copied successfully');
   } catch (error) {
     console.error('❌ Error copying server files:', error);
+    // FIX: The `process` object is available globally in Node.js.
     process.exit(1);
   }
 }
@@ -159,5 +166,6 @@ async function copyServerFiles() {
 // Run the copy process
 copyServerFiles().catch((error) => {
   console.error('Unhandled error in copy-server-files:', error);
+  // FIX: The `process` object is available globally in Node.js.
   process.exit(1);
 });

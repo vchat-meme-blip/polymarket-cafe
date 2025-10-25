@@ -109,6 +109,7 @@ const connectDB = async () => {
     return mongoose.connection;
   } catch (error) {
     console.error('MongoDB connection error:', error);
+    // FIX: The `process` object is available globally in Node.js.
     process.exit(1);
   }
 };
@@ -127,13 +128,16 @@ mongoose.connection.on('disconnected', () => {
 });
 
 // Close the Mongoose connection when the Node process ends
+// FIX: The `process` object is available globally in Node.js.
 process.on('SIGINT', async () => {
   try {
     await mongoose.connection.close();
     console.log('Mongoose default connection disconnected through app termination');
+    // FIX: The `process` object is available globally in Node.js.
     process.exit(0);
   } catch (err) {
     console.error('Error closing MongoDB connection:', err);
+    // FIX: The `process` object is available globally in Node.js.
     process.exit(1);
   }
 });

@@ -1,9 +1,11 @@
 /// <reference types="node" />
-
 import { parentPort } from 'worker_threads';
+// Use NodeJS namespace from @types/node
+import type {} from 'node:timers';
 
 class ApiKeyProvider {
   private pendingRequests = new Map<string, (key: string | null) => void>();
+  // FIX: Use NodeJS.Timeout for the type of requestTimeouts.
   private requestTimeouts = new Map<string, NodeJS.Timeout>();
   private MAX_WAIT_TIME = 60000; // 60 seconds max wait time
 
@@ -23,7 +25,8 @@ class ApiKeyProvider {
         if (key === null && message.payload.allKeysOnCooldown) {
           console.log(`[ApiKeyProvider] All keys on cooldown. Will retry in 5 seconds.`);
           // Schedule a retry after 5 seconds
-          setTimeout(() => {
+          // FIX: Use `global.setTimeout` for consistency in Node.js environments.
+          global.setTimeout(() => {
             console.log(`[ApiKeyProvider] Retrying request for API key for agent ${message.payload.agentId}`);
             parentPort?.postMessage({ 
               type: 'requestApiKey', 
@@ -45,8 +48,6 @@ class ApiKeyProvider {
     return new Promise((resolve) => {
       // Set a timeout to prevent indefinite waiting
       // FIX: Use `global.setTimeout` to resolve type conflict between Node.js (returns NodeJS.Timeout) and browser (returns number) environments.
-      // DEV-FIX: Cast to 'any' to work around a broken type environment where `global.setTimeout` still resolves to a `number`.
-      // FIX: Cast `setTimeout` return value to `any` to resolve type conflict between Node.js (`NodeJS.Timeout`) and browser (`number`) environments, which was causing a type error in a misconfigured TypeScript environment.
       const timeout = global.setTimeout(() => {
         console.warn(`[ApiKeyProvider] Request for API key timed out after ${this.MAX_WAIT_TIME/1000}s`);
         if (this.pendingRequests.has(requestId)) {
