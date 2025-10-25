@@ -25,14 +25,26 @@
   "include": [
     "server/**/*.ts",
     "server/workers/*.worker.ts",
+    "server/types/**/*.d.ts",
     "lib/types/**/*.ts",
     "lib/prompts.ts",
     "lib/presets/agents.ts",
+    "src/vite-env.d.ts",
     "scripts/**/*.ts",
-    "vite-env.d.ts"
+    "vite-env.d.ts",
+    "src/types/**/*.d.ts",
+    "server/types/**/*.d.ts"
+  ],
+  "typeRoots": [
+    "./node_modules/@types",
+    "./src/types",
+    "./server/types",
+    "."
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ]
 }
