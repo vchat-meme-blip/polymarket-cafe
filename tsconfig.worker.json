@@ -1,12 +1,16 @@
 {
   "extends": "./tsconfig.server.json",
   "compilerOptions": {
-    "outDir": "./dist/server/server/workers",
+    "outDir": 
+    "./dist/server/workers",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "target": "ES2022",
-    "rootDir": "."
+    "sourceMap": true,
+    "declaration": true,
+    "noEmitOnError": true,
+    "resolveJsonModule": true
   },
   "include": ["server/workers/*.worker.ts"],
   "exclude": ["node_modules"]

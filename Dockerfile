@@ -1,5 +1,5 @@
 # ---- Build Stage ----
-FROM node:22-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -8,14 +8,15 @@ RUN apk add --no-cache python3 make g++
 
 # Copy package files and install all dependencies
 COPY package*.json ./
+COPY pnpm-lock.yaml ./
 COPY tsconfig*.json ./
 # FIX: Copy jsconfig.json as it might be used by some tools
 COPY jsconfig.json ./
 
 # Install dependencies and development tools
-RUN npm install -g typescript@5.3.3 && \
-    npm install --save-dev @types/node@22.14.0 && \
-    npm ci --legacy-peer-deps
+RUN npm install -g pnpm
+RUN pnpm install --frozen-lockfile
+
 # Copy the rest of the application
 COPY . .
 
@@ -25,35 +26,16 @@ RUN echo "Building client..." && \
 
 # Build server and workers
 RUN echo "Building server and workers..." && \
-    # Build server first
     npm run build:server && \
-    # Build workers with proper module type
     npm run build:workers && \
-    # Run post-build steps
     npm run postbuild:server && \
-    npm run postbuild:workers && \
-    # Create the workers directory if it doesn't exist
-    mkdir -p /app/dist/server/server/workers && \
-    # Ensure workers are in the correct location with .mjs extension
-    for worker in arena market-watcher dashboard autonomy resolution; do \
-      # Check and rename worker files to .mjs if they exist
-      if [ -f "/app/dist/server/server/workers/$worker.worker.js" ]; then \
-        mv "/app/dist/server/server/workers/$worker.worker.js" "/app/dist/server/server/workers/$worker.worker.mjs"; \
-      fi; \
-      if [ -f "/app/dist/server/server/workers/$worker.js" ]; then \
-        mv "/app/dist/server/server/workers/$worker.js" "/app/dist/server/server/workers/$worker.worker.mjs"; \
-      fi; \
-      # Copy from root workers directory if needed
-      if [ -f "/app/dist/server/workers/$worker.worker.js" ]; then \
-        cp "/app/dist/server/workers/$worker.worker.js" "/app/dist/server/server/workers/$worker.worker.mjs"; \
-      fi; \
-    done && \
-    # Verify workers were created
-    echo "Worker files in /app/dist/server/server/workers:" && \
-    ls -la /app/dist/server/server/workers/ || echo "No worker files found"
+    npm run postbuild:workers
+
+# Fix worker extensions
+RUN node scripts/fix-worker-extensions.js
 
 # ---- Production Stage ----
-FROM node:22-alpine
+FROM node:20-alpine
 
 # Install runtime dependencies
 RUN apk add --no-cache libusb udev curl
@@ -82,33 +64,43 @@ COPY --from=builder /app/dist/ /app/dist/
 # Ensure all necessary directories exist
 RUN mkdir -p /app/dist/client /public /app/logs
 
-# Copy necessary files from builder
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
+# Copy package files and configs
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./
+COPY --from=builder /app/scripts ./
+COPY --from=builder /app/ecosystem.config.* ./
+COPY --from=builder /app/.env* ./
 
-# Set the working directory to the server directory
-WORKDIR /app/dist/server
+# Copy public assets if they exist
+RUN if [ -d "/app/public" ]; then cp -r /app/public/* /public/; fi
 
-# Set the entry point to use ES modules
-ENTRYPOINT ["node", "--experimental-specifier-resolution=node", "--no-warnings", "server/index.js"]
+# FIX: Removed symlink creation - no longer necessary with corrected build output
+# The tsconfig.server.json 'rootDir' fix ensures workers are compiled directly to /app/dist/server/workers
 
-# Health check configuration
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3001/api/health || exit 1
+# Verify the build output
+# Verify the build output
+RUN echo "Build output verification:" && \
+    echo "\nServer files in /app/dist/:" && ls -la /app/dist/ && \
+    echo "\nServer files in /app/dist/server/:" && ls -la /app/dist/server/ 2>/dev/null || echo "No server files found in /app/dist/server/" && \
+    echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/" && \
+    echo "\nClient files in /app/dist/client/:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found" && \
+    echo "\nAll files in /app/dist:" && find /app/dist -maxdepth 3 -type f | sort
 
-# Expose the port the app runs on
-EXPOSE 3001
-
-# Verify the build output and entry point
+# Verify the server entry point
 RUN set -e; \
-    echo "Build output verification:"; \
-    echo "\nServer files in /app/dist/:" && ls -la /app/dist/; \
-    echo "\nServer files in /app/dist/server/:" && ls -la /app/dist/server/ 2>/dev/null || echo "No server files found in /app/dist/server/"; \
-    echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/"; \
-    echo "\nClient files in /app/dist/client/:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found"; \
-    echo "\nAll files in /app/dist (first level):" && find /app/dist -maxdepth 1 -type f | sort; \
-    echo "\nServer directory structure:" && find /app/dist/server -maxdepth 3 -type d | sort; \
+    echo "Verifying server entry point..."; \
+    echo "Build output in /app/dist:"; \
+    find /app/dist -type f | sort; \
+    \
+    # Check for server entry point in the correct location
+    if [ -f "/app/dist/server/server/index.js" ]; then \
+        ENTRYPOINT="/app/dist/server/server/index.js"; \
+    else \
+        echo "Error: Server entry point not found at /app/dist/server/server/index.js"; \
+        echo "Build output in /app/dist/server/server:"; \
+        ls -la /app/dist/server/server/ 2>/dev/null || echo "No server files found in /app/dist/server/server"; \
+        exit 1; \
+    fi; \
     \
     echo "✅ Found server entry point at: $ENTRYPOINT"; \
     echo "File size: $(ls -lh "$ENTRYPOINT" | awk '{print $5}')"; \
@@ -220,5 +212,8 @@ log " Starting application..."
 exec node --no-warnings "$ENTRYPOINT_PATH"
 EOF
 
+# Set NODE_OPTIONS to enable ES modules
+ENV NODE_OPTIONS="--experimental-modules --es-module-specifier-resolution=node"
+
 # Start the application using the resolved entry point
-CMD ["sh", "-c", "node /app/dist/server/server/index.js"]
+CMD ["node", "--experimental-modules", "--es-module-specifier-resolution=node", "/app/dist/server/server/index.js"]
