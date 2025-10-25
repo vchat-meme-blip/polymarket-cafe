@@ -1,0 +1,525 @@
+/* --- NEW Dashboard Redesign --- */
+.dashboardGrid {
+    display: grid;
+    grid-template-columns: 1fr 360px; /* Main content and right sidebar */
+    grid-template-rows: 1fr; /* Simplified single row */
+    grid-template-areas: 'main right';
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    gap: 24px;
+    padding: 24px;
+}
+
+.dashboardMain {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative; /* For background and overlays */
+}
+
+/* NEW LIQUID GRADIENT BACKGROUND */
+.dashboardMain::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, #0A0F1E 0%, #1e0c3b 50%, #03050C 100%);
+    background-size: 200% 200%;
+    animation: liquid-gradient 15s ease infinite;
+    z-index: 0;
+}
+
+@keyframes liquid-gradient {
+	0% { background-position: 0% 50%; }
+	50% { background-position: 100% 50%; }
+	100% { background-position: 0% 50%; }
+}
+
+
+.dashboardRight {
+  grid-area: right;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
+}
+
+.dashboardPanel {
+  background-color: rgba(28, 31, 33, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dashboardPanelTitle {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--Neutral-90);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dashboardPanelTitle .icon {
+  font-size: 24px;
+  color: var(--Neutral-60);
+}
+
+.streamingConsole {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: hidden;
+  background: transparent; /* Changed from panel BG */
+  border: none;
+  padding: 0;
+  z-index: 2; /* Above background effects */
+}
+
+.streamingConsole main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center; /* Center agent vertically */
+  flex-grow: 1;
+  gap: 1rem;
+  max-width: 100%;
+  min-height: 700px; /* Ensure enough vertical space */
+  overflow: visible; /* Allow content to overflow */
+  padding-bottom: 80px; /* Space for control tray */
+}
+.streamingConsole .mainAppArea {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 700px; /* Ensure enough vertical space for the model */
+  overflow: visible; /* Allow content to overflow if needed */
+}
+
+.intelBankPanel {
+  flex-grow: 1;
+}
+
+.intelBankList {
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.intelBankList .empty {
+  text-align: center;
+  color: var(--Neutral-60);
+  font-style: italic;
+  padding-top: 40px;
+}
+
+.intelBankItem {
+  background-color: var(--Neutral-05);
+  border: 1px solid var(--Neutral-20);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.intelBankItem.clickable {
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+.intelBankItem.clickable:hover {
+    background-color: var(--Neutral-20);
+    border-color: var(--Neutral-50);
+}
+.intelBankItemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.intelBankItemToken {
+  font-weight: bold;
+  color: var(--brand-cyan);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.intelBankItemToken .bountyRewardIcon {
+  font-size: 18px;
+  color: var(--brand-yellow);
+}
+.intelBankItemTime {
+  font-size: 12px;
+  color: var(--Neutral-60);
+}
+.intelBankItemSummary {
+  font-size: 14px;
+  color: var(--Neutral-80);
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+.intelBankItemSummary.pending {
+  font-style: italic;
+  color: var(--Neutral-50);
+}
+.intelItemMetrics {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    font-size: 12px;
+}
+.intelMetric {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.intelMetric .icon {
+    font-size: 16px;
+}
+.intelMetric.riskHigh { color: var(--Red-400); }
+.intelMetric.riskMedium { color: var(--brand-orange); }
+.intelMetric.riskLow { color: var(--Green-500); }
+.intelMetric.sentimentBullish { color: var(--Green-500); }
+.intelMetric.sentimentBearish { color: var(--Red-400); }
+.intelMetric.sentimentNeutral { color: var(--Neutral-60); }
+
+
+/* --- Scout Input in Intel Bank --- */
+.intelScoutForm {
+    padding-top: 16px;
+    margin-top: 16px;
+    border-top: 1px solid var(--Neutral-30);
+    display: flex;
+    gap: 8px;
+}
+.intelScoutForm input {
+    flex-grow: 1;
+    background: var(--Neutral-05);
+    border-radius: 8px;
+    border: 1px solid var(--Neutral-30);
+    padding: 8px 12px;
+    font-size: 14px;
+}
+.intelScoutForm input:focus {
+    border-color: var(--brand-primary);
+}
+.intelScoutForm .button {
+    padding: 8px 12px;
+    font-size: 14px;
+}
+.intelScoutForm .button .icon {
+    font-size: 18px;
+}
+
+/* --- Agent Actions Panel --- */
+.agentActionsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.agentActionsPanel .button {
+  justify-content: flex-start;
+  padding: 12px 16px;
+  font-size: 16px;
+  font-weight: 500;
+  background-color: var(--Neutral-20);
+  color: var(--Neutral-90);
+}
+.agentActionsPanel .button:hover:not(:disabled) {
+  background-color: var(--Neutral-30);
+  color: white;
+}
+.agentActionsPanel .button .icon {
+  font-size: 24px;
+  color: var(--brand-cyan);
+}
+
+
+/* --- NEW FLOATING CHAT --- */
+.directChatLogContainerFloating {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 450px;
+    max-width: 90%;
+    height: 60%;
+    padding: 24px;
+    display: flex;
+    flex-direction: column-reverse; /* New messages appear at the bottom and push old ones up */
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to top, black 60%, transparent 100%);
+    mask-image: linear-gradient(to top, black 60%, transparent 100%);
+}
+.directChatLogFloating {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-top: 40px; /* Space for messages to scroll into */
+}
+.chatMessageFloating {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+    max-width: 90%;
+    animation: float-in 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+    margin-bottom: 16px;
+}
+@keyframes float-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.floatingMessageAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--Neutral-20);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.floatingMessageAvatar .material-symbols-outlined {
+  font-size: 24px;
+  color: var(--Neutral-80);
+}
+
+.floatingMessageContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.floatingMessageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.floatingMessageName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--Neutral-80);
+}
+
+.floatingMessageTime {
+  font-size: 11px;
+  color: var(--Neutral-60);
+}
+.floatingMessageBubble {
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--Neutral-90);
+  background: rgba(28, 31, 33, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chatMessageFloating.user {
+  align-self: flex-end;
+}
+
+.chatMessageFloating.user .floatingMessageAvatar {
+  background: var(--brand-blue-dark);
+}
+
+.chatMessageFloating.user .floatingMessageAvatar .material-symbols-outlined {
+  color: white;
+}
+
+.chatMessageFloating.user .floatingMessageBubble {
+  background-color: rgba(52, 152, 219, 0.7);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.chatMessageFloating.agent {
+  align-self: flex-start;
+}
+
+.chatMessageFloating.agent .floatingMessageAvatar {
+  background: var(--brand-cyan-dark);
+}
+
+.chatMessageFloating.agent .floatingMessageAvatar .material-symbols-outlined {
+  color: white;
+}
+
+.chatMessageFloating.agent .floatingMessageBubble {
+  background-color: rgba(42, 47, 49, 0.7);
+  border-bottom-left-radius: 4px;
+}
+
+.floatingEmptyChatLog {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  color: var(--Neutral-50);
+  text-align: right;
+  font-style: italic;
+  max-width: 300px;
+}
+
+/* --- Contextual Token Card in Chat --- */
+.tokenSummaryCard {
+    background: rgba(42, 47, 49, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 12px;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.tokenSummaryHeader {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.tokenSummaryIcon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--Neutral-30);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--brand-cyan);
+    flex-shrink: 0;
+}
+.tokenSummaryName {
+    font-size: 16px;
+    font-weight: 500;
+}
+.tokenSummaryMetrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    font-size: 12px;
+}
+.tokenMetric {
+    display: flex;
+    flex-direction: column;
+}
+.tokenMetricLabel {
+    color: var(--Neutral-60);
+}
+.tokenMetricValue {
+    font-weight: 500;
+    color: var(--Neutral-90);
+}
+.tokenMetricValue.positive { color: var(--brand-green); }
+.tokenMetricValue.negative { color: var(--brand-red); }
+
+.keynoteCompanion {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  flex: 1; /* Allow it to grow */
+  width: 100%;
+  height: 100%;
+  min-height: 600px; /* Ensure enough height for the model */
+  overflow: visible; /* Allow model to overflow if needed */
+}
+
+/* Styles for both 2D and 3D agent renderers */
+.keynoteCompanion .basicFace,
+.keynoteCompanion .vrmAvatarCanvas {
+    width: 100%;
+    height: 100%;
+    min-height: 600px; /* Ensure enough height for the model */
+}
+.vrmAvatarCanvas {
+    position: relative;
+    background: transparent; /* Ensure canvas background is see-through */
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 600px !important;
+}
+
+.vrmPlaceholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--Neutral-15);
+    border-radius: 16px;
+    color: var(--Neutral-60);
+    text-align: center;
+    padding: 20px;
+}
+
+.vrmPlaceholder .icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.vrmPlaceholder p {
+    font-size: 14px;
+    max-width: 80%;
+    word-break: break-word;
+}
+
+/* Responsive Overrides */
+@media (max-width: var(--breakpoint-md)) {
+  .dashboardGrid {
+    grid-template-columns: 1fr 320px;
+    padding: 16px;
+  }
+}
+
+@media (max-width: var(--breakpoint-sm)) {
+  .dashboardGrid {
+    grid-template-columns: 1fr; /* single column */
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      'right'
+      'main';
+    padding: 12px;
+    gap: 16px;
+    overflow-y: auto;
+    height: 100%;
+  }
+  .dashboardMain {
+    min-height: 50vh;
+  }
+  .dashboardRight {
+    min-height: auto;
+    max-height: none;
+    flex-direction: row;
+    gap: 12px;
+  }
+  .dashboardRight > .dashboardPanel {
+    flex: 1;
+  }
+  .directChatLogContainerFloating {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    padding: 12px;
+    right: 0;
+  }
+}

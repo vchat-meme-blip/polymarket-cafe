@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "outDir": "./dist/server",
+    "rootDir": ".",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./server/*"]
+    },
+    "preserveSymlinks": true,
+    "moduleDetection": "force"
+  },
+  "include": [
+    "server/**/*.ts",
+    "scripts/**/*.ts",
+    "env.ts",
+    "lib/types/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

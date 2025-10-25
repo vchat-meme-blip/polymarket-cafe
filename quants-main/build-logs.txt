@@ -1,0 +1,792 @@
+
+04/10/2025, 12:20:12:
+build
+Enumerating objects: 714, done.
+04/10/2025, 12:20:12:
+build
+Compressing objects: 100% (6/6), done.
+04/10/2025, 12:20:12:
+build
+Counting objects: 100% (10/10), done.
+04/10/2025, 12:20:12:
+build
+Total 714 (delta 4), reused 10 (delta 4), pack-reused 704 (from 1)
+04/10/2025, 12:20:27:
+build
+#1 DONE 0.0s
+04/10/2025, 12:20:27:
+build
+#1 transferring dockerfile: 2.12kB done
+04/10/2025, 12:20:27:
+build
+#1 [service_event_jiofh8cgsqij internal] load build definition from Dockerfile
+04/10/2025, 12:20:27:
+build
+#2 [service_event_jiofh8cgsqij internal] load metadata for docker.io/library/node:22-alpine
+04/10/2025, 12:20:27:
+build
+04/10/2025, 12:20:28:
+build
+#2 DONE 0.8s
+04/10/2025, 12:20:28:
+build
+#3 [service_event_jiofh8cgsqij internal] load .dockerignore
+04/10/2025, 12:20:28:
+build
+04/10/2025, 12:20:28:
+build
+04/10/2025, 12:20:28:
+build
+#3 DONE 0.0s
+04/10/2025, 12:20:28:
+build
+#3 transferring context: 1.44kB done
+04/10/2025, 12:20:28:
+build
+#6 [service_event_jiofh8cgsqij internal] load build context
+04/10/2025, 12:20:28:
+build
+04/10/2025, 12:20:28:
+build
+#5 DONE 0.0s
+04/10/2025, 12:20:28:
+build
+#5 resolve docker.io/library/node:22-alpine@sha256:cb3143549582cc5f74f26f0992cdef4a422b22128cb517f94173a5f910fa4ee7 done
+04/10/2025, 12:20:28:
+build
+#5 [service_event_jiofh8cgsqij deps 1/7] FROM docker.io/library/node:22-alpine@sha256:cb3143549582cc5f74f26f0992cdef4a422b22128cb517f94173a5f910fa4ee7
+04/10/2025, 12:20:28:
+build
+04/10/2025, 12:20:28:
+build
+#4 DONE 0.0s
+04/10/2025, 12:20:28:
+build
+#4 inferred cache manifest type: application/vnd.oci.image.manifest.v1+json done
+04/10/2025, 12:20:28:
+build
+#4 [service_event_jiofh8cgsqij] importing cache manifest from local:13817219361747277921
+04/10/2025, 12:20:29:
+build
+#6 transferring context: 160.70MB 0.4s done
+04/10/2025, 12:20:29:
+build
+#9 DONE 0.2s
+04/10/2025, 12:20:29:
+build
+#9 [service_event_jiofh8cgsqij deps 4/7] COPY package*.json ./
+04/10/2025, 12:20:29:
+build
+04/10/2025, 12:20:29:
+build
+#8 CACHED
+04/10/2025, 12:20:29:
+build
+#8 [service_event_jiofh8cgsqij deps 3/7] WORKDIR /app
+04/10/2025, 12:20:29:
+build
+04/10/2025, 12:20:29:
+build
+#7 CACHED
+04/10/2025, 12:20:29:
+build
+#7 [service_event_jiofh8cgsqij deps 2/7] RUN apk add --no-cache     python3     make     g++     pkgconfig     udev     eudev-dev     libusb-dev     curl
+04/10/2025, 12:20:29:
+build
+04/10/2025, 12:20:29:
+build
+#6 DONE 0.4s
+04/10/2025, 12:20:29:
+build
+#10 [service_event_jiofh8cgsqij deps 5/7] RUN npm install --legacy-peer-deps --ignore-scripts
+04/10/2025, 12:20:29:
+build
+04/10/2025, 12:20:38:
+build
+04/10/2025, 12:20:38:
+build
+#10 9.668 added 530 packages, and audited 531 packages in 9s
+04/10/2025, 12:20:38:
+build
+#10 9.668 #10 9.688 
+04/10/2025, 12:20:38:
+build
+#10 9.668   run `npm fund` for details
+04/10/2025, 12:20:38:
+build
+#10 9.668 51 packages are looking for funding
+04/10/2025, 12:20:38:
+build
+#10 9.668 #10 9.688 
+04/10/2025, 12:20:39:
+build
+#10 9.688   npm audit fix
+04/10/2025, 12:20:39:
+build
+#10 9.688 To address issues that do not require attention, run:
+04/10/2025, 12:20:39:
+build
+#10 9.688 
+04/10/2025, 12:20:39:
+build
+#10 9.688 4 vulnerabilities (1 low, 2 moderate, 1 high)
+04/10/2025, 12:20:39:
+build
+#10 9.690 npm notice
+04/10/2025, 12:20:39:
+build
+#10 9.688 Run `npm audit` for details.
+04/10/2025, 12:20:39:
+build
+#10 9.688 
+04/10/2025, 12:20:39:
+build
+#10 9.688   npm audit fix --force
+04/10/2025, 12:20:39:
+build
+#10 9.688 To address all issues (including breaking changes), run:
+04/10/2025, 12:20:39:
+build
+04/10/2025, 12:20:39:
+build
+#10 9.690 npm notice
+04/10/2025, 12:20:39:
+build
+#10 9.690 npm notice To update run: npm install -g npm@11.6.1
+04/10/2025, 12:20:39:
+build
+#10 9.690 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.6.1
+04/10/2025, 12:20:39:
+build
+#10 9.690 npm notice New major version of npm available! 10.9.3 -> 11.6.1
+04/10/2025, 12:20:39:
+build
+#10 DONE 10.7s
+04/10/2025, 12:20:39:
+build
+#11 [service_event_jiofh8cgsqij deps 6/7] RUN npm install --legacy-peer-deps @rollup/rollup-linux-x64-musl
+04/10/2025, 12:20:39:
+build
+04/10/2025, 12:20:42:
+build
+04/10/2025, 12:20:42:
+build
+#11 2.265 
+04/10/2025, 12:20:42:
+build
+#11 2.265 added 1 package, changed 1 package, and audited 532 packages in 2s
+04/10/2025, 12:20:42:
+build
+#11 2.265 #11 2.292 
+04/10/2025, 12:20:42:
+build
+#11 2.265   run `npm fund` for details
+04/10/2025, 12:20:42:
+build
+#11 2.265 51 packages are looking for funding#11 2.292 
+04/10/2025, 12:20:42:
+build
+#11 2.292   npm audit fix
+04/10/2025, 12:20:42:
+build
+#11 2.292 To address issues that do not require attention, run:
+04/10/2025, 12:20:42:
+build
+#11 2.292 
+04/10/2025, 12:20:42:
+build
+#11 2.292 4 vulnerabilities (1 low, 2 moderate, 1 high)
+04/10/2025, 12:20:42:
+build
+#11 DONE 2.3s
+04/10/2025, 12:20:42:
+build
+04/10/2025, 12:20:42:
+build
+#11 2.292 Run `npm audit` for details.
+04/10/2025, 12:20:42:
+build
+#11 2.292 
+04/10/2025, 12:20:42:
+build
+#11 2.292   npm audit fix --force
+04/10/2025, 12:20:42:
+build
+#11 2.292 To address all issues (including breaking changes), run:
+04/10/2025, 12:20:42:
+build
+#13 [service_event_jiofh8cgsqij build 1/3] WORKDIR /app
+04/10/2025, 12:20:42:
+build
+04/10/2025, 12:20:42:
+build
+#12 DONE 0.3s
+04/10/2025, 12:20:42:
+build
+#12 [service_event_jiofh8cgsqij deps 7/7] COPY . .
+04/10/2025, 12:20:42:
+build
+04/10/2025, 12:20:42:
+build
+04/10/2025, 12:20:42:
+build
+#14 DONE 0.1s
+04/10/2025, 12:20:42:
+build
+#14 [service_event_jiofh8cgsqij build 2/3] RUN mkdir -p public dist/lib
+04/10/2025, 12:20:42:
+build
+04/10/2025, 12:20:42:
+build
+#13 DONE 0.0s
+04/10/2025, 12:20:42:
+build
+04/10/2025, 12:20:42:
+build
+#15 0.223 
+04/10/2025, 12:20:42:
+build
+#15 0.223 > npm run build:client && npm run build:server && npm run copy:server && npm run build:types
+04/10/2025, 12:20:42:
+build
+#15 0.223 > quants-cafe-ai-socialfi-simulation@0.0.0 build
+04/10/2025, 12:20:42:
+build
+#15 0.223 #15 [service_event_jiofh8cgsqij build 3/3] RUN npm run build
+04/10/2025, 12:20:42:
+build
+#15 0.355 
+04/10/2025, 12:20:43:
+build
+#15 0.355 
+04/10/2025, 12:20:43:
+build
+#15 0.355 > vite build
+04/10/2025, 12:20:43:
+build
+#15 0.355 > quants-cafe-ai-socialfi-simulation@0.0.0 build:client
+04/10/2025, 12:20:43:
+build
+04/10/2025, 12:20:43:
+build
+#15 0.591 NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.#15 0.621 vite v5.4.19 building for production...
+04/10/2025, 12:20:43:
+build
+#15 0.683 transforming...
+04/10/2025, 12:20:50:
+build
+04/10/2025, 12:20:50:
+build
+#15 8.253 ✓ 1081 modules transformed.
+04/10/2025, 12:20:51:
+build
+#15 9.060 rendering chunks...#15 9.155 
+04/10/2025, 12:20:51:
+build
+#15 9.155 dist/client/assets/index-DILh4PSk.js   1,613.14 kB │ gzip: 470.30 kB
+04/10/2025, 12:20:51:
+build
+#15 9.154 dist/client/assets/index-Bny3EV-w.css     79.06 kB │ gzip:  14.93 kB
+04/10/2025, 12:20:51:
+build
+#15 9.154 dist/client/index.html                     3.56 kB │ gzip:   1.27 kB
+04/10/2025, 12:20:51:
+build
+#15 9.085 computing gzip size...#15 9.155 ✓ built in 8.51s
+04/10/2025, 12:20:52:
+build
+#15 9.155 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+04/10/2025, 12:20:52:
+build
+#15 9.155 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+04/10/2025, 12:20:52:
+build
+#15 9.155 - Using dynamic import() to code-split the application
+04/10/2025, 12:20:52:
+build
+#15 9.155 (!) Some chunks are larger than 500 kB after minification. Consider:
+04/10/2025, 12:20:52:
+build
+04/10/2025, 12:20:52:
+build
+#15 9.334 
+04/10/2025, 12:20:52:
+build
+#15 9.334 > tsc --project tsconfig.server.json --moduleResolution bundler --outDir dist/server
+04/10/2025, 12:20:52:
+build
+#15 9.334 > quants-cafe-ai-socialfi-simulation@0.0.0 build:server
+04/10/2025, 12:20:52:
+build
+#15 9.334 
+04/10/2025, 12:20:55:
+build
+#15 12.57 
+04/10/2025, 12:20:55:
+build
+#15 12.57 
+04/10/2025, 12:20:55:
+build
+#15 12.57 > mkdir -p dist/server && (cp -r server/*.json dist/server/ 2>/dev/null || true) && (cp -r server/routes dist/server/ 2>/dev/null || true) && (cp -r server/services dist/server/ 2>/dev/null || true) && (cp -r server/db.js dist/server/ 2>/dev/null || true)
+04/10/2025, 12:20:55:
+build
+#15 12.57 > quants-cafe-ai-socialfi-simulation@0.0.0 copy:server
+04/10/2025, 12:20:55:
+build
+#15 12.68 > quants-cafe-ai-socialfi-simulation@0.0.0 build:types
+04/10/2025, 12:20:55:
+build
+#15 12.68 
+04/10/2025, 12:20:55:
+build
+#15 12.68 
+04/10/2025, 12:20:55:
+build
+#15 12.68 > tsc --emitDeclarationOnly --project tsconfig.server.json --outDir dist/server
+04/10/2025, 12:20:57:
+build
+#15 DONE 14.5s
+04/10/2025, 12:20:58:
+build
+#17 CACHED
+04/10/2025, 12:20:58:
+build
+#17 [service_event_jiofh8cgsqij stage-2  3/12] WORKDIR /app
+04/10/2025, 12:20:58:
+build
+04/10/2025, 12:20:58:
+build
+#16 CACHED
+04/10/2025, 12:20:58:
+build
+#16 [service_event_jiofh8cgsqij stage-2  2/12] RUN apk add --no-cache     libusb     udev     curl     && npm install -g pm2
+04/10/2025, 12:20:58:
+build
+04/10/2025, 12:20:58:
+build
+#18 [service_event_jiofh8cgsqij stage-2  4/12] COPY --from=build /app/package*.json ./
+04/10/2025, 12:20:58:
+build
+04/10/2025, 12:20:58:
+build
+#18 DONE 0.3s
+04/10/2025, 12:20:58:
+build
+04/10/2025, 12:20:58:
+build
+#19 [service_event_jiofh8cgsqij stage-2  5/12] RUN npm install --omit=dev --legacy-peer-deps --ignore-scripts
+04/10/2025, 12:21:03:
+build
+04/10/2025, 12:21:03:
+build
+#19 5.034   run `npm fund` for details
+04/10/2025, 12:21:03:
+build
+#19 5.034 42 packages are looking for funding
+04/10/2025, 12:21:03:
+build
+#19 5.034 
+04/10/2025, 12:21:03:
+build
+#19 5.034 added 458 packages, and audited 459 packages in 5s
+04/10/2025, 12:21:03:
+build
+#19 5.034 #19 5.039 #19 5.039 
+04/10/2025, 12:21:03:
+build
+#19 5.039   npm audit fix
+04/10/2025, 12:21:03:
+build
+#19 5.039 To address issues that do not require attention, run:
+04/10/2025, 12:21:03:
+build
+#19 5.039 
+04/10/2025, 12:21:03:
+build
+#19 5.039 2 vulnerabilities (1 low, 1 high)
+04/10/2025, 12:21:03:
+build
+04/10/2025, 12:21:03:
+build
+#19 5.039 Run `npm audit` for details.
+04/10/2025, 12:21:03:
+build
+#19 5.039 
+04/10/2025, 12:21:03:
+build
+#19 5.039   npm audit fix --force
+04/10/2025, 12:21:03:
+build
+#19 5.039 To address all issues (including breaking changes), run:
+04/10/2025, 12:21:04:
+build
+#19 DONE 5.8s
+04/10/2025, 12:21:04:
+build
+#20 DONE 0.1s
+04/10/2025, 12:21:04:
+build
+#20 [service_event_jiofh8cgsqij stage-2  6/12] COPY --from=build /app/dist ./dist
+04/10/2025, 12:21:04:
+build
+04/10/2025, 12:21:04:
+build
+04/10/2025, 12:21:04:
+build
+#22 DONE 0.0s
+04/10/2025, 12:21:04:
+build
+#22 [service_event_jiofh8cgsqij stage-2  8/12] COPY --from=build /app/server ./server
+04/10/2025, 12:21:04:
+build
+04/10/2025, 12:21:04:
+build
+#21 DONE 0.0s
+04/10/2025, 12:21:04:
+build
+#21 [service_event_jiofh8cgsqij stage-2  7/12] COPY --from=build /app/public ./public
+04/10/2025, 12:21:04:
+build
+04/10/2025, 12:21:04:
+build
+#25 [service_event_jiofh8cgsqij stage-2 11/12] COPY --from=build /app/tsconfig*.json ./
+04/10/2025, 12:21:04:
+build
+04/10/2025, 12:21:04:
+build
+#24 DONE 0.0s
+04/10/2025, 12:21:04:
+build
+#24 [service_event_jiofh8cgsqij stage-2 10/12] COPY --from=build /app/ecosystem.config.mjs ./
+04/10/2025, 12:21:04:
+build
+04/10/2025, 12:21:04:
+build
+#23 DONE 0.0s
+04/10/2025, 12:21:04:
+build
+#23 [service_event_jiofh8cgsqij stage-2  9/12] COPY --from=build /app/lib ./lib
+04/10/2025, 12:21:04:
+build
+#25 DONE 0.3s
+04/10/2025, 12:21:04:
+build
+#26 [service_event_jiofh8cgsqij stage-2 12/12] RUN mkdir -p /app/logs &&     chown -R node:node /app &&     chmod -R 755 /app/dist /app/lib /app/logs
+04/10/2025, 12:21:04:
+build
+04/10/2025, 12:21:14:
+build
+#26 DONE 10.2s
+04/10/2025, 12:21:15:
+build
+#27 exporting layers
+04/10/2025, 12:21:15:
+build
+#27 [service_event_jiofh8cgsqij] exporting to image
+04/10/2025, 12:21:15:
+build
+04/10/2025, 12:21:25:
+build
+#27 exporting layers 10.6s done
+04/10/2025, 12:21:25:
+build
+#27 pushing layers
+04/10/2025, 12:21:25:
+build
+#27 exporting config sha256:d6fe2ff1f1827f090cd72d5102c637f9a78046b8e7607874db29764d86618361 done
+04/10/2025, 12:21:25:
+build
+#27 exporting manifest sha256:d021d1bebccf7fc739c82116671fdd50fca84cbebc2935c34de17e4a89f30a5a done
+04/10/2025, 12:21:28:
+build
+#27 pushing manifest for fsn1-registry.sliplane.io/org_erumy4rp9398/service_a7zfs8j5iaiw:service_event_jiofh8cgsqij@sha256:d021d1bebccf7fc739c82116671fdd50fca84cbebc2935c34de17e4a89f30a5a
+04/10/2025, 12:21:28:
+build
+#27 pushing layers 2.7s done
+04/10/2025, 12:21:28:
+build
+#28 preparing build cache for export
+04/10/2025, 12:21:28:
+build
+#28 [service_event_jiofh8cgsqij] exporting cache to client directory
+04/10/2025, 12:21:28:
+build
+04/10/2025, 12:21:28:
+build
+#27 DONE 13.4s
+04/10/2025, 12:21:28:
+build
+#27 pushing manifest for fsn1-registry.sliplane.io/org_erumy4rp9398/service_a7zfs8j5iaiw:service_event_jiofh8cgsqij@sha256:d021d1bebccf7fc739c82116671fdd50fca84cbebc2935c34de17e4a89f30a5a 0.1s done
+04/10/2025, 12:21:40:
+build
+#28 writing layer sha256:0fab715c04d62fa172758f716e1bef278b8528632f71874df882e534af618991
+04/10/2025, 12:21:42:
+build
+#28 writing layer sha256:13e1c9e75712bb9e3fc3dbd61a2e70eec89493e171463d98eed749287f015e82
+04/10/2025, 12:21:42:
+build
+#28 writing layer sha256:0fab715c04d62fa172758f716e1bef278b8528632f71874df882e534af618991 1.5s done
+04/10/2025, 12:21:42:
+build
+#28 writing layer sha256:4908b6c0ff0134a21b3f9133342547e8841084ddfe7c39dd1d8b19b4c2e34cc6
+04/10/2025, 12:21:42:
+build
+#28 writing layer sha256:3dee69df0f2165716c4547eebe8d859accf7e04691c40e385e4aa39d9177d157 done
+04/10/2025, 12:21:42:
+build
+#28 writing layer sha256:2e6758a81c956e70242d6d75636243787b336fd087e0aad5150655aa2f00c974 done
+04/10/2025, 12:21:42:
+build
+#28 writing layer sha256:24919eb7190fe27b897c2b679481c92e624252b32881e9844a71f6aea31fa24b done
+04/10/2025, 12:21:42:
+build
+#28 writing layer sha256:13e1c9e75712bb9e3fc3dbd61a2e70eec89493e171463d98eed749287f015e82 done
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:4908b6c0ff0134a21b3f9133342547e8841084ddfe7c39dd1d8b19b4c2e34cc6 1.0s done
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:568251d7904dc68e62278a3728752163b8774b7425701ca430ee594ba0c61c23 done
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 done
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:cc8a209f5851378f9e7cfd15b45d0dba134d456758d853297bf0d77347248f24
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:a858067dd11bcc0a1a354ae6586d6f70385444e7af599ec1a247a8c1eb0edcbe done
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:9824c27679d3b27c5e1cb00a73adb6f4f8d556994111c12db3c5d61a0c843df8 done
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:9134846185c136070360f431e31cc64b74b82d6e0c5614184d72fade7414f3b8 done
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:8eb1ff6ad740797ef79f551816fbd6e71915b6feb0144f332aecb26a1ff297ec done
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:8898365f52d2e8539169e17e52a63f341a63ce7221a9a25b819b5e57ba94a60b done
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:75ccb6e0feb00fdbd74b6e2fa915e438f7901fe0d98961311f8e0efa57a86aff done
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:70e4bdbd89cb4aa73fec5b03c6a881bb374faca4b8e490deb7988f04a6765816 done
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:6390912cd369a9033f736ce26c537b0f4f04c230b1674b5bd23313d684dec5e3 done
+04/10/2025, 12:21:43:
+build
+#28 writing layer sha256:5a0805812496aaa2556bfd2781295a17014a85ca95df0d57f10ead92b9b29a9e 0.0s done
+04/10/2025, 12:21:44:
+build
+#28 writing layer sha256:d5b6f2a59a700c9bad0504566eb686aacc7c809454c0691bdb7c0af7fc81d564
+04/10/2025, 12:21:44:
+build
+#28 writing layer sha256:cc8a209f5851378f9e7cfd15b45d0dba134d456758d853297bf0d77347248f24 1.2s done
+04/10/2025, 12:21:44:
+build
+#28 writing layer sha256:db8a93519aad07456947b4c0c04e48c2f6490d3c900b4c526d4b5565fa84dfc0
+04/10/2025, 12:21:44:
+build
+#28 writing layer sha256:d5b6f2a59a700c9bad0504566eb686aacc7c809454c0691bdb7c0af7fc81d564 done
+04/10/2025, 12:21:45:
+build
+#28 writing layer sha256:e9b81183a013b74a6c85a7c6ea1b19f210c8b2597d4c506a276c3363f21288e7
+04/10/2025, 12:21:45:
+build
+#28 writing layer sha256:db8a93519aad07456947b4c0c04e48c2f6490d3c900b4c526d4b5565fa84dfc0 0.6s done
+04/10/2025, 12:21:45:
+build
+#28 writing layer sha256:f4c26c8fab28283c5e6660f72c50d096d381576be07383eaa1fb2c1066df1f5c done
+04/10/2025, 12:21:45:
+build
+#28 writing layer sha256:ece57d79dc59d304b5f67f17da70b1655d862b1015a65a1e218c4129abe624ca done
+04/10/2025, 12:21:45:
+build
+#28 writing layer sha256:e9b81183a013b74a6c85a7c6ea1b19f210c8b2597d4c506a276c3363f21288e7 done
+04/10/2025, 12:21:45:
+build
+#28 preparing build cache for export 17.0s done
+04/10/2025, 12:21:45:
+build
+#28 DONE 17.0s
+04/10/2025, 12:21:45:
+build
+#28 writing cache image manifest sha256:77f531800671053f68b4fa37c7563010b5c104ec0cddc705b0a8fa062f648c9a done
+04/10/2025, 12:21:45:
+build
+#28 writing config sha256:5721b5e2b9227ad9e75aadac4a53b5d8fddeaa052bb4bf4d144fc18e3428042d done
+04/10/2025, 12:21:45:
+build
+#28 writing layer sha256:fea464f676426bb9d7a986079bc8cc3fffa9cfc0145378bd2a56f7ca192ee8d4 0.0s done
+04/10/2025, 12:21:50:
+build
+service_event_jiofh8cgsqij: Download complete
+04/10/2025, 12:21:50:
+build
+9134846185c1: Verifying Checksum
+04/10/2025, 12:21:50:
+build
+9134846185c1: Download complete
+04/10/2025, 12:21:50:
+build
+ece57d79dc59: Verifying Checksum
+04/10/2025, 12:21:50:
+build
+ece57d79dc59: Download complete
+04/10/2025, 12:21:50:
+build
+6390912cd369: Verifying Checksum
+04/10/2025, 12:21:50:
+build
+6390912cd369: Download complete
+04/10/2025, 12:21:50:
+build
+3dee69df0f21: Verifying Checksum
+04/10/2025, 12:21:50:
+build
+3dee69df0f21: Pull complete
+04/10/2025, 12:21:50:
+build
+24919eb7190f: Download complete
+04/10/2025, 12:21:50:
+build
+70e4bdbd89cb: Verifying Checksum
+04/10/2025, 12:21:50:
+build
+70e4bdbd89cb: Download complete
+04/10/2025, 12:21:50:
+build
+24919eb7190f: Verifying Checksum
+04/10/2025, 12:21:50:
+build
+24919eb7190f: Waiting
+04/10/2025, 12:21:50:
+build
+db8a93519aad: Waiting
+04/10/2025, 12:21:50:
+build
+2e6758a81c95: Waiting
+04/10/2025, 12:21:50:
+build
+9134846185c1: Waiting
+04/10/2025, 12:21:50:
+build
+6390912cd369: Waiting
+04/10/2025, 12:21:50:
+build
+ece57d79dc59: Waiting
+04/10/2025, 12:21:50:
+build
+70e4bdbd89cb: Pulling fs layer
+04/10/2025, 12:21:50:
+build
+db8a93519aad: Pulling fs layer
+04/10/2025, 12:21:50:
+build
+2e6758a81c95: Pulling fs layer
+04/10/2025, 12:21:50:
+build
+9134846185c1: Pulling fs layer
+04/10/2025, 12:21:50:
+build
+6390912cd369: Pulling fs layer
+04/10/2025, 12:21:50:
+build
+ece57d79dc59: Pulling fs layer
+04/10/2025, 12:21:50:
+build
+70e4bdbd89cb: Pulling fs layer
+04/10/2025, 12:21:50:
+build
+3dee69df0f21: Pulling fs layer
+04/10/2025, 12:21:50:
+build
+4908b6c0ff01: Pulling fs layer
+04/10/2025, 12:21:50:
+build
+24919eb7190f: Already exists
+04/10/2025, 12:21:50:
+build
+8898365f52d2: Already exists
+04/10/2025, 12:21:50:
+build
+e9b81183a013: Already exists
+04/10/2025, 12:21:50:
+build
+568251d7904d: Already exists
+04/10/2025, 12:21:50:
+build
+8eb1ff6ad740: Already exists
+04/10/2025, 12:21:50:
+build
+f4c26c8fab28: Already exists
+04/10/2025, 12:21:50:
+build
+9824c27679d3: Pulling from org_erumy4rp9398/service_a7zfs8j5iaiw
+04/10/2025, 12:21:50:
+build
+Download complete
+04/10/2025, 12:21:50:
+build
+2e6758a81c95: Verifying Checksum
+04/10/2025, 12:21:50:
+build
+2e6758a81c95: Download complete
+04/10/2025, 12:21:50:
+build
+db8a93519aad: Verifying Checksum
+04/10/2025, 12:21:50:
+build
+db8a93519aad: Download complete
+04/10/2025, 12:21:50:
+build
+4908b6c0ff01: Verifying Checksum
+04/10/2025, 12:21:50:
+build
+4908b6c0ff01: Pull complete
+04/10/2025, 12:21:56:
+build
+4908b6c0ff01: Pull complete
+04/10/2025, 12:21:56:
+build
+3dee69df0f21: Pull complete
+04/10/2025, 12:21:56:
+build
+70e4bdbd89cb: Pull complete
+04/10/2025, 12:21:56:
+build
+ece57d79dc59: Pull complete
+04/10/2025, 12:21:56:
+build
+6390912cd369: Pull complete
+04/10/2025, 12:21:56:
+build
+9134846185c1: Pull complete
+04/10/2025, 12:21:56:
+build
+2e6758a81c95: Pull complete
+04/10/2025, 12:22:01:
+build
+db8a93519aad: Digest: sha256:d021d1bebccf7fc739c82116671fdd50fca84cbebc2935c34de17e4a89f30a5a
+04/10/2025, 12:22:01:
+build
+Status: Downloaded newer image for fsn1-registry.sliplane.io/org_erumy4rp9398/service_a7zfs8j5iaiw:service_event_jiofh8cgsqij
+04/10/2025, 12:22:02:
+runtime
+2025-10-04T10:22:02: PM2 log: Launching in no daemon mode
+04/10/2025, 12:22:02:
+runtime
+2025-10-04T10:22:02: PM2 error: Error: No script path - aborting
+04/10/2025, 12:22:02:
+runtime
+2025-10-04T10:22:02: PM2 log: PM2 successfully stopped
+04/10/2025, 12:23:02:
+runtime
+Sliplane: Service deployment failed with reason: healthchecks on route 'http://localhost:3001/api/health' keep failing. Make sure your app is starting a HTTP server and listening on a port

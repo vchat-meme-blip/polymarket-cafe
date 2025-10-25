@@ -1,0 +1,7 @@
+{
+  "name": "Quants Café - A Virtual AI SocialFi Simulation",
+  "description": "An interactive tool that allows you to design, test, and banter with custom AI characters on the fly.\nDesign and train your own agent and sent it into a CAFE to exchange intel, or watch tickers to research intel.\nMarathon Buidl - Created using Google AI Studio :)",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
