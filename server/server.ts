@@ -132,7 +132,7 @@ export async function startServer() {
   app.use('/api', apiRouter);
 
   if (process.env.NODE_ENV === 'production') {
-    const clientPath = path.join(__dirname, '..', 'client');
+    const clientPath = path.join(__dirname, '..', '..', 'client');
     app.use(express.static(clientPath));
     // FIX: Use explicitly imported Request and Response types.
     app.get('*', (req: Request, res: Response) => {
