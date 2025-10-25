@@ -14,7 +14,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Use the production domain if in production, otherwise use the local server.
 // `process.env.VITE_PUBLIC_APP_URL` is supplied by Vite on the client and dotenv on the server.
-const PROD_DOMAIN = process.env.VITE_PUBLIC_APP_URL || 'https://quants.sliplane.app';
+const PROD_DOMAIN = process.env.VITE_PUBLIC_APP_URL || 'https://polymarket-cafe.sliplane.app/';
 
 export const API_BASE_URL = isProduction
   ? `${PROD_DOMAIN}`
