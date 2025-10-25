@@ -52,32 +52,10 @@ export class AutonomyDirector {
                         if (agentDoc) {
                             // Convert the MongoDB document to our Agent type
                             const agent: Agent = {
-                                id: agentDoc.id,
-                                name: agentDoc.name || 'Unnamed Agent',
-                                personality: agentDoc.personality || '',
-                                instructions: agentDoc.instructions || '',
-                                voice: agentDoc.voice || 'default',
-                                topics: Array.isArray(agentDoc.topics) ? agentDoc.topics : [],
-                                wishlist: Array.isArray(agentDoc.wishlist) ? agentDoc.wishlist : [],
-                                reputation: typeof agentDoc.reputation === 'number' ? agentDoc.reputation : 0,
-                                isShilling: !!agentDoc.isShilling,
-                                shillInstructions: agentDoc.shillInstructions || '',
-                                modelUrl: agentDoc.modelUrl || '',
-                                bettingHistory: [], // Initialize as empty array since we don't need the actual bets here
-                                currentPnl: typeof agentDoc.currentPnl === 'number' ? agentDoc.currentPnl : 0,
-                                bettingIntel: agentDoc.bettingIntel?.map((id: any) => id.toString()) || [], // Convert ObjectId to string
-                                marketWatchlists: agentDoc.marketWatchlists?.map((id: any) => id.toString()) || [], // Convert ObjectId to string
-                                boxBalance: typeof agentDoc.boxBalance === 'number' ? agentDoc.boxBalance : 0,
-                                portfolio: agentDoc.portfolio || {},
-                                isProactive: typeof agentDoc.isProactive === 'boolean' ? agentDoc.isProactive : true,
-                                trustedRoomIds: Array.isArray(agentDoc.trustedRoomIds) ? agentDoc.trustedRoomIds : [],
-                                operatingHours: agentDoc.operatingHours || '',
-                                mode: agentDoc.mode || 'Safe',
-                                templateId: agentDoc.templateId,
-                                copiedFromId: agentDoc.copiedFromId,
-                                createdAt: agentDoc.createdAt?.getTime() || Date.now(),
-                                updatedAt: agentDoc.updatedAt?.getTime() || Date.now(),
-                                lastActiveAt: agentDoc.lastActiveAt?.getTime() || Date.now(),
+                                ...agentDoc,
+                                // Initialize bettingHistory as an empty array since we don't need it here
+                                // If you need the actual bets, you'll need to populate them
+                                bettingHistory: []
                             };
                             await this.decideAndExecuteNextAction(agent);
                         }
@@ -234,19 +212,10 @@ export class AutonomyDirector {
                     modelUrl: agentDoc.modelUrl || '',
                     bettingHistory: [],
                     currentPnl: typeof agentDoc.currentPnl === 'number' ? agentDoc.currentPnl : 0,
-                    bettingIntel: agentDoc.bettingIntel?.map((id: any) => id.toString()) || [], // Convert ObjectId to string
-                    marketWatchlists: agentDoc.marketWatchlists?.map((id: any) => id.toString()) || [], // Convert ObjectId to string
+                    bettingIntel: [],
+                    marketWatchlists: [],
                     boxBalance: typeof agentDoc.boxBalance === 'number' ? agentDoc.boxBalance : 0,
-                    portfolio: agentDoc.portfolio || {},
-                    isProactive: typeof agentDoc.isProactive === 'boolean' ? agentDoc.isProactive : true,
-                    trustedRoomIds: Array.isArray(agentDoc.trustedRoomIds) ? agentDoc.trustedRoomIds : [],
-                    operatingHours: agentDoc.operatingHours || '',
-                    mode: agentDoc.mode || 'Safe',
-                    templateId: agentDoc.templateId,
-                    copiedFromId: agentDoc.copiedFromId,
-                    createdAt: agentDoc.createdAt?.getTime() || Date.now(),
-                    updatedAt: agentDoc.updatedAt?.getTime() || Date.now(),
-                    lastActiveAt: agentDoc.lastActiveAt?.getTime() || Date.now(),
+                    portfolio: agentDoc.portfolio || {}
                 };
                 this.executeResearch(agent);
             }

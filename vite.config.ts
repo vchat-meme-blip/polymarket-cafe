@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import path from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +17,8 @@ export default defineConfig(({ mode }) => {
         // Explicitly define which environment variables should be available to the client
         NODE_ENV: process.env.NODE_ENV || mode,
         VITE_APP_TITLE: env.VITE_APP_TITLE,
+        // FIX: Expose VITE_PUBLIC_APP_URL to the client build via process.env.
+        VITE_PUBLIC_APP_URL: env.VITE_PUBLIC_APP_URL,
         // Add other client-side environment variables here
     };
 

@@ -10,8 +10,11 @@
       "DOM.Iterable"
     ],
     "skipLibCheck": true,
-    "types": [
-      "node"
+    "types": ["node"],
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types",
+      "."
     ],
     "moduleResolution": "bundler",
     "isolatedModules": true,
@@ -23,10 +26,21 @@
         "./*"
       ]
     },
-    "allowImportingTsExtensions": true,
-    "noEmit": true
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noEmit": true,
+    "allowSyntheticDefaultImports": true
   },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.d.ts",
+    "src/types/**/*.d.ts",
+    "vite-env.d.ts"
+  ],
   "exclude": [
-    "server"
+    "node_modules",
+    "dist"
   ]
 }

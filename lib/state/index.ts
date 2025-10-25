@@ -154,19 +154,6 @@ export const useUser = create(
   
   // User methods
   setUserApiKey: async (key: string) => {
-    // This will now update the server, which will also persist the key.
-    // The key is passed directly in the request header to the AI service.
-    // The server doesn't need to store it; it uses the provided key.
-    try {
-        await apiService.request('/api/users/api-key', {
-            method: 'PUT',
-            body: JSON.stringify({ apiKey: key }),
-        });
-        set({ userApiKey: key });
-    } catch (error) {
-        console.error("Failed to save API key:", error);
-        throw error;
-    }
   },
 
   updateNotificationSettings: async (settings) => {
@@ -203,9 +190,8 @@ export const useUser = create(
         state: {
           ...parsed.state,
           lastSeen: parsed.state.lastSeen ? new Date(parsed.state.lastSeen).getTime() : null,
-          // FIX: Correctly handle createdAt and updatedAt to ensure they are numbers without calling .getTime() on a number.
-          createdAt: typeof parsed.state.createdAt === 'number' ? parsed.state.createdAt : (parsed.state.createdAt ? new Date(parsed.state.createdAt).getTime() : Date.now()),
-          updatedAt: typeof parsed.state.updatedAt === 'number' ? parsed.state.updatedAt : (parsed.state.updatedAt ? new Date(parsed.state.updatedAt).getTime() : Date.now())
+          createdAt: new Date(parsed.state.createdAt).getTime(),
+          updatedAt: new Date(parsed.state.updatedAt).getTime()
         }
       });
     },
@@ -216,7 +202,7 @@ export const useUser = create(
       localStorage.removeItem(name);
     },
   }))
-});
+}));
 
 /**
  * Agents
@@ -239,14 +225,11 @@ export const createNewAgent = (properties?: Partial<Agent>): Agent => {
         templateId: undefined,
         bettingHistory: [],
         currentPnl: 0,
-        // FIX: Add missing properties to conform to the Agent type when creating from a preset.
+        // FIX: Add missing properties to conform to the Agent type.
         bettingIntel: [],
         marketWatchlists: [],
-        boxBalance: 0,
-        portfolio: {},
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        lastActiveAt: Date.now(),
+        boxBalance: 0, // Deprecated
+        portfolio: {},   // Deprecated
       };
     }
   }
@@ -266,14 +249,11 @@ export const createNewAgent = (properties?: Partial<Agent>): Agent => {
     modelUrl: properties?.modelUrl || DEFAULT_VRM_URL,
     bettingHistory: [],
     currentPnl: 0,
-    // FIX: Add missing properties to conform to the Agent type when creating a new agent.
+    // FIX: Add missing properties to conform to the Agent type.
     bettingIntel: [],
     marketWatchlists: [],
-    boxBalance: 0,
-    portfolio: {},
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    lastActiveAt: Date.now(),
+    boxBalance: 0, // Deprecated
+    portfolio: {},   // Deprecated
     ...properties,
   };
 };
@@ -365,7 +345,7 @@ export const useAgent = create(
           const agentToUpdate = state.availablePersonal.find(a => a.id === agentId);
           if (!agentToUpdate) return state;
           
-          const updatedAgent = { ...agentToUpdate, ...adjustments, updatedAt: Date.now() };
+          const updatedAgent = { ...agentToUpdate, ...adjustments };
 
           return {
             availablePersonal: state.availablePersonal.map(a => a.id === agentId ? updatedAgent : a),

@@ -9,12 +9,11 @@ RUN apk add --no-cache python3 make g++
 # Copy package files and install all dependencies
 COPY package*.json ./
 COPY tsconfig*.json ./
-COPY jsconfig.json ./
 
 # Install dependencies and development tools
-# Removed global typescript install, npm ci will handle dev dependencies
-RUN npm ci --legacy-peer-deps
-
+RUN npm install -g typescript@5.3.3 && \
+    npm install --save-dev @types/node@22.14.0 && \
+    npm ci --legacy-peer-deps
 # Copy the rest of the application
 COPY . .
 
@@ -22,7 +21,7 @@ COPY . .
 RUN echo "Building client..." && \
     npm run build:client
 
-# Build server separately
+# Build server separately to handle any specific requirements
 RUN echo "Building server..." && \
     npm run build:server && \
     npm run postbuild:server
@@ -35,41 +34,82 @@ RUN apk add --no-cache libusb udev curl
 
 WORKDIR /app
 
-# Set production environment variables
+# Set production environment
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ENV VITE_SOCKET_URL=${VITE_SOCKET_URL}
 ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
 ENV DOCKER_ENV=true
 ENV NODE_ENV=production
-ENV PORT=3001
-ENV NODE_PATH="/app/node_modules"
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps
 
 # Create necessary directories
-RUN mkdir -p /app/logs /app/dist/server/workers /app/dist/client
+RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
 
 # Copy built files from builder
-# With rootDir=./server, compiled server code is now directly in /app/dist/server
 COPY --from=builder /app/dist/server/ /app/dist/server/
-# Copy client files
+# Copy workers if they exist
+RUN if [ -d "/app/dist/workers" ]; then \
+      echo "Copying workers from dist/workers" && \
+      cp -r /app/dist/workers/* /app/dist/workers/ 2>/dev/null || true; \
+    else \
+      echo "No workers directory found in dist/workers"; \
+    fi
 COPY --from=builder /app/dist/client/ /app/dist/client/
-# Copy public assets
 COPY --from=builder /app/public/ /app/public/
-# Copy PM2 config and env files
 COPY --from=builder /app/ecosystem.config.* ./
+COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.env* ./
+
+# Create symlinks for backward compatibility
+RUN ln -sf /app/dist/workers/* /app/dist/server/workers/ 2>/dev/null || echo "No workers to link"
 
 # Verify the build output
 RUN echo "Build output verification:" && \
-    echo "\nServer files in /app/dist/server/:" && ls -la /app/dist/server/ && \
+    echo "\nServer files:" && ls -la /app/dist/server/ && \
+    echo "\nWorkers in /app/dist/workers/:" && ls -la /app/dist/workers/ 2>/dev/null || echo "No workers in /app/dist/workers/" && \
     echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/" && \
-    echo "\nClient files in /app/dist/client/:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found"
+    echo "\nClient files:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found"
+
+COPY --from=builder /app/server/env.ts ./dist/server/
+
+# Verify the build output, surface entry point, and persist it for runtime
+RUN set -e; \
+    echo "Verifying build..."; \
+    if [ -f "/app/dist/server/server/index.mjs" ]; then \
+        ENTRYPOINT="/app/dist/server/server/index.mjs"; \
+    elif [ -f "/app/dist/server/server/index.js" ]; then \
+        ENTRYPOINT="/app/dist/server/server/index.js"; \
+    elif [ -f "/app/dist/server/index.mjs" ]; then \
+        ENTRYPOINT="/app/dist/server/index.mjs"; \
+    elif [ -f "/app/dist/server/index.js" ]; then \
+        ENTRYPOINT="/app/dist/server/index.js"; \
+    else \
+        echo "Error: No entry point found in /app/dist/server"; \
+        echo "Build output in /app/dist:"; \
+        find /app/dist -type f; \
+        exit 1; \
+    fi; \
+    echo "Found entry point at $ENTRYPOINT"; \
+    echo "First 10 lines of entry point:"; \
+    head -n 10 "$ENTRYPOINT" || true; \
+    echo "..."; \
+    echo "$ENTRYPOINT" > /app/.entrypoint-path; \
+    echo "Will use entry point: $(cat /app/.entrypoint-path)"
+
+# Set working directory to the app root
+WORKDIR /app
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/health || exit 1
+
+# Expose the port your application will run on
+EXPOSE ${PORT}
 
 # Create a startup script with debug info and dynamic entry point detection
-# This is now in the CWD of PM2 in ecosystem.config.mjs
 RUN cat <<'EOF' > /app/startup.sh && \
     chmod +x /app/startup.sh
 #!/bin/sh
@@ -80,15 +120,30 @@ log() {
 }
 
 resolve_entrypoint() {
-  # Look for entry point directly in /app/dist/server
-  if [ -f /app/dist/server/index.mjs ]; then
-    echo "/app/dist/server/index.mjs"
+  if [ -n "$APP_ENTRYPOINT" ] && [ -f "$APP_ENTRYPOINT" ]; then
+    echo "$APP_ENTRYPOINT"
     return 0
   fi
-  if [ -f /app/dist/server/index.js ]; then
-    echo "/app/dist/server/index.js"
-    return 0
+
+  if [ -f /app/.entrypoint-path ]; then
+    CACHED_PATH=$(cat /app/.entrypoint-path || true)
+    if [ -n "$CACHED_PATH" ] && [ -f "$CACHED_PATH" ]; then
+      echo "$CACHED_PATH"
+      return 0
+    fi
   fi
+
+  for candidate in \
+    /app/dist/server/server/index.mjs \
+    /app/dist/server/server/index.js \
+    /app/dist/server/index.mjs \
+    /app/dist/server/index.js; do
+    if [ -f "$candidate" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
   return 1
 }
 
@@ -123,15 +178,5 @@ log "🚀 Starting application..."
 exec node --no-warnings "$ENTRYPOINT_PATH"
 EOF
 
-# Set working directory to the app root
-WORKDIR /app
-
-# Health check - Note: PORT environment variable should be used here, matching docker-compose
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/api/health || exit 1
-
-# Expose the port your application will run on
-EXPOSE ${PORT}
-
-# Start the application using the startup.sh script
+# Start the application
 CMD ["/app/startup.sh"]

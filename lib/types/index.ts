@@ -35,19 +35,7 @@ export type {
 } from './mongodb.js';
 
 // Export conversion functions separately since they're values, not types
-export { 
-  toSharedUser, 
-  toSharedAgent,
-  toSharedRoom,
-  toSharedBounty,
-  toSharedBet,
-  toSharedBettingIntel,
-  toSharedMarketWatchlist,
-  toSharedDailySummary,
-  toSharedNotification,
-  toSharedTransaction,
-  toSharedTradeRecord
-} from './mongodb.js';
+export { toSharedUser, toSharedAgent } from './mongodb.js';
 
 // Export document type for MongoDB collections
 export type MongoDocument<T> = T & {

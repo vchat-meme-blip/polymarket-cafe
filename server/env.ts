@@ -10,7 +10,7 @@ const projectRoot = path.join(__dirname, '..');
 // Default configuration
 const defaultConfig = {
   NODE_ENV: process.env.NODE_ENV || 'production',
-  PORT: process.env.PORT || '3001',
+  PORT: process.env.PORT || '3000',
   // Add other default environment variables here
 };
 

@@ -1,7 +1,6 @@
 import { Worker, WorkerOptions } from 'node:worker_threads';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import fs from 'node:fs'; // FIX: Import fs for fs.existsSync
 
 // Get the directory name in an ESM-compatible way
 const __filename = fileURLToPath(import.meta.url);
@@ -54,8 +53,8 @@ export function createWorker(workerPath: string, options?: WorkerOptions) {
     // Find the first existing path
     const existingPath = possiblePaths.find(p => {
       try {
-        // FIX: Replaced require.resolve with fs.existsSync for ESM compatibility.
-        return fs.existsSync(p);
+        require.resolve(p);
+        return true;
       } catch {
         return false;
       }

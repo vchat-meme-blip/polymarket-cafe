@@ -170,7 +170,7 @@ export class GenAILiveClient {
       );
       return;
     }
-    this.session.sendClientContent({ contents: Array.isArray(parts) ? { parts } : { parts: [parts] }, turnComplete });
+    this.session.sendClientContent({ turns: parts, turnComplete });
     this.log(`client.send`, parts);
   }
 

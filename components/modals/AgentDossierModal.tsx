@@ -393,17 +393,11 @@ const IntelBriefingTab = ({ agent }: { agent: Agent }) => {
         }
         setIsSaving(true);
         try {
-            // FIX: Add missing required properties for BettingIntel type
             await apiService.addBettingIntel(agent.id, {
-                id: `briefedintel-${Math.random().toString(36).substring(2, 9)}`,
-                ownerAgentId: agent.id,
-                ownerHandle: agent.ownerHandle,
                 market,
                 content,
                 sourceDescription: source,
                 isTradable,
-                createdAt: Date.now(),
-                pnlGenerated: { amount: 0, currency: 'USD' },
             });
             addToast({ type: 'system', message: 'Intel successfully briefed to agent.' });
             clearForm();

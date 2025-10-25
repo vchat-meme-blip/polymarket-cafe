@@ -18,32 +18,41 @@
  * limitations under the License.
  */
 
-import { useUI, useUser, useAgent } from './lib/state';
+import { useUI, useUser, useAgent } from './lib/state/index.js';
 import { useCafeSocket } from './hooks/useCafeSocket';
 import AppShell from './components/shell/AppShell';
 import ThreeJSLandingPage from './components/landing/ThreeJSLandingPage';
 import { useEffect, useState } from 'react';
 import Onboarding from './components/onboarding/Onboarding';
-import IntelDossierModal from './components/dashboard/IntelDossierModal';
 import ToastContainer from './components/shell/ToastContainer';
-import { apiService } from './lib/services/api.service';
+import { apiService } from './lib/services/api.service.js';
 import { socketService } from './lib/services/socket.service';
 import ServerHealthModal from './components/modals/ServerHealthModal';
 import AgentDossierModal from './components/modals/AgentDossierModal';
 import AboutPage from './components/about/AboutPage';
 import ProfileView from './components/profile/ProfileView';
+import CreateRoomModal from './components/modals/CreateRoomModal';
+import ManageRoomModal from './components/modals/ManageRoomModal';
+import ShareRoomModal from './components/modals/ShareRoomModal';
+import MarketDetailModal from './components/modals/MarketDetailModal';
 
 /**
  * Main application component.
  * Acts as a router to show the landing page, onboarding, or the main app.
  */
 function App() {
-  const { isSignedIn, showIntelDossier, closeIntelDossier, showServerHealthModal, agentDossierId, showAboutPage, showOnboarding, showProfileView, openOnboarding } = useUI();
+  const { 
+    isSignedIn, showServerHealthModal, 
+    agentDossierId, showAboutPage, showOnboarding, showProfileView, 
+    openOnboarding, setIsSignedIn, showCreateRoomModal, showManageRoomModal,
+    showShareRoomModal, shareModalData, marketDetailModalData
+  } = useUI();
   const { availablePersonal } = useAgent();
   const { hasCompletedOnboarding } = useUser();
   // Explicitly type the signIn function to include the isNewUser parameter
-  const { signIn } = useUser() as {
+  const { signIn, _setHandle } = useUser() as {
     signIn: (handle: string, isNewUser?: boolean) => Promise<void>;
+    _setHandle: (handle: string) => void;
   };
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   useCafeSocket(); // Initialize the cafe socket connection
@@ -53,11 +62,16 @@ function App() {
     const bootstrapApp = async () => {
       const persistedHandle = useUser.getState().handle;
       if (persistedHandle) {
-        // This single call now fetches user, agents, arena, and all other
-        // necessary data, then hydrates the client-side stores.
-        const { success } = await apiService.bootstrap(persistedHandle);
-        if (success) {
-          socketService.connect();
+        try {
+          const { success } = await apiService.bootstrap(persistedHandle);
+          if (success) {
+            socketService.connect();
+          }
+        } catch (error) {
+           console.error("Bootstrap failed, user might not exist on server. Clearing local state.", error);
+          // If bootstrap fails (e.g., user deleted on server), log them out locally.
+          _setHandle('');
+          setIsSignedIn(false);
         }
       }
       setIsBootstrapping(false);
@@ -68,7 +82,7 @@ function App() {
     return () => {
       socketService.disconnect();
     }
-  }, []);
+  }, [_setHandle, setIsSignedIn]);
 
   // Auto-open onboarding for new users with zero personal agents
   useEffect(() => {
@@ -100,10 +114,13 @@ function App() {
     <>
       <div className="App">{renderContent()}</div>
       {showOnboarding && <Onboarding />}
-      {showIntelDossier && <IntelDossierModal onClose={closeIntelDossier} />}
       {showServerHealthModal && <ServerHealthModal />}
       {agentDossierId && <AgentDossierModal agentId={agentDossierId} />}
       {showProfileView && <ProfileView />}
+      {showCreateRoomModal && <CreateRoomModal />}
+      {showManageRoomModal && <ManageRoomModal />}
+      {showShareRoomModal && shareModalData && <ShareRoomModal data={shareModalData} />}
+      {marketDetailModalData && <MarketDetailModal market={marketDetailModalData} />}
       <ToastContainer />
     </>
   );

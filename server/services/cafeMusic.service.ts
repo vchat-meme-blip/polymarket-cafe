@@ -6,8 +6,6 @@
  */
 // FIX: Corrected import for `elevenLabsService` to resolve module export error.
 import { elevenLabsService } from './elevenlabs.service.js';
-// FIX: Explicitly import Buffer from Node.js for type recognition.
-import { Buffer } from 'node:buffer';
 
 export type CafeMusicTrack = {
   buffer: Buffer;

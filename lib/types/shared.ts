@@ -61,10 +61,6 @@ export type Agent = {
   portfolio: Record<string, number>;
   templateId?: string;
   copiedFromId?: string;
-  // FIX: Add missing createdAt, updatedAt, lastActiveAt to Agent type.
-  createdAt: number;
-  updatedAt: number;
-  lastActiveAt: number;
 };
 
 // Arena types
@@ -102,9 +98,8 @@ export type Offer = {
   intelId?: string; // Should be the primary identifier
   market?: string; // Kept for context
   // for watchlist
-  watchlistId?: string; // Add this line
-  watchlistName?: string; // Add this line for display purposes
-  // for common
+  watchlistId?: string;
+  // common
   price: number;
   status: 'pending' | 'accepted' | 'rejected';
 };
@@ -119,8 +114,6 @@ export type TradeRecord = {
   quantity?: number;
   timestamp: number;
   roomId: string;
-  createdAt?: number; // Add this for consistency
-  updatedAt?: number; // Add this for consistency
 };
 
 // Autonomy types
@@ -139,16 +132,12 @@ export type Bounty = {
   reward: number;
   status: 'active' | 'completed';
   ownerHandle?: string;
-  createdAt?: number; // Add this for consistency
-  updatedAt?: number; // Add this for consistency
 };
 
 export type DailySummary = {
     agentId: string;
     date: string; // YYYY-MM-DD format
     summary: string;
-    createdAt?: number; // Add this for consistency
-    updatedAt?: number; // Add this for consistency
 };
 
 // Wallet types
@@ -160,8 +149,6 @@ export type Transaction = {
   type: TransactionType;
   amount: number;
   description: string;
-  createdAt?: number; // Add this for consistency
-  updatedAt?: number; // Add this for consistency
 };
 
 // Prediction Market types
@@ -197,7 +184,6 @@ export type Bet = {
   status: 'pending' | 'resolved'; // Changed from active/won/lost to pending/resolved
   pnl?: number; // Profit or Loss
   sourceIntelId?: string; // ID of the BettingIntel that influenced this bet
-  ownerHandle?: string; // Add this for consistency
 };
 
 export type BettingIntel = {
@@ -218,7 +204,6 @@ export type BettingIntel = {
     ownerHandle?: string;
     sourceUrls?: string[];
     rawResearchData?: { url: string; markdown: string; }[];
-    updatedAt?: number; // Add this for consistency
 }
 
 export type MarketWatchlist = {
@@ -227,7 +212,6 @@ export type MarketWatchlist = {
     markets: string[]; // List of market IDs or questions
     wallets?: string[]; // List of wallet addresses
     createdAt: number;
-    updatedAt?: number; // Add this for consistency
 }
 
 // Notification type for logging
@@ -239,8 +223,6 @@ export type Notification = {
     message: string;
     timestamp: number;
     wasSent: boolean;
-    createdAt?: number; // Add this for consistency
-    updatedAt?: number; // Add this for consistency
 };
 
 

@@ -78,16 +78,11 @@ export class ArenaDirector {
             const agentId = agent._id.toString();
             this.agents.set(agentId, {
                 ...agent,
-                id: agent.id, // Use client-side ID
+                id: agentId,
                 // Ensure all IDs are strings in the agent object
                 currentRoomId: agent.currentRoomId?.toString(),
                 bettingHistory: agent.bettingHistory?.map((id: any) => id.toString()) || [],
-                bets: agent.bets?.map((id: any) => id.toString()) || [],
-                bettingIntel: agent.bettingIntel?.map((id: any) => id.toString()) || [], // Convert ObjectIds to strings
-                marketWatchlists: agent.marketWatchlists?.map((id: any) => id.toString()) || [], // Convert ObjectIds to strings
-                createdAt: agent.createdAt?.getTime() || Date.now(),
-                updatedAt: agent.updatedAt?.getTime() || Date.now(),
-                lastActiveAt: agent.lastActiveAt?.getTime() || Date.now(),
+                bets: agent.bets?.map((id: any) => id.toString()) || []
             } as Agent);
             this.agentLocations.set(agentId, null); // Assume all are wandering initially
         });
@@ -106,9 +101,7 @@ export class ArenaDirector {
                 ...(room.ownerHandle && { ownerHandle: room.ownerHandle }),
                 ...(room.roomBio && { roomBio: room.roomBio }),
                 ...(room.twitterUrl && { twitterUrl: room.twitterUrl }),
-                ...(room.rules && { rules: room.rules }),
-                createdAt: room.createdAt?.getTime() || Date.now(),
-                updatedAt: room.updatedAt?.getTime() || Date.now(),
+                ...(room.rules && { rules: room.rules })
             };
             
             this.rooms.set(roomId, roomData);
@@ -156,7 +149,7 @@ export class ArenaDirector {
             }
             this.rooms.delete(roomId);
             this.conversations.delete(roomId);
-            await roomsCollection.deleteOne({ _id: new ObjectId(roomId) });
+            this.emitWorldState();
         }
     }
 

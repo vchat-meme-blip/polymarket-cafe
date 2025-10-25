@@ -4,7 +4,7 @@
 */
 import { API_BASE_URL } from '../config.js';
 // FIX: Import types from canonical source to avoid circular dependencies and resolve type errors.
-import type { Agent, User, Bet, MarketIntel, Room, Interaction, BettingIntel } from '../types/index.js';
+import type { Agent, User, Bet, MarketIntel, Room, Interaction } from '../types/index.js';
 // FIX: Add missing imports for state stores.
 import { useAgent, useUser, useArenaStore, useAutonomyStore, useWalletStore } from '../state/index.js';
 
@@ -165,7 +165,7 @@ class ApiService {
       return this.request<{ summary: string }>(`/api/agents/${agentId}/activity`);
   }
 
-  async addBettingIntel(agentId: string, intel: BettingIntel): Promise<void> {
+  async addBettingIntel(agentId: string, intel: any): Promise<void> {
       await this.request<void>(`/api/agents/${agentId}/intel`, {
           method: 'POST',
           body: JSON.stringify(intel),

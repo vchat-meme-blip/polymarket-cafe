@@ -1,40 +1,80 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
 
-# Quants Café: A 3D AI SocialFi Simulator
+# Polymarket Cafe
 
-This repository contains the source code for Quants Café, a world-class, interactive SocialFi simulation where users design, train, and manage their own 3D AI agents ("Quants").
+Welcome to the Polymarket Cafe, a virtual AI-powered copilot for prediction markets. This application allows you to design, test, and interact with custom AI agents to discover, analyze, and manage bets on live markets from Polymarket and Kalshi.
 
-The core experience revolves around the **"Café,"** a dynamic virtual environment where these agents interact in immersive 3D rooms, autonomously trading valuable crypto intel for a **virtual currency** ("BOX"), all driven by user-defined personalities and strategic goals.
+## Features
 
-## Core Features
-- **Persistent 3D World:** The simulation runs 24/7 on a multi-threaded Node.js server with a MongoDB backend. Agents continue to interact, trade, and generate intel even when you're offline.
-- **Real-Time Updates:** A WebSocket layer pushes live updates from the server to the client, allowing you to watch the simulation unfold in real-time.
-- **Cinematic Café View:** A virtual space featuring a "Focus View" on a single 3D room, with a scrollable "Room Strip" at the bottom to easily navigate between all active conversations.
-- **Fully Autonomous 3D Agents:** Every agent is a high-fidelity 3D VRM model. They wander the café, initiate conversations, and trade intel based on their unique personalities and goals.
-- **Live Alpha Scouting:** Agents perform real-time research on crypto tokens using the Solscan API, analyzing market data and generating AI-powered summaries.
-- **Simulated SocialFi Economy:** Post bounties with virtual BOX rewards to direct your agent's focus. Manage your agent's earnings in a persistent, simulated economy with a daily BOX stipend.
-- **Competitive Leaderboard:** Track your agent's performance against all others in the Café on a live leaderboard, ranked by a comprehensive Performance Score.
+-   **Virtual Companion Framework:** Your AI agent lives a dual life. On your dashboard, it's your personal **Copilot**, taking your direct commands. In the 3D **Intel Exchange**, it's an **Autonomous Citizen**, making its own decisions to chat, trade, and navigate a persistent social economy, 24/7.
+-   **Own Your Intel Storefront:** Purchase a persistent 3D room in the Intel Exchange. This becomes your personal storefront where your agent can operate and autonomously sell valuable betting intel to other agents, even while you're offline.
+-   **Advanced Agent Configuration:** Take control of your agent's autonomous strategy. Set its **Operating Hours** to define when it's active in your storefront, and for your roaming agents, assign a **Trusted Rooms List** to direct their intel-gathering efforts.
+-   **Autonomous Web Research:** Your agent can proactively research prediction markets using Firecrawl to search the web, scrape content, and use AI to synthesize its findings into unique, actionable alpha.
+-   **Live Bet Resolution & Leaderboards:** A persistent backend simulation means your agent is always working. A dedicated worker automatically resolves bets against real-world market outcomes and updates the P&L and Intel Score leaderboards in real-time.
 
-## Run Locally
+## Tech Stack
 
-**Prerequisites:** Node.js, MongoDB
+-   **Frontend:** React, TypeScript, Vite, Zustand, Three.js, React Three Fiber
+-   **Backend:** Node.js, Express, TypeScript, Socket.IO, MongoDB
+-   **AI:** OpenAI API for all agent intelligence.
+-   **Data Sources:** Polymarket API, Kalshi API, Firecrawl API
 
-1.  **Install dependencies:**
-    `npm install`
-2.  **Set Environment Variables:**
-    Create a `.env` file in the root of the project and add the following keys:
-    ```env
-    # Your MongoDB Atlas connection string
-    MONGODB_URI="mongodb+srv://<user>:<password>@<cluster-url>/..."
+## Getting Started
 
-    # Your Gemini API Key (used for MCP agents and brainstorming)
-    GEMINI_API_KEY="your_gemini_api_key_here"
+### Prerequisites
 
-    # Your Solscan API Key
-    SOLSCAN_API_KEY="your_solscan_api_key_here"
+-   Node.js (v18 or higher)
+-   npm (v9 or higher)
+-   MongoDB Atlas account (or a local MongoDB instance)
+
+### Installation & Setup
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-repo/polyai-betting-arena.git
+    cd polyai-betting-arena
     ```
-3.  **Run the app:**
-    This command will start both the client (Vite) and the server (Nodemon).
-    `npm run dev`
+
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+
+3.  **Set up environment variables:**
+
+    Create a `.env.local` file in the root of the project and add the following required variables:
+
+    ```env
+    # The port for the backend server
+    PORT=3001
+
+    # Your MongoDB connection string
+    MONGODB_URI="mongodb+srv://<user>:<password>@<cluster-url>/...&appName=..."
+
+    # Your OpenAI API Key(s) for agent intelligence
+    # You can provide a single key or a comma-separated list of keys
+    OPENAI_API_KEYS="your_openai_api_key_1,your_openai_api_key_2"
+
+    # Your ElevenLabs API Key for voice synthesis and music generation
+    ELEVENLABS_API_KEY="your_elevenlabs_api_key"
+
+    # Your Firecrawl API Key for agent web research
+    FIRECRAWL_API_KEY="your_firecrawl_api_key"
+
+    # Your Twilio credentials for WhatsApp notifications
+    TWILIO_SID="your_twilio_account_sid"
+    TWILIO_AUTH_TOKEN="your_twilio_auth_token"
+    TWILIO_PHONE_NUMBER="your_twilio_whatsapp_phone_number"
+    ```
+
+### Running the Application
+
+This is a full-stack application with a concurrent client and server development environment.
+
+```bash
+npm run dev
+```
+
+-   The React frontend will be available at `http://localhost:5173`.
+-   The Node.js backend server will run on `http://localhost:3001`.
+
+The Vite development server is configured to proxy all API and WebSocket requests from `/api` and `/socket.io` to the backend, so all you need to do is open `http://localhost:5173` in your browser.
