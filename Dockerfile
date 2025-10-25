@@ -23,11 +23,12 @@ COPY . .
 RUN echo "Building client..." && \
     npm run build:client
 
-# Build server separately to handle any specific requirements
-# The tsconfig.server.json should now correctly output to dist/server
-RUN echo "Building server..." && \
+# Build server and workers
+RUN echo "Building server and workers..." && \
     npm run build:server && \
-    npm run postbuild:server
+    npm run build:workers && \
+    npm run postbuild:server && \
+    npm run postbuild:workers
 
 # ---- Production Stage ----
 FROM node:22-alpine
@@ -74,30 +75,21 @@ RUN echo "Build output verification:" && \
     echo "\nServer files in /app/dist/server/:" && ls -la /app/dist/server/ && \
     echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/" && \
     echo "\nClient files in /app/dist/client/:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found" && \
-    echo "\nAll files in /app/dist:" && find /app/dist -type f | sort
+    echo "\nAll files in /app/dist/server:" && find /app/dist/server -type f | sort
 
-# FIX: Removed copying server/env.ts - it should be compiled by build:server
-# The `server/index.ts` (now compiled to `dist/server/index.js` or `.mjs`) handles `dotenv.config()`
-
-# Verify the build output, surface entry point, and persist it for runtime
+# Verify the server entry point
 RUN set -e; \
-    echo "Verifying build..."; \
-    if [ -f "/app/dist/server/index.mjs" ]; then \
-        ENTRYPOINT="/app/dist/server/index.mjs"; \
-    elif [ -f "/app/dist/server/index.js" ]; then \
+    echo "Verifying server entry point..."; \
+    if [ -f "/app/dist/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/index.js"; \
-    elif [ -f "/app/dist/index.mjs" ]; then \
-        ENTRYPOINT="/app/dist/index.mjs"; \
-    elif [ -f "/app/dist/index.js" ]; then \
-        ENTRYPOINT="/app/dist/index.js"; \
     else \
-        echo "Error: No entry point found in /app/dist"; \
-        echo "Build output in /app/dist:"; \
-        find /app/dist -type f; \
+        echo "Error: No server entry point found"; \
+        echo "Build output in /app/dist/server:"; \
+        find /app/dist/server -type f; \
         exit 1; \
     fi; \
-    echo "Found entry point at $ENTRYPOINT"; \
-    echo "First 10 lines of entry point:"; \
+    echo "Found server entry point at $ENTRYPOINT"; \
+    echo "First 10 lines of server entry point:"; \
     head -n 10 "$ENTRYPOINT" || true; \
     echo "..."; \
     echo "$ENTRYPOINT" > /app/.entrypoint-path; \
@@ -151,11 +143,14 @@ resolve_entrypoint() {
 
 log "🔍 Debug Info:"
 log "  - Current directory: $(pwd)"
-ENTRYPOINT_PATH=$(resolve_entrypoint) || {
-  log "  - Entry point: (not found)"
-  log "❌ Could not determine entry point. Listing /app/dist/server:";
-  find /app/dist/server -maxdepth 2 -type f 2>/dev/null || true
+ENTRYPOINT_PATH="/app/dist/server/index.js"
+if [ ! -f "$ENTRYPOINT_PATH" ]; then
+  log "❌ Could not find entry point at $ENTRYPOINT_PATH"
+  log "Build output in /app/dist/server:"
+  find /app/dist/server -type f 2>/dev/null || true
   exit 1
+fi
+log "  - Entry point: $ENTRYPOINT_PATH"
 }
 
 log "  - Entry point: $ENTRYPOINT_PATH"

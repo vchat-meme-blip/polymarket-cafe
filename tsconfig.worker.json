@@ -1,0 +1,33 @@
+{
+  "extends": "./tsconfig.server.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "outDir": "./dist/server/workers",
+    "rootDir": ".",
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "declaration": true,
+    "noEmitOnError": true,
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "noEmit": false
+  },
+  "include": [
+    "server/workers/*.worker.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}
