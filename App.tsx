@@ -18,12 +18,12 @@
  * limitations under the License.
  */
 
-import React from 'react';
+/** @jsxImportSource react */
+import React, { useEffect, useState } from 'react';
 import { useUI, useUser, useAgent } from './lib/state/index.js';
 import { useCafeSocket } from './hooks/useCafeSocket';
 import AppShell from './components/shell/AppShell';
 import ThreeJSLandingPage from './components/landing/ThreeJSLandingPage';
-import { useEffect, useState } from 'react';
 import Onboarding from './components/onboarding/Onboarding';
 import ToastContainer from './components/shell/ToastContainer';
 import { apiService } from './lib/services/api.service.js';

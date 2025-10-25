@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 
 // FIX: Define __dirname in an ES module context using the cross-platform compatible `fileURLToPath`.
@@ -19,10 +20,18 @@ export default defineConfig(({ mode }) => {
     };
 
     return {
-        // Define environment variables for client-side code
+        plugins: [react({
+            jsxImportSource: 'react',
+            babel: {
+                plugins: [
+                    ['@babel/plugin-transform-react-jsx', { runtime: 'automatic' }]
+                ]
+            }
+        })],
         define: {
             'process.env': JSON.stringify(clientEnv),
-            '__APP_ENV__': JSON.stringify(mode)
+            '__APP_ENV__': JSON.stringify(mode),
+            'global': 'window'
         },
         server: {
             proxy: {
