@@ -21,6 +21,16 @@ COPY . .
 RUN echo "Building client..." && \
     npm run build:client
 
+# Build workers first
+RUN echo "Building workers..." && \
+    mkdir -p dist/workers && \
+    for worker in $(find server/workers -name "*.worker.ts"); do \
+        worker_name=$(basename $worker .ts); \
+        echo "Building worker: $worker_name"; \
+        npx tsc $worker --outDir dist/workers --module es2020 --target es2020 --moduleResolution node && \
+        cp "dist/workers/$worker_name.js" "dist/workers/$worker_name.mjs" || true; \
+    done
+
 # Build server separately to handle any specific requirements
 RUN echo "Building server..." && \
     npm run build:server && \
@@ -46,17 +56,21 @@ COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps
 
 # Create necessary directories
-RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
+RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client /app/workers
 
 # Copy built files from builder
 COPY --from=builder /app/dist/server/ /app/dist/server/
 
-# Create workers directory in the final image
-RUN mkdir -p /app/dist/workers /app/dist/server/workers
-
-# Copy workers from builder to both locations for compatibility
+# Copy workers from builder to all possible locations for compatibility
 COPY --from=builder /app/dist/workers/ /app/dist/workers/
 COPY --from=builder /app/dist/workers/ /app/dist/server/workers/
+COPY --from=builder /app/dist/workers/ /app/workers/
+
+# Verify workers were copied
+RUN echo "Verifying workers were copied..." && \
+    echo "Workers in /app/dist/workers/:" && ls -la /app/dist/workers/ 2>/dev/null || echo "No workers in /app/dist/workers/" && \
+    echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/" && \
+    echo "\nWorkers in /app/workers/:" && ls -la /app/workers/ 2>/dev/null || echo "No workers in /app/workers/"
 
 # Copy other necessary files
 COPY --from=builder /app/dist/client/ /app/dist/client/

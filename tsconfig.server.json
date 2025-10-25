@@ -17,14 +17,19 @@
     },
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
+    "isolatedModules": false,
     "noEmit": false,
     "declaration": true,
     "emitDeclarationOnly": false
   },
   "include": [
     "server/**/*.ts",
-    "server/workers/*.worker.ts",
+    "server/**/*.tsx",
+    "server/**/*.js",
+    "server/**/*.jsx",
+    "server/**/*.json",
+    "server/**/*.node",
+    "server/workers/**/*.ts",
     "lib/types/**/*.ts",
     "lib/prompts.ts",
     "lib/presets/agents.ts",
@@ -33,6 +38,8 @@
   ],
   "exclude": [
     "node_modules",
+    "**/*.test.ts",
+    "**/*.spec.ts",
     "dist"
   ]
 }
