@@ -54,11 +54,15 @@ RUN npm ci --only=production --legacy-peer-deps
 # Create necessary directories
 RUN mkdir -p /app/dist/server/workers /app/dist/client /app/logs
 
-# Copy all built files from builder
-COPY --from=builder /app/dist/ /app/dist/
-
 # Ensure all necessary directories exist
-RUN mkdir -p /app/dist/client /public /app/logs
+RUN mkdir -p /app/dist/client /app/dist/server/workers /public /app/logs
+
+# Copy built files in stages for better layer caching
+COPY --from=builder /app/dist/client/ /app/dist/client/
+COPY --from=builder /app/dist/server/ /app/dist/server/
+
+# Explicitly copy worker files
+COPY --from=builder /app/dist/server/workers/ /app/dist/server/workers/
 
 # Copy package files and configs
 COPY --from=builder /app/package*.json ./
@@ -72,7 +76,8 @@ RUN if [ -d "/app/public" ]; then cp -r /app/public/* /public/; fi
 RUN echo "Build output verification:" && \
     echo "\nServer files in /app/dist/:" && ls -la /app/dist/ && \
     echo "\nServer files in /app/dist/server/:" && ls -la /app/dist/server/ 2>/dev/null || echo "No server files found in /app/dist/server/" && \
-    echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/" && \
+    echo "\nWorkers in /app/dist/server/workers/:" && (ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/") && \
+    echo "\nWorker files found:" && (find /app/dist -name "*.worker.*" -o -name "arena.*" -o -name "resolution.*" -o -name "dashboard.*" -o -name "autonomy.*" -o -name "market-watcher.*" | sort) && \
     echo "\nClient files in /app/dist/client/:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found" && \
     echo "\nAll files in /app/dist:" && find /app/dist -maxdepth 3 -type f | sort
 

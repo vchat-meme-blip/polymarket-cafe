@@ -4,6 +4,7 @@
 // with module augmentation and middleware signatures.
 import express, { Request, Response, NextFunction } from 'express';
 import { Worker as NodeWorker } from 'worker_threads';
+import { createWorker } from './worker-loader.js';
 
 // FIX: Replaced global augmentation with module augmentation for 'express-serve-static-core'.
 // This is the recommended way to augment Express's Request object and resolves all
@@ -39,105 +40,117 @@ let autonomyWorker: NodeWorker;
 let marketWatcherWorker: NodeWorker;
 const apiKeyManager = new ApiKeyManager();
 
-function createWorker(workerPath: string) {
-  const resolvedPath = path.resolve(__dirname, workerPath);
-  return new NodeWorker(resolvedPath);
-}
-
 function setupWorkers() {
   try {
     console.log('[Server] Initializing workers...');
     
-    // In development, these point to .ts files in server/workers/
-    // In production, they'll be .js files in dist/server/workers/
-    const workerBasePath = process.env.NODE_ENV === 'production' ? './server/workers/' : './workers/';
+    // In production, use .js files from the dist directory
+    // In development, use .ts files directly
+    const workerExt = process.env.NODE_ENV === 'production' ? '.js' : '.ts';
+    const workerBasePath = process.env.NODE_ENV === 'production' ? './dist/server/workers/' : './workers/';
     
-    console.log(`[Server] Using worker base path: ${workerBasePath}`);
+    console.log(`[Server] Initializing workers from: ${workerBasePath} with extension: ${workerExt}`);
     
-    arenaWorker = createWorker(`${workerBasePath}arena.worker`);
-    resolutionWorker = createWorker(`${workerBasePath}resolution.worker`);
-    dashboardWorker = createWorker(`${workerBasePath}dashboard.worker`);
+    // Worker configurations
+    const workerConfigs = [
+      { name: 'arena', file: 'arena.worker' },
+      { name: 'resolution', file: 'resolution.worker' },
+      { name: 'dashboard', file: 'dashboard.worker' },
+      { name: 'autonomy', file: 'autonomy.worker' },
+      { name: 'marketWatcher', file: 'market-watcher.worker' }
+    ];
     
-    // Set up error handlers for each worker
-    const setupWorkerHandlers = (worker: NodeWorker, name: string) => {
-      worker.on('error', (error) => {
-        console.error(`[${name} Worker] Error:`, error);
-      });
-      
-      worker.on('exit', (code) => {
-        if (code !== 0) {
-          console.error(`[${name} Worker] Worker stopped with exit code ${code}`);
-        }
-      });
-      
-      worker.on('message', (message) => {
-        console.log(`[${name} Worker] Message:`, message);
-      });
-    };
+    // Create all workers
+    const workers = new Map<string, NodeWorker>();
     
-    setupWorkerHandlers(arenaWorker, 'Arena');
-    setupWorkerHandlers(resolutionWorker, 'Resolution');
-    setupWorkerHandlers(dashboardWorker, 'Dashboard');
+    for (const { name, file } of workerConfigs) {
+      try {
+        const workerPath = path.join(workerBasePath, `${file}${workerExt}`);
+        console.log(`[Worker ${name}] Creating worker from: ${workerPath}`);
+        
+        const worker = createWorker(workerPath);
+        workers.set(name, worker);
+        
+        // Set up event handlers for each worker
+        worker.on('online', () => {
+          console.log(`[Worker ${name}] Started successfully`);
+        });
+        
+        worker.on('error', (error: Error) => {
+          console.error(`[Worker ${name}] Error:`, error);
+        });
+        
+        worker.on('exit', (code: number) => {
+          if (code !== 0) {
+            console.error(`[Worker ${name}] Stopped with exit code ${code}`);
+          }
+        });
+        
+        // Set up message handlers for each worker
+        worker.on('message', (message: any) => {
+          // Handle socket.io message forwarding
+          if (message?.type === 'socketEmit') {
+            if (message.room) {
+              io.to(message.room).emit(message.event, message.payload);
+            } else {
+              io.emit(message.event, message.payload);
+            }
+          }
+          // Handle worker-to-worker communication
+          else if (message?.type === 'forwardToWorker') {
+            const targetWorker = workers.get(message.worker);
+            if (targetWorker) {
+              targetWorker.postMessage(message.message);
+            } else {
+              console.warn(`[Server] Received forward request for unknown worker: ${message.worker}`);
+            }
+          }
+          // Handle API key management
+          else if (message?.type === 'requestApiKey') {
+            const key = apiKeyManager.getKey();
+            worker.postMessage({
+              type: 'apiKeyResponse',
+              payload: {
+                key,
+                requestId: message.payload.requestId,
+                agentId: message.payload.agentId,
+                allKeysOnCooldown: key === null && apiKeyManager.areAllKeysOnCooldown()
+              }
+            });
+          }
+          // Handle rate limit reporting
+          else if (message?.type === 'reportRateLimit') {
+            apiKeyManager.reportRateLimit(message.payload.key, message.payload.durationSeconds);
+          }
+          // Handle cooldown status checks
+          else if (message?.type === 'checkAllKeysCooldown') {
+            worker.postMessage({
+              type: 'allKeysCooldownResponse',
+              payload: {
+                requestId: message.payload.requestId,
+                allKeysOnCooldown: apiKeyManager.areAllKeysOnCooldown()
+              }
+            });
+          }
+        });
+      } catch (error) {
+        console.error(`[Worker ${name}] Failed to initialize:`, error);
+        throw error; // Re-throw to be caught by the outer try-catch
+      }
+    }
     
-    console.log('[Server] Workers initialized successfully');
+    // Assign to module-level variables
+    arenaWorker = workers.get('arena')!;
+    resolutionWorker = workers.get('resolution')!;
+    dashboardWorker = workers.get('dashboard')!;
+    autonomyWorker = workers.get('autonomy')!;
+    marketWatcherWorker = workers.get('marketWatcher')!;
+    
+    console.log('[Server] All workers initialized successfully');
   } catch (error) {
     console.error('[Server] Failed to initialize workers:', error);
-    throw error; // Re-throw to prevent the server from starting without workers
+    process.exit(1); // Exit if workers can't be initialized
   }
-  autonomyWorker = createWorker('./workers/autonomy.worker.mjs');
-  marketWatcherWorker = createWorker('./workers/market-watcher.worker.mjs');
-
-  const workers = { arena: arenaWorker, resolution: resolutionWorker, dashboard: dashboardWorker, autonomy: autonomyWorker, marketWatcher: marketWatcherWorker };
-
-  Object.entries(workers).forEach(([name, worker]) => {
-    worker.on('message', (message: any) => {
-      if (message.type === 'socketEmit') {
-        if (message.room) {
-          io.to(message.room).emit(message.event, message.payload);
-        } else {
-          io.emit(message.event, message.payload);
-        }
-      } else if (message.type === 'forwardToWorker') {
-        const targetWorker = workers[message.worker as keyof typeof workers];
-        if (targetWorker) {
-          targetWorker.postMessage(message.message);
-        } else {
-          console.warn(`[Server] Received forward request for unknown worker: ${message.worker}`);
-        }
-      } else if (message.type === 'requestApiKey') {
-        const key = apiKeyManager.getKey();
-        worker.postMessage({
-          type: 'apiKeyResponse',
-          payload: {
-            key,
-            requestId: message.payload.requestId,
-            agentId: message.payload.agentId,
-            allKeysOnCooldown: key === null && apiKeyManager.areAllKeysOnCooldown()
-          }
-        });
-      } else if (message.type === 'reportRateLimit') {
-        apiKeyManager.reportRateLimit(message.payload.key, message.payload.durationSeconds);
-      } else if (message.type === 'checkAllKeysCooldown') {
-        worker.postMessage({
-          type: 'allKeysCooldownResponse',
-          payload: {
-            requestId: message.payload.requestId,
-            allKeysOnCooldown: apiKeyManager.areAllKeysOnCooldown()
-          }
-        });
-      }
-    });
-
-    worker.on('error', (err) => {
-      console.error(`Worker error (${name}):`, err);
-    });
-
-    worker.on('exit', (code) => {
-      if (code !== 0) {
-        console.error(`Worker (${name}) stopped with exit code ${code}`);
-      }
-    });
-  });
 }
 
 // FIX: Use explicitly imported Request, Response, and NextFunction types.
