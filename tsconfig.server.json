@@ -1,5 +1,4 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
@@ -13,23 +12,16 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./server/*"]
     },
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
-    "noEmit": false,
-    "declaration": true,
-    "emitDeclarationOnly": false
+    "preserveSymlinks": true,
+    "moduleDetection": "force"
   },
   "include": [
     "server/**/*.ts",
-    "server/workers/*.worker.ts",
-    "lib/types/**/*.ts",
-    "lib/prompts.ts",
-    "lib/presets/agents.ts",
     "scripts/**/*.ts",
-    "vite-env.d.ts"
+    "env.ts",
+    "lib/types/**/*.d.ts"
   ],
   "exclude": [
     "node_modules",
