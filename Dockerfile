@@ -55,14 +55,14 @@ RUN npm ci --only=production --legacy-peer-deps
 RUN mkdir -p /app/dist/server/workers /app/logs /app/dist/client
 
 # Copy built files from builder
-# FIX: Copy dist/server first, which now correctly contains the compiled server and worker files
-COPY --from=builder /app/dist/server/ /app/dist/server/
-# Copy client files
+COPY --from=builder /app/dist/ /app/dist/
+# Copy client files from builder
 COPY --from=builder /app/dist/client/ /app/dist/client/
 # Copy public assets
-COPY --from=builder /app/public/ /app/public/
+COPY --from=builder /app/public/ /public/
 # Copy PM2 config and env files
 COPY --from=builder /app/ecosystem.config.* ./
+COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.env* ./
 
 # FIX: Removed symlink creation - no longer necessary with corrected build output
@@ -84,8 +84,12 @@ RUN set -e; \
         ENTRYPOINT="/app/dist/server/index.mjs"; \
     elif [ -f "/app/dist/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/index.js"; \
+    elif [ -f "/app/dist/index.mjs" ]; then \
+        ENTRYPOINT="/app/dist/index.mjs"; \
+    elif [ -f "/app/dist/index.js" ]; then \
+        ENTRYPOINT="/app/dist/index.js"; \
     else \
-        echo "Error: No entry point found in /app/dist/server"; \
+        echo "Error: No entry point found in /app/dist"; \
         echo "Build output in /app/dist:"; \
         find /app/dist -type f; \
         exit 1; \
