@@ -54,17 +54,19 @@ RUN npm ci --only=production --legacy-peer-deps
 # Create necessary directories
 RUN mkdir -p /app/dist/server/workers /app/dist/client /app/logs
 
-# Copy built server files
-COPY --from=builder /app/dist/server/ /app/dist/server/
+# Copy all built files from builder
+COPY --from=builder /app/dist/ /app/dist/
 
-# Copy built client files
-COPY --from=builder /app/dist/client/ /app/dist/client/
-# Copy public assets
-COPY --from=builder /app/public/ /public/
-# Copy PM2 config and env files
-COPY --from=builder /app/ecosystem.config.* ./
+# Ensure all necessary directories exist
+RUN mkdir -p /app/dist/client /public /app/logs
+
+# Copy package files and configs
 COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/ecosystem.config.* ./
 COPY --from=builder /app/.env* ./
+
+# Copy public assets if they exist
+RUN if [ -d "/app/public" ]; then cp -r /app/public/* /public/; fi
 
 # FIX: Removed symlink creation - no longer necessary with corrected build output
 # The tsconfig.server.json 'rootDir' fix ensures workers are compiled directly to /app/dist/server/workers
@@ -72,20 +74,23 @@ COPY --from=builder /app/.env* ./
 # Verify the build output
 # Verify the build output
 RUN echo "Build output verification:" && \
-    echo "\nServer files in /app/dist/server/:" && ls -la /app/dist/server/ && \
+    echo "\nServer files in /app/dist/:" && ls -la /app/dist/ && \
+    echo "\nServer files in /app/dist/server/:" && ls -la /app/dist/server/ 2>/dev/null || echo "No server files found in /app/dist/server/" && \
     echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/" && \
     echo "\nClient files in /app/dist/client/:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found" && \
-    echo "\nAll files in /app/dist/server:" && find /app/dist/server -type f | sort
+    echo "\nAll files in /app/dist:" && find /app/dist -maxdepth 3 -type f | sort
 
 # Verify the server entry point
 RUN set -e; \
     echo "Verifying server entry point..."; \
     if [ -f "/app/dist/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/index.js"; \
+    elif [ -f "/app/dist/index.js" ]; then \
+        ENTRYPOINT="/app/dist/index.js"; \
     else \
         echo "Error: No server entry point found"; \
-        echo "Build output in /app/dist/server:"; \
-        find /app/dist/server -type f; \
+        echo "Build output in /app/dist:"; \
+        find /app/dist -maxdepth 2 -type f; \
         exit 1; \
     fi; \
     echo "Found server entry point at $ENTRYPOINT"; \
@@ -143,17 +148,38 @@ resolve_entrypoint() {
 
 log "🔍 Debug Info:"
 log "  - Current directory: $(pwd)"
-ENTRYPOINT_PATH="/app/dist/server/index.js"
-if [ ! -f "$ENTRYPOINT_PATH" ]; then
-  log "❌ Could not find entry point at $ENTRYPOINT_PATH"
-  log "Build output in /app/dist/server:"
-  find /app/dist/server -type f 2>/dev/null || true
+
+# Define possible entry point locations
+ENTRY_POINTS=(
+  "/app/dist/server/index.js"
+  "/app/dist/index.js"
+  "/app/dist/server/server/index.js"
+  "$(cat /app/.entrypoint-path 2>/dev/null || echo '')"
+)
+
+# Find the first valid entry point
+ENTRYPOINT_PATH=""
+for entry in "${ENTRY_POINTS[@]}"; do
+  if [ -n "$entry" ] && [ -f "$entry" ]; then
+    ENTRYPOINT_PATH="$entry"
+    log "✅ Found entry point at: $ENTRYPOINT_PATH"
+    break
+  fi
+done
+
+# If no entry point found, show error and exit
+if [ -z "$ENTRYPOINT_PATH" ]; then
+  log "❌ No valid entry point found. Tried:"
+  for entry in "${ENTRY_POINTS[@]}"; do
+    log "   - $entry"
+  done
+  log "\nBuild output in /app/dist:"
+  find /app/dist -type f 2>/dev/null || true
   exit 1
 fi
-log "  - Entry point: $ENTRYPOINT_PATH"
-}
 
-log "  - Entry point: $ENTRYPOINT_PATH"
+# Export the entry point for use in the container
+log "  - Using entry point: $ENTRYPOINT_PATH"
 ENTRY_DIR=$(dirname "$ENTRYPOINT_PATH" 2>/dev/null || true)
 if [ -n "$ENTRY_DIR" ] && [ -d "$ENTRY_DIR" ]; then
   log "  - Directory contents:"
@@ -171,9 +197,9 @@ log "  - First 20 lines of entry point:"
 head -n 20 "$ENTRYPOINT_PATH" 2>/dev/null || log "    Could not read entry point file"
 
 log ""
-log "🚀 Starting application..."
+log " Starting application..."
 exec node --no-warnings "$ENTRYPOINT_PATH"
 EOF
 
-# Start the application
-CMD ["/app/startup.sh"]
+# Start the application using the resolved entry point
+CMD ["node", "$ENTRYPOINT_PATH"]
