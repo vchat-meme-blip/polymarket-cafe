@@ -51,12 +51,12 @@ COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps
 
 # Create necessary directories
-# FIX: Simplified worker directory structure, as tsconfig.server.json now places workers directly in dist/server/workers
-RUN mkdir -p /app/dist/server/workers /app/logs /app/dist/client
+RUN mkdir -p /app/dist/server/workers /app/dist/client /app/logs
 
-# Copy built files from builder
-COPY --from=builder /app/dist/ /app/dist/
-# Copy client files from builder
+# Copy built server files
+COPY --from=builder /app/dist/server/ /app/dist/server/
+
+# Copy built client files
 COPY --from=builder /app/dist/client/ /app/dist/client/
 # Copy public assets
 COPY --from=builder /app/public/ /public/
@@ -69,10 +69,12 @@ COPY --from=builder /app/.env* ./
 # The tsconfig.server.json 'rootDir' fix ensures workers are compiled directly to /app/dist/server/workers
 
 # Verify the build output
+# Verify the build output
 RUN echo "Build output verification:" && \
     echo "\nServer files in /app/dist/server/:" && ls -la /app/dist/server/ && \
     echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/" && \
-    echo "\nClient files in /app/dist/client/:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found"
+    echo "\nClient files in /app/dist/client/:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found" && \
+    echo "\nAll files in /app/dist:" && find /app/dist -type f | sort
 
 # FIX: Removed copying server/env.ts - it should be compiled by build:server
 # The `server/index.ts` (now compiled to `dist/server/index.js` or `.mjs`) handles `dotenv.config()`

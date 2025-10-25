@@ -124,11 +124,23 @@ export async function startServer() {
   app.use('/api', apiRouter);
 
   if (process.env.NODE_ENV === 'production') {
-    const clientPath = path.join(__dirname, '..', 'client');
+    // In production, the client files are in the dist/client directory
+    const clientPath = path.join(__dirname, '..', '..', 'client');
+    const distClientPath = path.join(__dirname, '..', 'client');
+    
+    // Try both possible locations for client files
+    app.use(express.static(distClientPath));
     app.use(express.static(clientPath));
+    
     // FIX: Use explicitly imported Request and Response types.
     app.get('*', (req: Request, res: Response) => {
-      res.sendFile(path.resolve(clientPath, 'index.html'));
+      // Try to serve from dist/client first, then fall back to client
+      const indexPath = path.join(distClientPath, 'index.html');
+      if (require('fs').existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.sendFile(path.join(clientPath, 'index.html'));
+      }
     });
   }
 
