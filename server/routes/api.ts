@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import mongoose, { Collection } from 'mongoose';
 import { TradeRecord, BettingIntel } from '../../lib/types/shared.js';
 import { 
@@ -26,17 +26,17 @@ import OpenAI from 'openai';
 import { Readable } from 'stream';
 import { startOfToday, formatISO } from 'date-fns';
 
-const router = Router();
+const router: Router = Router();
 
 // Middleware to get user handle from header
-router.use((req, res, next) => {
+router.use((req: Request, res: Response, next: NextFunction) => {
   const handle = req.header('X-User-Handle');
   res.locals.userHandle = handle;
   next();
 });
 
 // --- Health Check ---
-router.get('/health', (req, res) => {
+router.get('/health', (_req: Request, res: Response) => {
     res.status(200).send('OK');
 });
 
