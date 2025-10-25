@@ -8,14 +8,20 @@ RUN apk add --no-cache python3 make g++
 
 # Copy package files and install all dependencies
 COPY package*.json ./
-COPY pnpm-lock.yaml ./
+# Copy pnpm-lock.yaml if it exists, otherwise don't fail
+COPY pnpm-lock.yaml* ./
 COPY tsconfig*.json ./
 # FIX: Copy jsconfig.json as it might be used by some tools
 COPY jsconfig.json ./
 
 # Install dependencies and development tools
 RUN npm install -g pnpm
-RUN pnpm install --frozen-lockfile
+# Only use --frozen-lockfile if pnpm-lock.yaml exists
+RUN if [ -f "pnpm-lock.yaml" ]; then \
+        pnpm install --frozen-lockfile; \
+    else \
+        pnpm install; \
+    fi
 
 # Copy the rest of the application
 COPY . .
