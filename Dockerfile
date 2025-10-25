@@ -50,6 +50,7 @@ RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/clie
 
 # Copy built files from builder
 COPY --from=builder /app/dist/server/ /app/dist/server/
+
 # Copy workers if they exist
 RUN if [ -d "/app/dist/workers" ]; then \
       echo "Copying workers from dist/workers" && \
@@ -57,8 +58,19 @@ RUN if [ -d "/app/dist/workers" ]; then \
     else \
       echo "No workers directory found in dist/workers"; \
     fi
+
+# Copy client files
 COPY --from=builder /app/dist/client/ /app/dist/client/
-COPY --from=builder /app/public/ /app/public/
+
+# Handle public directory
+RUN if [ -d "/app/public" ]; then \
+      echo "Copying public directory" && \
+      mkdir -p /app/dist/client && \
+      cp -r /app/public/* /app/dist/client/ 2>/dev/null || true; \
+    else \
+      echo "No public directory found, creating an empty one" && \
+      mkdir -p /app/dist/client; \
+    fi
 COPY --from=builder /app/ecosystem.config.* ./
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.env* ./
