@@ -24,9 +24,10 @@ COPY tsconfig*.json ./
 # FIX: Copy jsconfig.json as it might be used by some tools
 COPY jsconfig.json ./
 
-# Enable corepack and install pnpm
+# Enable corepack and ensure pnpm is installed
 RUN corepack enable && \
-    npm install -g pnpm@8.15.4 && \
+    npm uninstall -g pnpm || true && \
+    npm install -g pnpm@8.15.4 --force && \
     # Install TypeScript and type definitions locally
     npm install -g typescript@5.3.3 @types/node@20.11.19
 # Install root dependencies, handle missing lockfile
@@ -82,9 +83,10 @@ ENV PORT=3001
 COPY package*.json ./
 COPY pnpm-lock.yaml* ./
 
-# Enable corepack and install pnpm
+# Ensure pnpm is available
 RUN corepack enable && \
-    npm install -g pnpm@8.15.4
+    npm uninstall -g pnpm || true && \
+    npm install -g pnpm@8.15.4 --force
 
 # Install production dependencies using pnpm
 RUN pnpm install --prod --no-frozen-lockfile
