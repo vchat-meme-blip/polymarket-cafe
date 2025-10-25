@@ -7,13 +7,14 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++ \
     # Add MongoDB tools and dependencies
     && apk add --no-cache mongodb-tools \
-    # Install MongoDB client libraries
+    # Install MongoDB client libraries and build tools
     && apk add --no-cache --virtual .build-deps \
         build-base \
         python3-dev \
         libffi-dev \
         openssl-dev \
-        libc6-compat
+        libc6-compat \
+        git
 
 # Copy package files and install all dependencies
 COPY package*.json ./
@@ -23,9 +24,12 @@ COPY tsconfig*.json ./
 # FIX: Copy jsconfig.json as it might be used by some tools
 COPY jsconfig.json ./
 
-# Install dependencies and development tools
-RUN npm install -g pnpm typescript @types/node
+# Install pnpm and core dependencies
+RUN npm install -g pnpm@8.15.4 && \
+    # Install TypeScript and type definitions
+    pnpm add -g typescript@5.3.3 @types/node@20.11.19 @types/mongoose@5.11.97
 # Only use --frozen-lockfile if pnpm-lock.yaml exists
+# Install root dependencies
 RUN if [ -f "pnpm-lock.yaml" ]; then \
         pnpm install --frozen-lockfile; \
     else \
@@ -35,15 +39,19 @@ RUN if [ -f "pnpm-lock.yaml" ]; then \
 # Copy the rest of the application
 COPY . .
 
+# Install server dependencies
+RUN echo "Installing server dependencies..." && \
+    cd server && \
+    pnpm install --production=false && \
+    pnpm add -D @types/mongoose && \
+    cd ..
+
 # Build the application
 RUN echo "Building client..." && \
     npm run build:client
 
 # Build server and workers
 RUN echo "Building server and workers..." && \
-    # Install server dependencies
-    cd server && pnpm install --production=false && cd .. && \
-    # Build steps
     npm run build:server && \
     npm run build:workers && \
     npm run postbuild:server && \
