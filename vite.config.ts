@@ -1,5 +1,3 @@
-/// <reference types="node" />
-
 import path from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
 import { fileURLToPath } from 'node:url';
@@ -17,15 +15,12 @@ export default defineConfig(({ mode }) => {
         // Explicitly define which environment variables should be available to the client
         NODE_ENV: process.env.NODE_ENV || mode,
         VITE_APP_TITLE: env.VITE_APP_TITLE,
-        // FIX: Expose VITE_PUBLIC_APP_URL to the client build via process.env.
-        VITE_PUBLIC_APP_URL: env.VITE_PUBLIC_APP_URL,
         // Add other client-side environment variables here
     };
 
     return {
         // Define environment variables for client-side code
         define: {
-            // FIX: Ensure `process.env` is correctly typed by making sure Node.js types are loaded via `/// <reference types="node" />` at the top of the file.
             'process.env': JSON.stringify(clientEnv),
             '__APP_ENV__': JSON.stringify(mode)
         },
@@ -49,7 +44,6 @@ export default defineConfig(({ mode }) => {
             emptyOutDir: true,
             // Improve chunking to address the large chunk warning
             rollupOptions: {
-                input: 'index.html', // Explicitly specify index.html as input
                 output: {
                     manualChunks: {
                         vendor: ['react', 'react-dom', 'three'],

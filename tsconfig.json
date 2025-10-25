@@ -1,35 +1,32 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
     "target": "ES2022",
-    "outDir": "./dist/server",
-    "rootDir": "./server", // <-- IMPORTANT: Change rootDir to ./server
-    "esModuleInterop": true,
-    "strict": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "types": ["node"],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./*"] // This path alias will now resolve relative to 'server/'
-    },
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
+    "types": [
+      "node"
+    ],
+    "moduleResolution": "bundler",
     "isolatedModules": true,
-    "noEmit": false,
-    "declaration": true,
-    "emitDeclarationOnly": false
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   },
-  "include": [
-    "./**/*.ts", // <-- IMPORTANT: Include all .ts files relative to new rootDir (./server)
-    "../lib/types/**/*.ts", // Relative to new rootDir
-    "../scripts/**/*.ts", // Relative to new rootDir
-    "../src/vite-env.d.ts" // <-- IMPORTANT: Explicitly include vite-env.d.ts relative to new rootDir
-  ],
   "exclude": [
-    "node_modules",
-    "dist"
+    "server"
   ]
 }
