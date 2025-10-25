@@ -4,7 +4,6 @@
 // with module augmentation and middleware signatures.
 import express, { Request, Response, NextFunction } from 'express';
 import { Worker as NodeWorker } from 'worker_threads';
-import { createWorker } from './worker-loader.js';
 
 // FIX: Replaced global augmentation with module augmentation for 'express-serve-static-core'.
 // This is the recommended way to augment Express's Request object and resolves all
@@ -16,9 +15,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import * as fs from 'fs';
 
-// FIX: Remove explicit 'default' as api.ts has a default export and `import apiRouter from './routes/api.js'` is correct.
 import apiRouter from './routes/api.js';
 import { usersCollection, agentsCollection } from './db.js';
 import { ApiKeyManager } from './services/apiKey.service.js';
@@ -42,161 +39,78 @@ let autonomyWorker: NodeWorker;
 let marketWatcherWorker: NodeWorker;
 const apiKeyManager = new ApiKeyManager();
 
+function createWorker(workerPath: string) {
+  const resolvedPath = path.resolve(__dirname, workerPath);
+  return new NodeWorker(resolvedPath);
+}
+
 function setupWorkers() {
-  try {
-    console.log('[Server] Initializing workers...');
-    
-    // Worker configurations
-    const workerConfigs = [
-      { name: 'arena', file: 'arena.worker' },
-      { name: 'resolution', file: 'resolution.worker' },
-      { name: 'dashboard', file: 'dashboard.worker' },
-      { name: 'autonomy', file: 'autonomy.worker' },
-      { name: 'marketWatcher', file: 'market-watcher.worker' }
-    ];
-    
-    // Create all workers
-    const workers = new Map<string, NodeWorker>();
-    
-    for (const { name, file } of workerConfigs) {
-      try {
-        // In production, look for .mjs files, in development use .ts
-        const workerPath = process.env.NODE_ENV === 'production' 
-          ? `./dist/server/workers/${file}.mjs`
-          : `./workers/${file}.ts`;
-          
-        console.log(`[Server] Creating worker: ${name} from ${workerPath}`);
-        
-        const worker = createWorker(workerPath, {
-          workerData: {
-            workerName: name,
-            isProduction: process.env.NODE_ENV === 'production'
-          }
-        });
-        
-        workers.set(name, worker);
-        
-        // Set up event handlers for each worker
-        worker.on('online', () => {
-          console.log(`[Worker ${name}] Started successfully`);
-          
-          // Notify worker it's ready
-          worker.postMessage({ type: 'workerReady' });
-        });
-        
-        worker.on('error', (error: Error) => {
-          console.error(`[Worker ${name}] Error:`, error);
-        });
-        
-        worker.on('exit', (code: number) => {
-          if (code !== 0) {
-            console.error(`[Worker ${name}] Stopped with exit code ${code}`);
-            // Consider restarting the worker after a delay
-            setTimeout(() => {
-              console.log(`[Worker ${name}] Attempting to restart...`);
-              setupWorkers();
-            }, 5000);
-          }
-        });
-        
-        // Set up message handlers for each worker
-        worker.on('message', (message: any) => {
-          if (!message || typeof message !== 'object') return;
-          
-          // Handle socket.io message forwarding
-          if (message.type === 'socketEmit') {
-            if (message.room) {
-              io.to(message.room).emit(message.event, message.payload);
-            } else {
-              io.emit(message.event, message.payload);
-            }
-          }
-          // Handle worker-to-worker communication
-          else if (message.type === 'forwardToWorker') {
-            const targetWorker = workers.get(message.worker);
-            if (targetWorker) {
-              targetWorker.postMessage(message.message);
-            } else {
-              console.warn(`[Server] Received forward request for unknown worker: ${message.worker}`);
-            }
-          }
-          // Handle API key management
-          else if (message.type === 'requestApiKey') {
-            const key = apiKeyManager.getKey();
-            worker.postMessage({
-              type: 'apiKeyResponse',
-              payload: {
-                key,
-                requestId: message.payload?.requestId,
-                agentId: message.payload?.agentId,
-                allKeysOnCooldown: key === null && apiKeyManager.areAllKeysOnCooldown()
-              }
-            });
-          }
-          // Handle rate limit reporting
-          else if (message.type === 'reportRateLimit') {
-            if (message.payload?.key) {
-              apiKeyManager.reportRateLimit(
-                message.payload.key, 
-                message.payload.durationSeconds || 60
-              );
-            }
-          }
-          // Handle cooldown status checks
-          else if (message.type === 'checkAllKeysCooldown') {
-            worker.postMessage({
-              type: 'allKeysCooldownResponse',
-              payload: {
-                requestId: message.payload?.requestId,
-                allKeysOnCooldown: apiKeyManager.areAllKeysOnCooldown()
-              }
-            });
-          }
-        });
-      } catch (error) {
-        console.error(`[Worker ${name}] Failed to initialize:`, error);
-        // Don't throw here, try to continue with other workers
-      }
-    }
-    
-    // Assign to module-level variables
-    arenaWorker = workers.get('arena')!;
-    resolutionWorker = workers.get('resolution')!;
-    dashboardWorker = workers.get('dashboard')!;
-    autonomyWorker = workers.get('autonomy')!;
-    marketWatcherWorker = workers.get('marketWatcher')!;
-    
-    // Verify all workers were created
-    const missingWorkers = workerConfigs
-      .filter(({ name }) => !workers.has(name))
-      .map(({ name }) => name);
-      
-    if (missingWorkers.length > 0) {
-      console.error(`[Server] Failed to initialize workers: ${missingWorkers.join(', ')}`);
-      if (process.env.NODE_ENV === 'production') {
-        // In production, exit if critical workers are missing
-        const criticalWorkers = ['arena', 'dashboard'];
-        if (criticalWorkers.some(worker => missingWorkers.includes(worker))) {
-          process.exit(1);
+  arenaWorker = createWorker('./workers/arena.worker.mjs');
+  resolutionWorker = createWorker('./workers/resolution.worker.mjs');
+  dashboardWorker = createWorker('./workers/dashboard.worker.mjs');
+  autonomyWorker = createWorker('./workers/autonomy.worker.mjs');
+  marketWatcherWorker = createWorker('./workers/market-watcher.worker.mjs');
+
+  const workers = { arena: arenaWorker, resolution: resolutionWorker, dashboard: dashboardWorker, autonomy: autonomyWorker, marketWatcher: marketWatcherWorker };
+
+  Object.entries(workers).forEach(([name, worker]) => {
+    worker.on('message', (message: any) => {
+      if (message.type === 'socketEmit') {
+        if (message.room) {
+          io.to(message.room).emit(message.event, message.payload);
+        } else {
+          io.emit(message.event, message.payload);
         }
+      } else if (message.type === 'forwardToWorker') {
+        const targetWorker = workers[message.worker as keyof typeof workers];
+        if (targetWorker) {
+          targetWorker.postMessage(message.message);
+        } else {
+          console.warn(`[Server] Received forward request for unknown worker: ${message.worker}`);
+        }
+      } else if (message.type === 'requestApiKey') {
+        const key = apiKeyManager.getKey();
+        worker.postMessage({
+          type: 'apiKeyResponse',
+          payload: {
+            key,
+            requestId: message.payload.requestId,
+            agentId: message.payload.agentId,
+            allKeysOnCooldown: key === null && apiKeyManager.areAllKeysOnCooldown()
+          }
+        });
+      } else if (message.type === 'reportRateLimit') {
+        apiKeyManager.reportRateLimit(message.payload.key, message.payload.durationSeconds);
+      } else if (message.type === 'checkAllKeysCooldown') {
+        worker.postMessage({
+          type: 'allKeysCooldownResponse',
+          payload: {
+            requestId: message.payload.requestId,
+            allKeysOnCooldown: apiKeyManager.areAllKeysOnCooldown()
+          }
+        });
       }
-    }
-    
-    console.log('[Server] Worker initialization complete');
-  } catch (error) {
-    console.error('[Server] Fatal error initializing workers:', error);
-    process.exit(1);
-  }
+    });
+
+    worker.on('error', (err) => {
+      console.error(`Worker error (${name}):`, err);
+    });
+
+    worker.on('exit', (code) => {
+      if (code !== 0) {
+        console.error(`Worker (${name}) stopped with exit code ${code}`);
+      }
+    });
+  });
 }
 
 // FIX: Use explicitly imported Request, Response, and NextFunction types.
 const attachWorkers = (req: Request, res: Response, next: NextFunction) => {
-  // FIX: Access worker properties directly on 'req' after type augmentation.
-  (req as any).arenaWorker = arenaWorker;
-  (req as any).resolutionWorker = resolutionWorker;
-  (req as any).dashboardWorker = dashboardWorker;
-  (req as any).autonomyWorker = autonomyWorker;
-  (req as any).marketWatcherWorker = marketWatcherWorker;
+  req.arenaWorker = arenaWorker;
+  req.resolutionWorker = resolutionWorker;
+  req.dashboardWorker = dashboardWorker;
+  req.autonomyWorker = autonomyWorker;
+  req.marketWatcherWorker = marketWatcherWorker;
   next();
 };
 
@@ -209,48 +123,13 @@ export async function startServer() {
   app.use(attachWorkers);
   app.use('/api', apiRouter);
 
-  // Serve static files in production
   if (process.env.NODE_ENV === 'production') {
-    // Possible client paths in order of preference
-    const possibleClientPaths = [
-      path.join(__dirname, '..', 'client'),          // /dist/server/../client
-      path.join(__dirname, '..', '..', 'client'),    // /dist/server/../../client
-      path.join(process.cwd(), 'dist', 'client'),    // /app/dist/client
-      path.join(process.cwd(), 'client')             // /app/client
-    ];
-    
-    // Find the first existing client directory
-    let clientPath = '';
-    for (const clientPathOption of possibleClientPaths) {
-      try {
-        if (fs.existsSync(clientPathOption) && fs.statSync(clientPathOption).isDirectory()) {
-          clientPath = clientPathOption;
-          console.log(`[Server] Serving client files from: ${clientPath}`);
-          break;
-        }
-      } catch (err) {
-        console.warn(`[Server] Error checking client path ${clientPathOption}:`, err);
-      }
-    }
-    
-    if (!clientPath) {
-      console.error('[Server] Could not find client directory');
-    } else {
-      // Serve static files from the client directory
-      app.use(express.static(clientPath));
-      
-      // Serve index.html for all other routes (client-side routing)
-      app.get('*', (req: Request, res: Response) => {
-        const indexPath = path.join(clientPath, 'index.html');
-        if (fs.existsSync(indexPath)) {
-          // FIX: Use 'res.sendFile' (available on augmented Response type)
-          res.sendFile(indexPath);
-        } else {
-          // FIX: Use 'res.status' (available on augmented Response type)
-          res.status(404).send('Client files not found');
-        }
-      });
-    }
+    const clientPath = path.join(__dirname, '..', 'client');
+    app.use(express.static(clientPath));
+    // FIX: Use explicitly imported Request and Response types.
+    app.get('*', (req: Request, res: Response) => {
+      res.sendFile(path.resolve(clientPath, 'index.html'));
+    });
   }
 
   io.on('connection', async (socket) => {

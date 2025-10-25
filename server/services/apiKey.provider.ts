@@ -17,7 +17,7 @@ class ApiKeyProvider {
       // Clear any timeout for this request
       if (this.requestTimeouts.has(requestId)) {
         // FIX: Ensure clearTimeout is called with the correct NodeJS.Timeout type.
-        clearTimeout(this.requestTimeouts.get(requestId)!);
+        global.clearTimeout(this.requestTimeouts.get(requestId)!);
         this.requestTimeouts.delete(requestId);
       }
       

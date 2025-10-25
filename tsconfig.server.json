@@ -4,9 +4,8 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "target": "ES2022",
-    "outDir": "./dist",
+    "outDir": "./dist/server",
     "rootDir": ".",
-    "rootDirs": ["."],
     "esModuleInterop": true,
     "strict": true,
     "skipLibCheck": true,
@@ -18,7 +17,7 @@
     },
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "isolatedModules": false,
+    "isolatedModules": true,
     "noEmit": false,
     "declaration": true,
     "emitDeclarationOnly": false
@@ -26,27 +25,14 @@
   "include": [
     "server/**/*.ts",
     "server/workers/*.worker.ts",
-    "server/types/**/*.d.ts",
     "lib/types/**/*.ts",
     "lib/prompts.ts",
     "lib/presets/agents.ts",
-    "src/vite-env.d.ts",
     "scripts/**/*.ts",
-    "vite-env.d.ts",
-    "src/types/**/*.d.ts",
-    "server/types/**/*.d.ts"
-  ],
-  "typeRoots": [
-    "./node_modules/@types",
-    "./src/types",
-    "./server/types",
-    "."
+    "vite-env.d.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "**/*.test.ts",
-    "**/*.spec.ts",
-    "server/workers/*.worker.ts"
+    "dist"
   ]
 }

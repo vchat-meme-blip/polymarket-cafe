@@ -63,8 +63,8 @@ const userSchema = new mongoose.Schema<UserDocumentType>({
   userApiKey: { type: String, default: null },
   solanaWalletAddress: { type: String, default: null },
   // FIX: Change type to Date for createdAt and updatedAt
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: () => new Date() },
+  updatedAt: { type: Date, default: () => new Date() },
   currentAgentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' },
   ownedRoomId: { type: mongoose.Schema.Types.ObjectId, ref: 'Room' },
   phone: { type: String, default: '' },
@@ -110,9 +110,9 @@ const agentSchema = new mongoose.Schema<AgentDocumentType>({
   // Deprecated fields
   boxBalance: { type: Number, default: 0 },
   portfolio: { type: Map, of: Number, default: {} },
-  lastActiveAt: { type: Date, default: Date.now },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+  lastActiveAt: { type: Date, default: () => new Date() },
+  createdAt: { type: Date, default: () => new Date() },
+  updatedAt: { type: Date, default: () => new Date() },
 }, { toJSON: { virtuals: true }, toObject: { virtuals: true } });
 
 agentSchema.virtual('bets', { // Virtual populate for bets
@@ -141,8 +141,8 @@ const roomSchema = new mongoose.Schema<RoomDocumentType>({
   twitterUrl: { type: String, default: '' },
   isRevenuePublic: { type: Boolean, default: false },
   bannedAgentIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Agent' }],
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: () => new Date() }, // Added missing field
+  updatedAt: { type: Date, default: () => new Date() }, // Added missing field
 }, { toJSON: { virtuals: true }, toObject: { virtuals: true } });
 
 roomSchema.method('toShared', function(this: RoomDocumentType): SharedRoom {
@@ -155,8 +155,8 @@ const bountySchema = new mongoose.Schema<BountyDocumentType>({
   status: { type: String, enum: ['active', 'completed'], default: 'active' },
   ownerHandle: { type: String, required: true, ref: 'User' },
   // FIX: Change type to Date for createdAt and updatedAt
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: () => new Date() },
+  updatedAt: { type: Date, default: () => new Date() },
 });
 
 bountySchema.method('toShared', function(this: BountyDocumentType): SharedBounty {
@@ -169,14 +169,14 @@ const betSchema = new mongoose.Schema<BetDocumentType>({
   outcome: { type: String, enum: ['yes', 'no'], required: true },
   amount: { type: Number, required: true },
   price: { type: Number, required: true },
-  timestamp: { type: Date, default: Date.now },
+  timestamp: { type: Date, default: () => new Date() },
   status: { type: String, enum: ['pending', 'resolved'], default: 'pending' },
   pnl: { type: Number },
   sourceIntelId: { type: mongoose.Schema.Types.ObjectId, ref: 'BettingIntel' },
   ownerHandle: { type: String, ref: 'User' }, // Denormalize owner handle for easier queries
   // FIX: Change type to Date for createdAt and updatedAt
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: () => new Date() },
+  updatedAt: { type: Date, default: () => new Date() },
 });
 
 betSchema.method('toShared', function(this: BetDocumentType): SharedBet {
@@ -189,7 +189,7 @@ const bettingIntelSchema = new mongoose.Schema<BettingIntelDocumentType>({
   content: { type: String, required: true },
   sourceDescription: { type: String },
   isTradable: { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: () => new Date() },
   pnlGenerated: {
     amount: { type: Number, default: 0 },
     currency: { type: String, default: 'USD' },
@@ -201,7 +201,7 @@ const bettingIntelSchema = new mongoose.Schema<BettingIntelDocumentType>({
   sourceUrls: { type: [String], default: [] },
   rawResearchData: { type: [{ url: String, markdown: String }], default: [] },
   // FIX: Change type to Date for updatedAt
-  updatedAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: () => new Date() },
 });
 
 bettingIntelSchema.method('toShared', function(this: BettingIntelDocumentType): SharedBettingIntel {
@@ -214,8 +214,8 @@ const marketWatchlistSchema = new mongoose.Schema<MarketWatchlistDocumentType>({
   markets: { type: [String], default: [] },
   wallets: { type: [String], default: [] },
   // FIX: Change type to Date for createdAt and updatedAt
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: () => new Date() },
+  updatedAt: { type: Date, default: () => new Date() },
 });
 
 marketWatchlistSchema.method('toShared', function(this: MarketWatchlistDocumentType): SharedMarketWatchlist {
@@ -227,8 +227,8 @@ const dailySummarySchema = new mongoose.Schema<DailySummaryDocumentType>({
   date: { type: String, required: true }, // YYYY-MM-DD format
   summary: { type: String, required: true },
   // FIX: Change type to Date for createdAt and updatedAt
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: () => new Date() },
+  updatedAt: { type: Date, default: () => new Date() },
 });
 
 dailySummarySchema.method('toShared', function(this: DailySummaryDocumentType): SharedDailySummary {
@@ -240,11 +240,11 @@ const notificationSchema = new mongoose.Schema<NotificationDocumentType>({
   agentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' },
   type: { type: String, required: true, enum: ['agentResearch', 'agentTrade', 'newMarkets', 'agentEngagement'] },
   message: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now },
+  timestamp: { type: Date, default: () => new Date() },
   wasSent: { type: Boolean, default: false },
   // FIX: Change type to Date for createdAt and updatedAt
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: () => new Date() },
+  updatedAt: { type: Date, default: () => new Date() },
 });
 
 notificationSchema.method('toShared', function(this: NotificationDocumentType): SharedNotification {
@@ -255,11 +255,11 @@ const transactionSchema = new mongoose.Schema<TransactionDocumentType>({
   type: { type: String, enum: ['send', 'receive', 'claim', 'stipend', 'escrow', 'room_purchase'], required: true },
   amount: { type: Number, required: true },
   description: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now },
+  timestamp: { type: Date, default: () => new Date() },
   ownerHandle: { type: String, required: true, ref: 'User' },
   // FIX: Change type to Date for createdAt and updatedAt
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: () => new Date() },
+  updatedAt: { type: Date, default: () => new Date() },
 });
 
 transactionSchema.method('toShared', function(this: TransactionDocumentType): SharedTransaction {
@@ -275,11 +275,11 @@ const tradeRecordSchema = new mongoose.Schema<TradeRecordDocumentType>({
   intelId: { type: mongoose.Schema.Types.ObjectId, ref: 'BettingIntel' },
   price: { type: Number, required: true },
   quantity: { type: Number, default: 1 },
-  timestamp: { type: Date, default: Date.now },
+  timestamp: { type: Date, default: () => new Date() },
   roomId: { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true },
   // FIX: Change type to Date for createdAt and updatedAt
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: () => new Date() },
+  updatedAt: { type: Date, default: () => new Date() },
 });
 
 tradeRecordSchema.method('toShared', function(this: TradeRecordDocumentType): SharedTradeRecord {
@@ -338,18 +338,18 @@ const connectDB = async () => {
     console.log('MongoDB connected successfully.');
 
     // Initialize collection references with proper typing
-    usersCollection = UserModel.collection;
-    agentsCollection = AgentModel.collection;
-    roomsCollection = RoomModel.collection;
-    betsCollection = BetModel.collection;
-    bountiesCollection = BountyModel.collection;
+    usersCollection = UserModel.collection as Collection<UserDocumentType & mongoose.Document>;
+    agentsCollection = AgentModel.collection as Collection<AgentDocumentType & mongoose.Document>;
+    roomsCollection = RoomModel.collection as Collection<RoomDocumentType & mongoose.Document>;
+    betsCollection = BetModel.collection as Collection<BetDocumentType & mongoose.Document>;
+    bountiesCollection = BountyModel.collection as Collection<BountyDocumentType & mongoose.Document>;
     activityLogCollection = mongoose.connection.collection<Document>('activity_logs');
-    tradeHistoryCollection = TradeRecordModel.collection;
-    transactionsCollection = TransactionModel.collection;
-    bettingIntelCollection = BettingIntelModel.collection;
-    marketWatchlistsCollection = MarketWatchlistModel.collection;
-    dailySummariesCollection = DailySummaryModel.collection;
-    notificationsCollection = NotificationModel.collection;
+    tradeHistoryCollection = TradeRecordModel.collection as Collection<TradeRecordDocumentType & mongoose.Document>;
+    transactionsCollection = TransactionModel.collection as Collection<TransactionDocumentType & mongoose.Document>;
+    bettingIntelCollection = BettingIntelModel.collection as Collection<BettingIntelDocumentType & mongoose.Document>;
+    marketWatchlistsCollection = MarketWatchlistModel.collection as Collection<MarketWatchlistDocumentType & mongoose.Document>;
+    dailySummariesCollection = DailySummaryModel.collection as Collection<DailySummaryDocumentType & mongoose.Document>;
+    notificationsCollection = NotificationModel.collection as Collection<NotificationDocumentType & mongoose.Document>;
 
     // Create indexes
     await Promise.all([
@@ -425,6 +425,8 @@ export async function seedDatabase() {
       activeOffer: null,
       vibe: 'General Chat ☕️',
       isOwned: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     });
   }
 

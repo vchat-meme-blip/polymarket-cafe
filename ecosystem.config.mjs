@@ -1,10 +1,10 @@
-
 export default {
   apps: [{
     name: "quants-cafe",
-    cwd: "/app",  // Use absolute path in container
-    script: "dist/server/index.js",  // Main script to run
+    cwd: "/app/dist/server",  // <-- IMPORTANT: Change CWD to the server build output directory
+    script: "index.js",  // <-- IMPORTANT: Script is now directly in CWD
     interpreter: "node",  // Use Node.js as interpreter
+    // REMOVED: node_args: "--import=tsx", // <-- IMPORTANT: Remove tsx dependency in production
     instances: 1,
     exec_mode: "fork",
     env: {
@@ -12,7 +12,7 @@ export default {
       PORT: 3001,
       HOST: "0.0.0.0",
       DOCKER_ENV: "true",
-      NODE_PATH: "/app/node_modules"
+      NODE_PATH: "/app/node_modules" // Still useful for resolving modules
     },
     env_production: {
       NODE_ENV: "production",

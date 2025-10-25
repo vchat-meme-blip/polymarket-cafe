@@ -49,6 +49,7 @@ export default defineConfig(({ mode }) => {
             emptyOutDir: true,
             // Improve chunking to address the large chunk warning
             rollupOptions: {
+                input: 'index.html', // Explicitly specify index.html as input
                 output: {
                     manualChunks: {
                         vendor: ['react', 'react-dom', 'three'],

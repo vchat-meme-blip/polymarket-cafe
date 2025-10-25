@@ -83,8 +83,8 @@ export class DashboardAgentDirector {
             modelUrl: agentDoc.modelUrl || '',
             bettingHistory: [], // Initialize as empty array since we don't need the actual bets here
             currentPnl: typeof agentDoc.currentPnl === 'number' ? agentDoc.currentPnl : 0,
-            bettingIntel: [],
-            marketWatchlists: [],
+            bettingIntel: agentDoc.bettingIntel?.map((id: any) => id.toString()) || [], // Convert ObjectId to string
+            marketWatchlists: agentDoc.marketWatchlists?.map((id: any) => id.toString()) || [], // Convert ObjectId to string
             boxBalance: typeof agentDoc.boxBalance === 'number' ? agentDoc.boxBalance : 0,
             portfolio: agentDoc.portfolio || {},
             // Optional fields
@@ -94,7 +94,10 @@ export class DashboardAgentDirector {
             operatingHours: agentDoc.operatingHours,
             mode: agentDoc.mode,
             templateId: agentDoc.templateId,
-            copiedFromId: agentDoc.copiedFromId
+            copiedFromId: agentDoc.copiedFromId,
+            createdAt: agentDoc.createdAt?.getTime() || Date.now(),
+            updatedAt: agentDoc.updatedAt?.getTime() || Date.now(),
+            lastActiveAt: agentDoc.lastActiveAt?.getTime() || Date.now(),
         };
 
         agentState.isBusy = true;

@@ -1,167 +1,91 @@
-import { Worker, WorkerOptions } from 'worker_threads';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+import { Worker, WorkerOptions } from 'node:worker_threads';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fs from 'node:fs'; // FIX: Import fs for fs.existsSync
 
 // Get the directory name in an ESM-compatible way
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Supported worker extensions in order of preference
-const WORKER_EXTENSIONS = ['.mjs', '.js', '.cjs', '.ts'];
-const isDocker = process.env.DOCKER_ENV === 'true';
-
-// Cache for resolved worker paths
-const workerPathCache = new Map<string, string>();
-
-/**
- * Resolve the full path to a worker file
- */
-function resolveWorkerPath(workerPath: string): string | null {
-  const cacheKey = `${process.env.NODE_ENV}:${workerPath}`;
-  if (workerPathCache.has(cacheKey)) {
-    return workerPathCache.get(cacheKey) || null;
-  }
-
+export function createWorker(workerPath: string, options?: WorkerOptions) {
   const isDev = process.env.NODE_ENV !== 'production';
-  const cwd = isDocker ? '/app' : process.cwd();
+  const isDocker = process.env.DOCKER_ENV === 'true';
   
-  // Possible base directories to search
-  const baseDirs = [
-    cwd,
-    path.join(cwd, 'dist/server'),
-    path.join(cwd, 'dist'),
-    path.join(cwd, 'server')
-  ];
-
-  // Possible subdirectories to check
-  const workerDirs = [
-    'workers',
-    'dist/workers',
-    'dist/server/workers',
-    'server/workers',
-    ''
-  ];
-
-  // Worker name without extension
-  const workerName = path.basename(workerPath, path.extname(workerPath));
-  
-  // Try different naming patterns
-  const possibleNames = [
-    workerName.endsWith('.worker') ? workerName : `${workerName}.worker`,
-    workerName.endsWith('.worker') ? workerName.replace(/\.worker$/, '') : workerName
-  ];
-
-  // Try all combinations of base dirs, worker dirs, names and extensions
-  for (const baseDir of baseDirs) {
-    for (const workerDir of workerDirs) {
-      for (const name of possibleNames) {
-        for (const ext of WORKER_EXTENSIONS) {
-          const fullPath = path.join(baseDir, workerDir, `${name}${ext}`);
-          if (fs.existsSync(fullPath)) {
-            console.log(`[Worker Loader] Found worker at: ${fullPath}`);
-            workerPathCache.set(cacheKey, fullPath);
-            return fullPath;
-          }
-        }
-      }
-    }
-  }
-
-  // Try direct path if not found in search paths
-  if (fs.existsSync(workerPath)) {
-    const resolvedPath = path.resolve(workerPath);
-    workerPathCache.set(cacheKey, resolvedPath);
-    return resolvedPath;
-  }
-
-  console.error(`[Worker Loader] Worker file not found: ${workerPath}`);
-  console.error('[Worker Loader] Searched in:', {
-    baseDirs,
-    workerDirs,
-    possibleNames,
-    extensions: WORKER_EXTENSIONS
-  });
-  
-  return null;
-}
-
-/**
- * Creates and configures a worker thread with proper error handling and module resolution
- */
-export function createWorker(workerPath: string, options: WorkerOptions = {}): Worker {
-  const isDev = process.env.NODE_ENV !== 'production';
-  const workerName = path.basename(workerPath, path.extname(workerPath));
-  
-  console.log(`[Worker Loader] Initializing worker: ${workerName}`);
-  
-  // Resolve the worker file path
-  const resolvedPath = resolveWorkerPath(workerPath);
-  
-  if (!resolvedPath) {
-    throw new Error(`Worker file not found: ${workerPath}`);
-  }
-
-  // Configure worker options
   const workerOptions: WorkerOptions = {
     ...options,
     workerData: {
-      ...(options.workerData || {}),
-      __filename: resolvedPath,
-      __dirname: path.dirname(resolvedPath),
-      workerPath: resolvedPath,
-      isDocker,
-      NODE_ENV: process.env.NODE_ENV
+      ...(options?.workerData || {})
     },
-    // Enable ES modules and source maps
     execArgv: [
-      ...(options.execArgv || []),
-      ...(isDev ? ['--loader', 'ts-node/esm'] : []),
-      '--no-warnings',
-      '--experimental-modules',
-      '--es-module-specifier-resolution=node'
-    ].filter(Boolean),
-    env: {
-      ...process.env,
-      NODE_OPTIONS: '--experimental-modules --es-module-specifier-resolution=node',
-      NODE_ENV: process.env.NODE_ENV || 'production'
-    }
+      ...(options?.execArgv || []),
+      ...(isDev ? ['--loader', 'ts-node/esm'] : [])
+    ]
   };
 
-  console.log(`[Worker Loader] Loading worker from: ${resolvedPath}`);
-  console.log(`[Worker Loader] Worker options:`, {
-    ...workerOptions,
-    workerData: { ...workerOptions.workerData, __filename: 'REDACTED' }
-  });
-
-  try {
-    // Create and configure the worker
-    const worker = new Worker(resolvedPath, workerOptions);
-
-    // Set up error handling
-    worker.on('error', (error: Error) => {
-      console.error(`[Worker ${workerName}] Error:`, error);
-    });
-
-    worker.on('exit', (code: number) => {
-      if (code !== 0) {
-        console.error(`[Worker ${workerName}] Worker stopped with exit code ${code}`);
+  let finalPath: string;
+  
+  if (isDev) {
+    // In development, use the TypeScript files directly
+    const resolvedPath = path.resolve(__dirname, workerPath);
+    finalPath = !workerPath.endsWith('.ts') && !workerPath.endsWith('.js')
+      ? `${resolvedPath}.ts`
+      : resolvedPath;
+  } else {
+    // In production, handle Docker environment
+    const basePath = isDocker ? '/app/dist' : path.resolve(__dirname, '..');
+    const workerName = path.basename(workerPath, '.worker');
+    // Try multiple possible paths and extensions
+    const possiblePaths = [
+      // Try with .mjs extension first (ES Modules)
+      path.join(basePath, 'workers', `${workerName}.worker.mjs`),
+      path.join(basePath, 'workers', `${workerName}.mjs`),
+      // Then try with .js extension (CommonJS)
+      path.join(basePath, 'workers', `${workerName}.worker.js`),
+      path.join(basePath, 'workers', `${workerName}.js`),
+      // Also try in server/workers directory
+      path.join(basePath, 'server', 'workers', `${workerName}.worker.mjs`),
+      path.join(basePath, 'server', 'workers', `${workerName}.mjs`),
+      path.join(basePath, 'server', 'workers', `${workerName}.worker.js`),
+      path.join(basePath, 'server', 'workers', `${workerName}.js`)
+    ];
+    
+    console.log('[Worker Loader] Looking for worker in paths:', possiblePaths);
+    
+    // Find the first existing path
+    const existingPath = possiblePaths.find(p => {
+      try {
+        // FIX: Replaced require.resolve with fs.existsSync for ESM compatibility.
+        return fs.existsSync(p);
+      } catch {
+        return false;
       }
     });
-
-    worker.on('online', () => {
-      console.log(`[Worker ${workerName}] Worker is online`);
-    });
-
-    if (process.env.NODE_ENV !== 'production') {
-      worker.on('message', (message: unknown) => {
-        console.log(`[Worker ${workerName}] Message:`, message);
-      });
+    
+    if (!existingPath) {
+      throw new Error(`Worker file not found. Tried: ${possiblePaths.join(', ')}`);
     }
+    
+    finalPath = existingPath;
+  }
 
+  console.log(`[Worker Loader] Starting worker at: ${finalPath}`);
+  
+  try {
+    const worker = new Worker(finalPath, workerOptions);
+    
+    worker.on('error', (error) => {
+      console.error(`[Worker ${worker.threadId}] Error:`, error);
+    });
+    
+    worker.on('exit', (code) => {
+      if (code !== 0) {
+        console.error(`[Worker ${worker.threadId}] stopped with exit code ${code}`);
+      }
+    });
+    
     return worker;
   } catch (error) {
-    console.error(`[Worker ${workerName}] Failed to create worker:`, error);
+    console.error(`[Worker Loader] Failed to start worker at ${finalPath}:`, error);
     throw error;
   }
 }
