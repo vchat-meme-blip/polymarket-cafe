@@ -83,20 +83,25 @@ RUN echo "Build output verification:" && \
 # Verify the server entry point
 RUN set -e; \
     echo "Verifying server entry point..."; \
-    if [ -f "/app/dist/server/index.js" ]; then \
-        ENTRYPOINT="/app/dist/server/index.js"; \
-    elif [ -f "/app/dist/index.js" ]; then \
-        ENTRYPOINT="/app/dist/index.js"; \
+    echo "Build output in /app/dist:"; \
+    find /app/dist -type f | sort; \
+    \
+    # Check for server entry point in the correct location
+    if [ -f "/app/dist/server/server/index.js" ]; then \
+        ENTRYPOINT="/app/dist/server/server/index.js"; \
     else \
-        echo "Error: No server entry point found"; \
-        echo "Build output in /app/dist:"; \
-        find /app/dist -maxdepth 2 -type f; \
+        echo "Error: Server entry point not found at /app/dist/server/server/index.js"; \
+        echo "Build output in /app/dist/server/server:"; \
+        ls -la /app/dist/server/server/ 2>/dev/null || echo "No server files found in /app/dist/server/server"; \
         exit 1; \
     fi; \
-    echo "Found server entry point at $ENTRYPOINT"; \
-    echo "First 10 lines of server entry point:"; \
+    \
+    echo "✅ Found server entry point at: $ENTRYPOINT"; \
+    echo "File size: $(ls -lh "$ENTRYPOINT" | awk '{print $5}')"; \
+    echo "First 10 lines of entry point:"; \
     head -n 10 "$ENTRYPOINT" || true; \
-    echo "..."; \
+    \
+    # Write entry point path for later use
     echo "$ENTRYPOINT" > /app/.entrypoint-path; \
     echo "Will use entry point: $(cat /app/.entrypoint-path)"
 
@@ -202,4 +207,4 @@ exec node --no-warnings "$ENTRYPOINT_PATH"
 EOF
 
 # Start the application using the resolved entry point
-CMD ["node", "$ENTRYPOINT_PATH"]
+CMD ["sh", "-c", "node /app/dist/server/server/index.js"]
