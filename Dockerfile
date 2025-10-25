@@ -54,25 +54,14 @@ COPY --from=builder /app/dist/server/ /app/dist/server/
 # Copy and rename worker files from .js to .mjs
 RUN echo "Copying and renaming worker files..." && \
     mkdir -p /app/dist/server/server/workers && \
-    # Copy and rename .js worker files to .mjs in server/workers
-    if [ -d "/app/dist/server/workers" ]; then \
-        for file in /app/dist/server/workers/*.worker.js; do \
-            if [ -f "$file" ]; then \
-                cp "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
-                echo "Copied $file to /app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
-            fi; \
-        done; \
-    fi && \
-    # Also check the root workers directory
-    if [ -d "/app/dist/workers" ]; then \
-        for file in /app/dist/workers/*.worker.js; do \
-            if [ -f "$file" ]; then \
-                cp "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
-                echo "Copied $file to /app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
-            fi; \
-        done; \
-    fi && \
-    # Verify the files were copied
+    # First, copy all worker files to the target directory with .mjs extension
+    find /app/dist -name "*.worker.js" | while read file; do \
+        if [ -f "$file" ]; then \
+            cp "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+            echo "Copied $file to /app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+        fi; \
+    done && \
+    # Verify the files were copied with .mjs extension
     echo "Worker files in /app/dist/server/server/workers/:" && \
     ls -la /app/dist/server/server/workers/ 2>/dev/null || echo "No worker files found"
 
@@ -94,16 +83,20 @@ COPY --from=builder /app/.env* ./
 
 # Create symlinks for backward compatibility (using .mjs extension)
 RUN if [ -d "/app/dist/server/server/workers" ]; then \
+        # Create .js symlinks for all .mjs worker files
         for file in /app/dist/server/server/workers/*.mjs; do \
             if [ -f "$file" ]; then \
                 ln -sf "$file" "/app/dist/server/workers/$(basename "$file" .mjs).js" 2>/dev/null || true; \
+                # Also create a .mjs symlink in the same directory for consistency
+                ln -sf "$file" "/app/dist/server/workers/$(basename "$file")" 2>/dev/null || true; \
             fi; \
         done; \
-    fi && \
-    if [ -d "/app/dist/workers" ]; then \
-        for file in /app/dist/workers/*.worker.js; do \
+        # Also ensure the workers directory is accessible from the root
+        mkdir -p /app/dist/workers && \
+        for file in /app/dist/server/server/workers/*.mjs; do \
             if [ -f "$file" ]; then \
-                ln -sf "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs" 2>/dev/null || true; \
+                ln -sf "$file" "/app/dist/workers/$(basename "$file" .mjs).js" 2>/dev/null || true; \
+                ln -sf "$file" "/app/dist/workers/$(basename "$file")" 2>/dev/null || true; \
             fi; \
         done; \
     fi
