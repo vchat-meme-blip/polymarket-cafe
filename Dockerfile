@@ -51,13 +51,30 @@ RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/clie
 # Copy built files from builder
 COPY --from=builder /app/dist/server/ /app/dist/server/
 
-# Copy workers if they exist
-RUN if [ -d "/app/dist/workers" ]; then \
-      echo "Copying workers from dist/workers" && \
-      cp -r /app/dist/workers/* /app/dist/workers/ 2>/dev/null || true; \
-    else \
-      echo "No workers directory found in dist/workers"; \
-    fi
+# Copy and rename worker files from .js to .mjs
+RUN echo "Copying and renaming worker files..." && \
+    mkdir -p /app/dist/server/server/workers && \
+    # Copy and rename .js worker files to .mjs in server/workers
+    if [ -d "/app/dist/server/workers" ]; then \
+        for file in /app/dist/server/workers/*.worker.js; do \
+            if [ -f "$file" ]; then \
+                cp "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+                echo "Copied $file to /app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+            fi; \
+        done; \
+    fi && \
+    # Also check the root workers directory
+    if [ -d "/app/dist/workers" ]; then \
+        for file in /app/dist/workers/*.worker.js; do \
+            if [ -f "$file" ]; then \
+                cp "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+                echo "Copied $file to /app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+            fi; \
+        done; \
+    fi && \
+    # Verify the files were copied
+    echo "Worker files in /app/dist/server/server/workers/:" && \
+    ls -la /app/dist/server/server/workers/ 2>/dev/null || echo "No worker files found"
 
 # Copy client files
 COPY --from=builder /app/dist/client/ /app/dist/client/
@@ -75,8 +92,21 @@ COPY --from=builder /app/ecosystem.config.* ./
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.env* ./
 
-# Create symlinks for backward compatibility
-RUN ln -sf /app/dist/workers/* /app/dist/server/workers/ 2>/dev/null || echo "No workers to link"
+# Create symlinks for backward compatibility (using .mjs extension)
+RUN if [ -d "/app/dist/server/server/workers" ]; then \
+        for file in /app/dist/server/server/workers/*.mjs; do \
+            if [ -f "$file" ]; then \
+                ln -sf "$file" "/app/dist/server/workers/$(basename "$file" .mjs).js" 2>/dev/null || true; \
+            fi; \
+        done; \
+    fi && \
+    if [ -d "/app/dist/workers" ]; then \
+        for file in /app/dist/workers/*.worker.js; do \
+            if [ -f "$file" ]; then \
+                ln -sf "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs" 2>/dev/null || true; \
+            fi; \
+        done; \
+    fi
 
 # Verify the build output
 RUN echo "Build output verification:" && \
