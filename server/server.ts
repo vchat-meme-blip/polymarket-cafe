@@ -8,15 +8,7 @@ import { Worker as NodeWorker } from 'worker_threads';
 // FIX: Replaced global augmentation with module augmentation for 'express-serve-static-core'.
 // This is the recommended way to augment Express's Request object and resolves all
 // related type errors for req properties, app.use(), app.get(), and res.sendFile().
-declare module 'express-serve-static-core' {
-  interface Request {
-    arenaWorker?: NodeWorker;
-    resolutionWorker?: NodeWorker;
-    dashboardWorker?: NodeWorker;
-    autonomyWorker?: NodeWorker;
-    marketWatcherWorker?: NodeWorker;
-  }
-}
+// The global augmentation is now in `src/vite-env.d.ts` and should be picked up.
 
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';

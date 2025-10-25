@@ -9,6 +9,8 @@ RUN apk add --no-cache python3 make g++
 # Copy package files and install all dependencies
 COPY package*.json ./
 COPY tsconfig*.json ./
+# FIX: Copy jsconfig.json as it might be used by some tools
+COPY jsconfig.json ./
 
 # Install dependencies and development tools
 RUN npm install -g typescript@5.3.3 && \
@@ -21,22 +23,11 @@ COPY . .
 RUN echo "Building client..." && \
     npm run build:client
 
-# Build server first
+# Build server separately to handle any specific requirements
+# The tsconfig.server.json should now correctly output to dist/server
 RUN echo "Building server..." && \
     npm run build:server && \
     npm run postbuild:server
-
-# Build workers into the server directory
-RUN echo "Building workers..." && \
-    mkdir -p dist/workers && \
-    for worker in $(find server/workers -name "*.worker.ts"); do \
-        worker_name=$(basename $worker .ts); \
-        echo "Building worker: $worker_name"; \
-        npx tsc $worker --outDir dist/workers --module commonjs --target es2020 --moduleResolution node; \
-        # Copy to server/workers for development
-        mkdir -p server/workers/compiled; \
-        cp "dist/workers/$worker_name.js" "server/workers/compiled/$worker_name.js" || true; \
-    done
 
 # ---- Production Stage ----
 FROM node:22-alpine
@@ -52,88 +43,44 @@ ENV VITE_SOCKET_URL=${VITE_SOCKET_URL}
 ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
 ENV DOCKER_ENV=true
 ENV NODE_ENV=production
+# FIX: Set a default PORT for consistency, although docker-compose overrides it
+ENV PORT=3001
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps
 
 # Create necessary directories
-RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client /app/workers
+# FIX: Simplified worker directory structure, as tsconfig.server.json now places workers directly in dist/server/workers
+RUN mkdir -p /app/dist/server/workers /app/logs /app/dist/client
 
 # Copy built files from builder
+# FIX: Copy dist/server first, which now correctly contains the compiled server and worker files
 COPY --from=builder /app/dist/server/ /app/dist/server/
-
-# Create workers directory
-RUN mkdir -p /app/dist/workers /app/workers
-
-# Copy worker-loader.js to handle all worker initialization
-COPY --from=builder /app/dist/server/worker-loader.js /app/dist/server/worker-loader.js
-
-# Create a simple worker shim that uses the worker-loader
-RUN echo '\
-const { createWorker } = require("./dist/server/worker-loader.js");
-const workerName = process.env.WORKER_NAME || "dummy";
-console.log(`Starting worker: ${workerName}`);
-
-// Create the worker with the given name
-const worker = createWorker(`./${workerName}.worker.js`, {
-  workerData: {
-    __workerName: workerName,
-    ...(process.env.WORKER_DATA ? JSON.parse(process.env.WORKER_DATA) : {})
-  }
-});
-
-// Forward messages to stdout for logging
-worker.on("message", (msg) => {
-  console.log(`[${workerName}]`, msg);
-});
-
-worker.on("error", (err) => {
-  console.error(`[${workerName} Error]`, err);
-});
-
-worker.on("exit", (code) => {
-  console.log(`[${workerName}] Worker exited with code ${code}`);
-  if (code !== 0) {
-    process.exit(code);
-  }
-});
-' > /app/worker-shim.js
-
-# Verify workers were copied
-RUN echo "Verifying workers were copied..." && \
-    echo "Workers in /app/dist/workers/:" && ls -la /app/dist/workers/ 2>/dev/null || echo "No workers in /app/dist/workers/" && \
-    echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/" && \
-    echo "\nWorkers in /app/workers/:" && ls -la /app/workers/ 2>/dev/null || echo "No workers in /app/workers/"
-
-# Copy other necessary files
+# Copy client files
 COPY --from=builder /app/dist/client/ /app/dist/client/
+# Copy public assets
 COPY --from=builder /app/public/ /app/public/
+# Copy PM2 config and env files
 COPY --from=builder /app/ecosystem.config.* ./
-COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.env* ./
 
-# Verify workers were copied
-RUN echo "Workers in /app/dist/workers/:" && ls -la /app/dist/workers/ 2>/dev/null || echo "No workers in /app/dist/workers/" && \
-    echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/"
+# FIX: Removed symlink creation - no longer necessary with corrected build output
+# The tsconfig.server.json 'rootDir' fix ensures workers are compiled directly to /app/dist/server/workers
 
 # Verify the build output
 RUN echo "Build output verification:" && \
-    echo "\nServer files:" && ls -la /app/dist/server/ && \
-    echo "\nWorkers in /app/dist/workers/:" && ls -la /app/dist/workers/ 2>/dev/null || echo "No workers in /app/dist/workers/" && \
+    echo "\nServer files in /app/dist/server/:" && ls -la /app/dist/server/ && \
     echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/" && \
-    echo "\nClient files:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found"
+    echo "\nClient files in /app/dist/client/:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found"
 
-COPY --from=builder /app/server/env.ts ./dist/server/
+# FIX: Removed copying server/env.ts - it should be compiled by build:server
+# The `server/index.ts` (now compiled to `dist/server/index.js` or `.mjs`) handles `dotenv.config()`
 
 # Verify the build output, surface entry point, and persist it for runtime
 RUN set -e; \
     echo "Verifying build..."; \
-    if [ -f "/app/dist/server/server/index.mjs" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.mjs"; \
-    elif [ -f "/app/dist/server/server/index.js" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.js"; \
-    elif [ -f "/app/dist/server/index.mjs" ]; then \
+    if [ -f "/app/dist/server/index.mjs" ]; then \
         ENTRYPOINT="/app/dist/server/index.mjs"; \
     elif [ -f "/app/dist/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/index.js"; \
@@ -153,7 +100,7 @@ RUN set -e; \
 # Set working directory to the app root
 WORKDIR /app
 
-# Health check
+# Health check - Note: PORT environment variable should be used here, matching docker-compose
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/api/health || exit 1
 
@@ -185,8 +132,6 @@ resolve_entrypoint() {
   fi
 
   for candidate in \
-    /app/dist/server/server/index.mjs \
-    /app/dist/server/server/index.js \
     /app/dist/server/index.mjs \
     /app/dist/server/index.js; do
     if [ -f "$candidate" ]; then

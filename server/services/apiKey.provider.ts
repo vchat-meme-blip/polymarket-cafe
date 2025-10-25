@@ -53,7 +53,7 @@ class ApiKeyProvider {
           this.pendingRequests.delete(requestId);
           resolve(null); // Resolve with null after timeout
         }
-      }, this.MAX_WAIT_TIME) as any;
+      }, this.MAX_WAIT_TIME);
       
       this.requestTimeouts.set(requestId, timeout);
       this.pendingRequests.set(requestId, resolve);
