@@ -24,10 +24,10 @@ COPY tsconfig*.json ./
 # FIX: Copy jsconfig.json as it might be used by some tools
 COPY jsconfig.json ./
 
-# Install pnpm using npm with --global-style to avoid permission issues
-RUN npm install -g pnpm@8.15.4 --global-style --no-fund --no-audit && \
+# Install pnpm using npm with --no-bin-links to avoid symlink issues
+RUN npm install -g pnpm@8.15.4 --no-bin-links --no-fund --no-audit && \
     # Install TypeScript and type definitions locally
-    npm install -g typescript@5.3.3 @types/node@20.11.19 --no-fund --no-audit
+    npm install -g typescript@5.3.3 @types/node@20.11.19 --no-bin-links --no-fund --no-audit
 # Install root dependencies, handle missing lockfile
 RUN if [ -f "pnpm-lock.yaml" ]; then \
         pnpm install --frozen-lockfile; \
@@ -82,7 +82,7 @@ COPY package*.json ./
 COPY pnpm-lock.yaml* ./
 
 # Install pnpm in production stage
-RUN npm install -g pnpm@8.15.4 --global-style --no-fund --no-audit
+RUN npm install -g pnpm@8.15.4 --no-bin-links --no-fund --no-audit
 
 # Install production dependencies using pnpm
 RUN pnpm install --prod --no-frozen-lockfile
