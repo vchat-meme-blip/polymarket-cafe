@@ -21,20 +21,22 @@ COPY . .
 RUN echo "Building client..." && \
     npm run build:client
 
-# Build workers first
+# Build server first
+RUN echo "Building server..." && \
+    npm run build:server && \
+    npm run postbuild:server
+
+# Build workers into the server directory
 RUN echo "Building workers..." && \
     mkdir -p dist/workers && \
     for worker in $(find server/workers -name "*.worker.ts"); do \
         worker_name=$(basename $worker .ts); \
         echo "Building worker: $worker_name"; \
-        npx tsc $worker --outDir dist/workers --module es2020 --target es2020 --moduleResolution node && \
-        cp "dist/workers/$worker_name.js" "dist/workers/$worker_name.mjs" || true; \
+        npx tsc $worker --outDir dist/workers --module commonjs --target es2020 --moduleResolution node; \
+        # Copy to server/workers for development
+        mkdir -p server/workers/compiled; \
+        cp "dist/workers/$worker_name.js" "server/workers/compiled/$worker_name.js" || true; \
     done
-
-# Build server separately to handle any specific requirements
-RUN echo "Building server..." && \
-    npm run build:server && \
-    npm run postbuild:server
 
 # ---- Production Stage ----
 FROM node:22-alpine
@@ -61,10 +63,42 @@ RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/clie
 # Copy built files from builder
 COPY --from=builder /app/dist/server/ /app/dist/server/
 
-# Copy workers from builder to all possible locations for compatibility
-COPY --from=builder /app/dist/workers/ /app/dist/workers/
-COPY --from=builder /app/dist/workers/ /app/dist/server/workers/
-COPY --from=builder /app/dist/workers/ /app/workers/
+# Create workers directory
+RUN mkdir -p /app/dist/workers /app/workers
+
+# Copy worker-loader.js to handle all worker initialization
+COPY --from=builder /app/dist/server/worker-loader.js /app/dist/server/worker-loader.js
+
+# Create a simple worker shim that uses the worker-loader
+RUN echo '\
+const { createWorker } = require("./dist/server/worker-loader.js");
+const workerName = process.env.WORKER_NAME || "dummy";
+console.log(`Starting worker: ${workerName}`);
+
+// Create the worker with the given name
+const worker = createWorker(`./${workerName}.worker.js`, {
+  workerData: {
+    __workerName: workerName,
+    ...(process.env.WORKER_DATA ? JSON.parse(process.env.WORKER_DATA) : {})
+  }
+});
+
+// Forward messages to stdout for logging
+worker.on("message", (msg) => {
+  console.log(`[${workerName}]`, msg);
+});
+
+worker.on("error", (err) => {
+  console.error(`[${workerName} Error]`, err);
+});
+
+worker.on("exit", (code) => {
+  console.log(`[${workerName}] Worker exited with code ${code}`);
+  if (code !== 0) {
+    process.exit(code);
+  }
+});
+' > /app/worker-shim.js
 
 # Verify workers were copied
 RUN echo "Verifying workers were copied..." && \
