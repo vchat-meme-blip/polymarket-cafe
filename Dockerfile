@@ -25,10 +25,32 @@ RUN echo "Building client..." && \
 
 # Build server and workers
 RUN echo "Building server and workers..." && \
+    # Build server first
     npm run build:server && \
+    # Build workers with proper module type
     npm run build:workers && \
+    # Run post-build steps
     npm run postbuild:server && \
-    npm run postbuild:workers
+    npm run postbuild:workers && \
+    # Create the workers directory if it doesn't exist
+    mkdir -p /app/dist/server/server/workers && \
+    # Ensure workers are in the correct location with .mjs extension
+    for worker in arena market-watcher dashboard autonomy resolution; do \
+      # Check and rename worker files to .mjs if they exist
+      if [ -f "/app/dist/server/server/workers/$worker.worker.js" ]; then \
+        mv "/app/dist/server/server/workers/$worker.worker.js" "/app/dist/server/server/workers/$worker.worker.mjs"; \
+      fi; \
+      if [ -f "/app/dist/server/server/workers/$worker.js" ]; then \
+        mv "/app/dist/server/server/workers/$worker.js" "/app/dist/server/server/workers/$worker.worker.mjs"; \
+      fi; \
+      # Copy from root workers directory if needed
+      if [ -f "/app/dist/server/workers/$worker.worker.js" ]; then \
+        cp "/app/dist/server/workers/$worker.worker.js" "/app/dist/server/server/workers/$worker.worker.mjs"; \
+      fi; \
+    done && \
+    # Verify workers were created
+    echo "Worker files in /app/dist/server/server/workers:" && \
+    ls -la /app/dist/server/server/workers/ || echo "No worker files found"
 
 # ---- Production Stage ----
 FROM node:22-alpine
@@ -60,41 +82,33 @@ COPY --from=builder /app/dist/ /app/dist/
 # Ensure all necessary directories exist
 RUN mkdir -p /app/dist/client /public /app/logs
 
-# Copy package files and configs
+# Copy necessary files from builder
 COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/ecosystem.config.* ./
-COPY --from=builder /app/.env* ./
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
 
-# Copy public assets if they exist
-RUN if [ -d "/app/public" ]; then cp -r /app/public/* /public/; fi
+# Set the working directory to the server directory
+WORKDIR /app/dist/server
 
-# FIX: Removed symlink creation - no longer necessary with corrected build output
-# The tsconfig.server.json 'rootDir' fix ensures workers are compiled directly to /app/dist/server/workers
+# Set the entry point to use ES modules
+ENTRYPOINT ["node", "--experimental-specifier-resolution=node", "--no-warnings", "server/index.js"]
 
-# Verify the build output
-# Verify the build output
-RUN echo "Build output verification:" && \
-    echo "\nServer files in /app/dist/:" && ls -la /app/dist/ && \
-    echo "\nServer files in /app/dist/server/:" && ls -la /app/dist/server/ 2>/dev/null || echo "No server files found in /app/dist/server/" && \
-    echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/" && \
-    echo "\nClient files in /app/dist/client/:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found" && \
-    echo "\nAll files in /app/dist:" && find /app/dist -maxdepth 3 -type f | sort
+# Health check configuration
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3001/api/health || exit 1
 
-# Verify the server entry point
+# Expose the port the app runs on
+EXPOSE 3001
+
+# Verify the build output and entry point
 RUN set -e; \
-    echo "Verifying server entry point..."; \
-    echo "Build output in /app/dist:"; \
-    find /app/dist -type f | sort; \
-    \
-    # Check for server entry point in the correct location
-    if [ -f "/app/dist/server/server/index.js" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.js"; \
-    else \
-        echo "Error: Server entry point not found at /app/dist/server/server/index.js"; \
-        echo "Build output in /app/dist/server/server:"; \
-        ls -la /app/dist/server/server/ 2>/dev/null || echo "No server files found in /app/dist/server/server"; \
-        exit 1; \
-    fi; \
+    echo "Build output verification:"; \
+    echo "\nServer files in /app/dist/:" && ls -la /app/dist/; \
+    echo "\nServer files in /app/dist/server/:" && ls -la /app/dist/server/ 2>/dev/null || echo "No server files found in /app/dist/server/"; \
+    echo "\nWorkers in /app/dist/server/workers/:" && ls -la /app/dist/server/workers/ 2>/dev/null || echo "No workers in /app/dist/server/workers/"; \
+    echo "\nClient files in /app/dist/client/:" && ls -la /app/dist/client/ 2>/dev/null || echo "No client files found"; \
+    echo "\nAll files in /app/dist (first level):" && find /app/dist -maxdepth 1 -type f | sort; \
+    echo "\nServer directory structure:" && find /app/dist/server -maxdepth 3 -type d | sort; \
     \
     echo "✅ Found server entry point at: $ENTRYPOINT"; \
     echo "File size: $(ls -lh "$ENTRYPOINT" | awk '{print $5}')"; \
