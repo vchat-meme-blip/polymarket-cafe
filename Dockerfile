@@ -3,8 +3,17 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apk add --no-cache python3 make g++
+# Install build dependencies and MongoDB tools
+RUN apk add --no-cache python3 make g++ \
+    # Add MongoDB tools and dependencies
+    && apk add --no-cache mongodb-tools \
+    # Install MongoDB client libraries
+    && apk add --no-cache --virtual .build-deps \
+        build-base \
+        python3-dev \
+        libffi-dev \
+        openssl-dev \
+        libc6-compat
 
 # Copy package files and install all dependencies
 COPY package*.json ./
@@ -15,7 +24,7 @@ COPY tsconfig*.json ./
 COPY jsconfig.json ./
 
 # Install dependencies and development tools
-RUN npm install -g pnpm
+RUN npm install -g pnpm typescript @types/node
 # Only use --frozen-lockfile if pnpm-lock.yaml exists
 RUN if [ -f "pnpm-lock.yaml" ]; then \
         pnpm install --frozen-lockfile; \
@@ -32,6 +41,9 @@ RUN echo "Building client..." && \
 
 # Build server and workers
 RUN echo "Building server and workers..." && \
+    # Install server dependencies
+    cd server && pnpm install --production=false && cd .. && \
+    # Build steps
     npm run build:server && \
     npm run build:workers && \
     npm run postbuild:server && \
