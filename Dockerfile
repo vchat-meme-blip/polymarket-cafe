@@ -24,10 +24,11 @@ COPY tsconfig*.json ./
 # FIX: Copy jsconfig.json as it might be used by some tools
 COPY jsconfig.json ./
 
-# Install pnpm and core dependencies
-RUN npm install -g pnpm@8.15.4 && \
-    # Install TypeScript and type definitions
-    pnpm add -g typescript@5.3.3 @types/node@20.11.19
+# Install pnpm and set up corepack
+RUN corepack enable && \
+    corepack prepare pnpm@8.15.4 --activate && \
+    # Install TypeScript and type definitions locally
+    npm install -g typescript@5.3.3 @types/node@20.11.19
 # Only use --frozen-lockfile if pnpm-lock.yaml exists
 # Install root dependencies
 RUN if [ -f "pnpm-lock.yaml" ]; then \
@@ -78,9 +79,15 @@ ENV NODE_ENV=production
 # FIX: Set a default PORT for consistency, although docker-compose overrides it
 ENV PORT=3001
 
-# Copy package files and install only production dependencies
+# Copy package files
 COPY package*.json ./
-RUN npm ci --only=production --legacy-peer-deps
+
+# Enable corepack and prepare pnpm
+RUN corepack enable && \
+    corepack prepare pnpm@8.15.4 --activate
+
+# Install production dependencies using pnpm
+RUN pnpm install --prod --frozen-lockfile
 
 # Create necessary directories
 RUN mkdir -p /app/dist/server/workers /app/dist/client /app/logs
