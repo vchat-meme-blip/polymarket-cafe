@@ -4,31 +4,38 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache python3 make g++ git
 
-# Copy package files and install all dependencies
+# Copy package files first for better layer caching
 COPY package*.json ./
 COPY tsconfig*.json ./
-# FIX: Copy jsconfig.json as it might be used by some tools
 COPY jsconfig.json ./
 
-# Install dependencies and development tools
+# Install dependencies with specific versions for stability
 RUN npm install -g typescript@5.3.3 && \
     npm install --save-dev @types/node@22.14.0 && \
-    npm ci --legacy-peer-deps
-# Copy the rest of the application
-COPY . .
+    npm ci --legacy-peer-deps --prefer-offline
+
+# Set build-time environment variables
+ENV NODE_ENV=production
+ENV DOCKER_ENV=true
 
 # Build the application
 RUN echo "Building client..." && \
     npm run build:client
 
-# Build server and workers
+# Build server and workers with source maps for better debugging
 RUN echo "Building server and workers..." && \
     npm run build:server && \
     npm run build:workers && \
     npm run postbuild:server && \
-    npm run postbuild:workers
+    npm run postbuild:workers && \
+    # Ensure worker files have proper permissions
+    chmod +x /app/dist/server/workers/*.mjs
+
+# Create a production node_modules with only production dependencies
+RUN rm -rf node_modules && \
+    npm ci --only=production --prefer-offline
 
 # ---- Production Stage ----
 FROM node:22-alpine
@@ -38,18 +45,25 @@ RUN apk add --no-cache libusb udev curl
 
 WORKDIR /app
 
-# Set production environment
-ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-ENV VITE_SOCKET_URL=${VITE_SOCKET_URL}
-ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
-ENV DOCKER_ENV=true
+# Set production environment with defaults
 ENV NODE_ENV=production
-# FIX: Set a default PORT for consistency, although docker-compose overrides it
+ENV DOCKER_ENV=true
 ENV PORT=3001
+ENV NODE_OPTIONS="--experimental-modules --es-module-specifier-resolution=node"
 
-# Copy package files and install only production dependencies
-COPY package*.json ./
-RUN npm ci --only=production --legacy-peer-deps
+# Environment variables with defaults
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:3001}
+ENV VITE_SOCKET_URL=${VITE_SOCKET_URL:-ws://localhost:3001}
+ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL:-http://localhost:3001}
+
+# Copy only production node_modules from builder
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy built files
+COPY --from=builder /app/dist ./dist
+
+# Copy package.json for version info
+COPY --from=builder /app/package*.json ./
 
 # Create necessary directories
 RUN mkdir -p /app/dist/server/workers /app/dist/client /app/logs
@@ -64,14 +78,14 @@ COPY --from=builder /app/dist/server/ /app/dist/server/
 # Explicitly copy worker files
 COPY --from=builder /app/dist/server/workers/ /app/dist/server/workers/
 
-# Copy package files and configs
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/ecosystem.config.* ./
-COPY --from=builder /app/.env* ./
+# Ensure proper file ownership
+RUN chown -R node:node /app
 
-# Copy public assets if they exist
-RUN if [ -d "/app/public" ]; then cp -r /app/public/* /public/; fi
+# Switch to non-root user for security
+USER node
 
+# Set working directory to server for better path resolution
+WORKDIR /app/dist/server
 # Verify the build output
 RUN echo "Build output verification:" && \
     echo "\nServer files in /app/dist/:" && ls -la /app/dist/ && \

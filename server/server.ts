@@ -16,6 +16,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import * as fs from 'fs';
 
 import apiRouter from './routes/api.js';
 import { usersCollection, agentsCollection } from './db.js';
@@ -44,13 +45,6 @@ function setupWorkers() {
   try {
     console.log('[Server] Initializing workers...');
     
-    // In production, use .js files from the dist directory
-    // In development, use .ts files directly
-    const workerExt = process.env.NODE_ENV === 'production' ? '.js' : '.ts';
-    const workerBasePath = process.env.NODE_ENV === 'production' ? './dist/server/workers/' : './workers/';
-    
-    console.log(`[Server] Initializing workers from: ${workerBasePath} with extension: ${workerExt}`);
-    
     // Worker configurations
     const workerConfigs = [
       { name: 'arena', file: 'arena.worker' },
@@ -65,15 +59,28 @@ function setupWorkers() {
     
     for (const { name, file } of workerConfigs) {
       try {
-        const workerPath = path.join(workerBasePath, `${file}${workerExt}`);
-        console.log(`[Worker ${name}] Creating worker from: ${workerPath}`);
+        // In production, look for .mjs files, in development use .ts
+        const workerPath = process.env.NODE_ENV === 'production' 
+          ? `./dist/server/workers/${file}.mjs`
+          : `./workers/${file}.ts`;
+          
+        console.log(`[Server] Creating worker: ${name} from ${workerPath}`);
         
-        const worker = createWorker(workerPath);
+        const worker = createWorker(workerPath, {
+          workerData: {
+            workerName: name,
+            isProduction: process.env.NODE_ENV === 'production'
+          }
+        });
+        
         workers.set(name, worker);
         
         // Set up event handlers for each worker
         worker.on('online', () => {
           console.log(`[Worker ${name}] Started successfully`);
+          
+          // Notify worker it's ready
+          worker.postMessage({ type: 'workerReady' });
         });
         
         worker.on('error', (error: Error) => {
@@ -83,13 +90,20 @@ function setupWorkers() {
         worker.on('exit', (code: number) => {
           if (code !== 0) {
             console.error(`[Worker ${name}] Stopped with exit code ${code}`);
+            // Consider restarting the worker after a delay
+            setTimeout(() => {
+              console.log(`[Worker ${name}] Attempting to restart...`);
+              setupWorkers();
+            }, 5000);
           }
         });
         
         // Set up message handlers for each worker
         worker.on('message', (message: any) => {
+          if (!message || typeof message !== 'object') return;
+          
           // Handle socket.io message forwarding
-          if (message?.type === 'socketEmit') {
+          if (message.type === 'socketEmit') {
             if (message.room) {
               io.to(message.room).emit(message.event, message.payload);
             } else {
@@ -97,7 +111,7 @@ function setupWorkers() {
             }
           }
           // Handle worker-to-worker communication
-          else if (message?.type === 'forwardToWorker') {
+          else if (message.type === 'forwardToWorker') {
             const targetWorker = workers.get(message.worker);
             if (targetWorker) {
               targetWorker.postMessage(message.message);
@@ -106,28 +120,33 @@ function setupWorkers() {
             }
           }
           // Handle API key management
-          else if (message?.type === 'requestApiKey') {
+          else if (message.type === 'requestApiKey') {
             const key = apiKeyManager.getKey();
             worker.postMessage({
               type: 'apiKeyResponse',
               payload: {
                 key,
-                requestId: message.payload.requestId,
-                agentId: message.payload.agentId,
+                requestId: message.payload?.requestId,
+                agentId: message.payload?.agentId,
                 allKeysOnCooldown: key === null && apiKeyManager.areAllKeysOnCooldown()
               }
             });
           }
           // Handle rate limit reporting
-          else if (message?.type === 'reportRateLimit') {
-            apiKeyManager.reportRateLimit(message.payload.key, message.payload.durationSeconds);
+          else if (message.type === 'reportRateLimit') {
+            if (message.payload?.key) {
+              apiKeyManager.reportRateLimit(
+                message.payload.key, 
+                message.payload.durationSeconds || 60
+              );
+            }
           }
           // Handle cooldown status checks
-          else if (message?.type === 'checkAllKeysCooldown') {
+          else if (message.type === 'checkAllKeysCooldown') {
             worker.postMessage({
               type: 'allKeysCooldownResponse',
               payload: {
-                requestId: message.payload.requestId,
+                requestId: message.payload?.requestId,
                 allKeysOnCooldown: apiKeyManager.areAllKeysOnCooldown()
               }
             });
@@ -135,7 +154,7 @@ function setupWorkers() {
         });
       } catch (error) {
         console.error(`[Worker ${name}] Failed to initialize:`, error);
-        throw error; // Re-throw to be caught by the outer try-catch
+        // Don't throw here, try to continue with other workers
       }
     }
     
@@ -146,10 +165,26 @@ function setupWorkers() {
     autonomyWorker = workers.get('autonomy')!;
     marketWatcherWorker = workers.get('marketWatcher')!;
     
-    console.log('[Server] All workers initialized successfully');
+    // Verify all workers were created
+    const missingWorkers = workerConfigs
+      .filter(({ name }) => !workers.has(name))
+      .map(({ name }) => name);
+      
+    if (missingWorkers.length > 0) {
+      console.error(`[Server] Failed to initialize workers: ${missingWorkers.join(', ')}`);
+      if (process.env.NODE_ENV === 'production') {
+        // In production, exit if critical workers are missing
+        const criticalWorkers = ['arena', 'dashboard'];
+        if (criticalWorkers.some(worker => missingWorkers.includes(worker))) {
+          process.exit(1);
+        }
+      }
+    }
+    
+    console.log('[Server] Worker initialization complete');
   } catch (error) {
-    console.error('[Server] Failed to initialize workers:', error);
-    process.exit(1); // Exit if workers can't be initialized
+    console.error('[Server] Fatal error initializing workers:', error);
+    process.exit(1);
   }
 }
 
@@ -172,25 +207,46 @@ export async function startServer() {
   app.use(attachWorkers);
   app.use('/api', apiRouter);
 
+  // Serve static files in production
   if (process.env.NODE_ENV === 'production') {
-    // In production, the client files are in the dist/client directory
-    const clientPath = path.join(__dirname, '..', '..', 'client');
-    const distClientPath = path.join(__dirname, '..', 'client');
+    // Possible client paths in order of preference
+    const possibleClientPaths = [
+      path.join(__dirname, '..', 'client'),          // /dist/server/../client
+      path.join(__dirname, '..', '..', 'client'),    // /dist/server/../../client
+      path.join(process.cwd(), 'dist', 'client'),    // /app/dist/client
+      path.join(process.cwd(), 'client')             // /app/client
+    ];
     
-    // Try both possible locations for client files
-    app.use(express.static(distClientPath));
-    app.use(express.static(clientPath));
-    
-    // FIX: Use explicitly imported Request and Response types.
-    app.get('*', (req: Request, res: Response) => {
-      // Try to serve from dist/client first, then fall back to client
-      const indexPath = path.join(distClientPath, 'index.html');
-      if (require('fs').existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.sendFile(path.join(clientPath, 'index.html'));
+    // Find the first existing client directory
+    let clientPath = '';
+    for (const clientPathOption of possibleClientPaths) {
+      try {
+        if (fs.existsSync(clientPathOption) && fs.statSync(clientPathOption).isDirectory()) {
+          clientPath = clientPathOption;
+          console.log(`[Server] Serving client files from: ${clientPath}`);
+          break;
+        }
+      } catch (err) {
+        console.warn(`[Server] Error checking client path ${clientPathOption}:`, err);
       }
-    });
+    }
+    
+    if (!clientPath) {
+      console.error('[Server] Could not find client directory');
+    } else {
+      // Serve static files from the client directory
+      app.use(express.static(clientPath));
+      
+      // Serve index.html for all other routes (client-side routing)
+      app.get('*', (req: Request, res: Response) => {
+        const indexPath = path.join(clientPath, 'index.html');
+        if (fs.existsSync(indexPath)) {
+          res.sendFile(indexPath);
+        } else {
+          res.status(404).send('Client files not found');
+        }
+      });
+    }
   }
 
   io.on('connection', async (socket) => {
