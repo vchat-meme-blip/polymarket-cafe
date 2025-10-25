@@ -25,29 +25,41 @@ export function createWorker(workerPath: string, options?: WorkerOptions) {
   let finalPath: string;
   
   if (isDev) {
-    // In development, use the TypeScript files directly
-    const resolvedPath = path.resolve(__dirname, workerPath);
-    finalPath = !workerPath.endsWith('.ts') && !workerPath.endsWith('.js')
-      ? `${resolvedPath}.ts`
-      : resolvedPath;
+    // In development, use the TypeScript files directly from the server/workers directory
+    const workerName = path.basename(workerPath, '.worker');
+    finalPath = path.resolve(__dirname, 'workers', `${workerName}.worker.ts`);
+    
+    if (!fs.existsSync(finalPath)) {
+      throw new Error(`Worker file not found: ${finalPath}`);
+    }
   } else {
-    // In production, handle Docker environment
+    // In production, look in the correct dist directory
     const basePath = isDocker ? '/app/dist' : path.resolve(__dirname, '..');
     const workerName = path.basename(workerPath, '.worker');
-    // Try multiple possible paths and extensions
+    
+    // Try these paths in order
     const possiblePaths = [
-      // Try with .mjs extension first (ES Modules)
-      path.join(basePath, 'workers', `${workerName}.worker.mjs`),
-      path.join(basePath, 'workers', `${workerName}.mjs`),
-      // Then try with .js extension (CommonJS)
-      path.join(basePath, 'workers', `${workerName}.worker.js`),
-      path.join(basePath, 'workers', `${workerName}.js`),
-      // Also try in server/workers directory
-      path.join(basePath, 'server', 'workers', `${workerName}.worker.mjs`),
-      path.join(basePath, 'server', 'workers', `${workerName}.mjs`),
+      // First try the direct path if it was specified with extension
+      path.resolve(basePath, workerPath),
+      // Then try standard locations
       path.join(basePath, 'server', 'workers', `${workerName}.worker.js`),
-      path.join(basePath, 'server', 'workers', `${workerName}.js`)
+      path.join(basePath, 'dist', 'server', 'workers', `${workerName}.worker.js`),
+      path.join(basePath, 'dist', 'workers', `${workerName}.worker.js`),
+      // Also try without .worker in the filename
+      path.join(basePath, 'server', 'workers', `${workerName}.js`),
+      path.join(basePath, 'dist', 'server', 'workers', `${workerName}.js`),
+      path.join(basePath, 'dist', 'workers', `${workerName}.js`)
     ];
+    
+    // Find the first path that exists
+    const foundPath = possiblePaths.find(p => fs.existsSync(p));
+    
+    if (!foundPath) {
+      console.error('Worker file not found. Tried paths:', possiblePaths);
+      throw new Error(`Worker file not found for: ${workerName}`);
+    }
+    
+    finalPath = foundPath;
     
     console.log('[Worker Loader] Looking for worker in paths:', possiblePaths);
     

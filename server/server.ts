@@ -45,9 +45,45 @@ function createWorker(workerPath: string) {
 }
 
 function setupWorkers() {
-  arenaWorker = createWorker('./workers/arena.worker.mjs');
-  resolutionWorker = createWorker('./workers/resolution.worker.mjs');
-  dashboardWorker = createWorker('./workers/dashboard.worker.mjs');
+  try {
+    console.log('[Server] Initializing workers...');
+    
+    // In development, these point to .ts files in server/workers/
+    // In production, they'll be .js files in dist/server/workers/
+    const workerBasePath = process.env.NODE_ENV === 'production' ? './server/workers/' : './workers/';
+    
+    console.log(`[Server] Using worker base path: ${workerBasePath}`);
+    
+    arenaWorker = createWorker(`${workerBasePath}arena.worker`);
+    resolutionWorker = createWorker(`${workerBasePath}resolution.worker`);
+    dashboardWorker = createWorker(`${workerBasePath}dashboard.worker`);
+    
+    // Set up error handlers for each worker
+    const setupWorkerHandlers = (worker: NodeWorker, name: string) => {
+      worker.on('error', (error) => {
+        console.error(`[${name} Worker] Error:`, error);
+      });
+      
+      worker.on('exit', (code) => {
+        if (code !== 0) {
+          console.error(`[${name} Worker] Worker stopped with exit code ${code}`);
+        }
+      });
+      
+      worker.on('message', (message) => {
+        console.log(`[${name} Worker] Message:`, message);
+      });
+    };
+    
+    setupWorkerHandlers(arenaWorker, 'Arena');
+    setupWorkerHandlers(resolutionWorker, 'Resolution');
+    setupWorkerHandlers(dashboardWorker, 'Dashboard');
+    
+    console.log('[Server] Workers initialized successfully');
+  } catch (error) {
+    console.error('[Server] Failed to initialize workers:', error);
+    throw error; // Re-throw to prevent the server from starting without workers
+  }
   autonomyWorker = createWorker('./workers/autonomy.worker.mjs');
   marketWatcherWorker = createWorker('./workers/market-watcher.worker.mjs');
 
