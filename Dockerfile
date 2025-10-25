@@ -29,8 +29,7 @@ RUN corepack enable && \
     corepack prepare pnpm@8.15.4 --activate && \
     # Install TypeScript and type definitions locally
     npm install -g typescript@5.3.3 @types/node@20.11.19
-# Only use --frozen-lockfile if pnpm-lock.yaml exists
-# Install root dependencies
+# Install root dependencies, handle missing lockfile
 RUN if [ -f "pnpm-lock.yaml" ]; then \
         pnpm install --frozen-lockfile; \
     else \
@@ -79,15 +78,20 @@ ENV NODE_ENV=production
 # FIX: Set a default PORT for consistency, although docker-compose overrides it
 ENV PORT=3001
 
-# Copy package files
+# Copy package files and lockfile if it exists
 COPY package*.json ./
+COPY pnpm-lock.yaml* ./
 
 # Enable corepack and prepare pnpm
 RUN corepack enable && \
     corepack prepare pnpm@8.15.4 --activate
 
-# Install production dependencies using pnpm
-RUN pnpm install --prod --frozen-lockfile
+# Install production dependencies using pnpm, handle missing lockfile
+RUN if [ -f "pnpm-lock.yaml" ]; then \
+        pnpm install --prod --frozen-lockfile; \
+    else \
+        pnpm install --prod; \
+    fi
 
 # Create necessary directories
 RUN mkdir -p /app/dist/server/workers /app/dist/client /app/logs
