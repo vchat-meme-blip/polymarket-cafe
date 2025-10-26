@@ -39,15 +39,29 @@ export default defineConfig(({ mode }) => {
         server: {
             proxy: {
                 '/api': {
-                    target: 'http://localhost:3001',
+                    target: env.VITE_API_BASE_URL || 'http://localhost:3001',
                     changeOrigin: true,
                     secure: false,
+                    rewrite: (path) => path.replace(/^\/api/, '')
                 },
                 '/socket.io': {
-                    target: 'http://localhost:3001',
+                    target: env.VITE_SOCKET_URL || 'ws://localhost:3001',
+                    // Required for WebSocket connections
                     ws: true,
                     changeOrigin: true,
                     secure: false,
+                    configure: (proxy, _options) => {
+                        proxy.on('error', (err, _req, _res) => {
+                            console.error('Proxy error:', err);
+                        });
+                        proxy.on('proxyReq', (proxyReq, req, _res) => {
+                            console.log('Sending Request to the Target:', {
+                                method: req.method,
+                                url: req.url,
+                                headers: req.headers,
+                            });
+                        });
+                    }
                 }
             }
         },

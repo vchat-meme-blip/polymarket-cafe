@@ -106,18 +106,18 @@ app.use(cors(corsOptions));
 // Handle preflight requests
 app.options('*', cors(corsOptions));
 
-// Socket.IO with CORS
-const io = new SocketIOServer(server, {
+// Socket.IO configuration
+const socketConfig: any = {
   cors: {
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, success?: boolean) => void) => {
       // Allow all subdomains of sliplane.app in production
       if (isProduction && origin && origin.endsWith('.sliplane.app')) {
-        return callback(null, origin);
+        return callback(null, true);
       }
       
       // Check against allowed origins
       if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, origin);
+        return callback(null, true);
       }
       
       console.warn('[Socket.IO] Blocked connection from origin:', origin);
@@ -128,19 +128,55 @@ const io = new SocketIOServer(server, {
     credentials: true
   },
   allowEIO3: true,
-  transports: ['websocket', 'polling'],
-  // Enable debugging in development
-  ...(!isProduction && { 
-    cors: {
-      origin: true, // Allow all in development for easier testing
-      credentials: true
-    }
-  })
-});
+  transports: (process.env.WS_TRANSPORTS || 'websocket,polling').split(','),
+  path: process.env.WS_PATH || '/socket.io/',
+  serveClient: false,
+  connectTimeout: 30000,
+  pingTimeout: 25000,
+  pingInterval: 20000,
+};
+
+// In development, allow all origins for easier testing
+if (!isProduction) {
+  console.log('[Socket.IO] Running in development mode - allowing all origins');
+  socketConfig.cors = {
+    origin: true,
+    credentials: true
+  };
+}
+
+const io = new SocketIOServer(server, socketConfig);
 
 // Add connection state change logging
 io.engine.on("connection_error", (err) => {
-  console.error('[Socket.IO] Connection error:', err);
+  console.error('[Socket.IO] Connection error:', err.message);
+  console.error('Error details:', err);
+});
+
+// Log when a client connects
+io.on('connection', (socket) => {
+  const clientAddress = socket.handshake.address;
+  const clientOrigin = socket.handshake.headers.origin;
+  
+  console.log(`[Socket.IO] Client connected from ${clientAddress} (Origin: ${clientOrigin})`);
+  
+  socket.on('disconnect', (reason) => {
+    console.log(`[Socket.IO] Client disconnected. Reason: ${reason}`);
+  });
+  
+  socket.on('error', (error) => {
+    console.error('[Socket.IO] Socket error:', error);
+  });
+});
+
+// Log server startup
+server.listen(Number(process.env.PORT || 3001), process.env.HOST || '0.0.0.0', () => {
+  const address = server.address();
+  const port = typeof address === 'string' ? address : address?.port;
+  console.log(`[Server] WebSocket server listening on port ${port}`);
+  console.log(`[Server] WebSocket path: ${socketConfig.path}`);
+  console.log(`[Server] Allowed transports: ${socketConfig.transports.join(', ')}`);
+  console.log(`[Server] CORS enabled for origins: ${isProduction ? '*.sliplane.app' : allowedOrigins.join(', ')}`);
 });
 
 let arenaWorker: NodeWorker;
