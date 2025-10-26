@@ -247,7 +247,7 @@ document.getElementById('download-pdf').addEventListener('click', () => {
         const loader = new THREE.GLTFLoader();
         loader.register((parser) => new THREE_VRM.VRMLoaderPlugin(parser));
 
-        loader.load('/models/ironman.vrm', (gltf) => {
+        loader.load('models/ironman.vrm', (gltf) => {
             const vrm = gltf.userData.vrm;
             
             THREE_VRM.VRMUtils.rotateVRM0(vrm);
