@@ -23,6 +23,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import helmet from 'helmet';
 
 import apiRouter from './routes/api.js';
 import { usersCollection, agentsCollection } from './db.js';
@@ -31,13 +32,115 @@ import { ApiKeyManager } from './services/apiKey.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Configure allowed origins based on environment
+const isProduction = process.env.NODE_ENV === 'production';
+const productionDomains = [
+  'polymarketcafe.sliplane.app',
+  'polymarket-cafe.sliplane.app'  // Add all your production domains here
+];
+
+// Development origins
+const devOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://192.168.10.135:5173'
+];
+
+// Production origins - convert domains to https
+const prodOrigins = productionDomains.map(domain => `https://${domain}`);
+
+// Combine origins based on environment
+const allowedOrigins = isProduction ? prodOrigins : [...devOrigins, ...prodOrigins];
+
+// Log allowed origins for debugging (only in development)
+if (!isProduction) {
+  console.log('[Server] Running in development mode');
+  console.log('[Server] Allowed CORS origins:', allowedOrigins);
+}
+
 const app = express();
 const server = http.createServer(app);
+
+// Security headers
+app.use(helmet());
+app.disable('x-powered-by');
+
+// CORS configuration
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow all subdomains of sliplane.app in production
+    if (isProduction && origin.endsWith('.sliplane.app')) {
+      return callback(null, true);
+    }
+    
+    // Check against allowed origins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    const msg = `CORS policy: ${origin} not allowed`;
+    console.warn('[CORS] Blocked request from origin:', origin);
+    return callback(new Error(msg));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'x-user-handle',
+    'x-requested-with'
+  ],
+  exposedHeaders: [
+    'Content-Length',
+    'X-Request-Id'
+  ]
+};
+
+// Apply CORS with options
+app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
+
+// Socket.IO with CORS
 const io = new SocketIOServer(server, {
   cors: {
-    origin: "*", // Be more restrictive in production
-    methods: ["GET", "POST"]
-  }
+    origin: (origin, callback) => {
+      // Allow all subdomains of sliplane.app in production
+      if (isProduction && origin && origin.endsWith('.sliplane.app')) {
+        return callback(null, origin);
+      }
+      
+      // Check against allowed origins
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, origin);
+      }
+      
+      console.warn('[Socket.IO] Blocked connection from origin:', origin);
+      return callback(new Error('Not allowed by CORS'));
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["x-user-handle", "content-type", "authorization"],
+    credentials: true
+  },
+  allowEIO3: true,
+  transports: ['websocket', 'polling'],
+  // Enable debugging in development
+  ...(!isProduction && { 
+    cors: {
+      origin: true, // Allow all in development for easier testing
+      credentials: true
+    }
+  })
+});
+
+// Add connection state change logging
+io.engine.on("connection_error", (err) => {
+  console.error('[Socket.IO] Connection error:', err);
 });
 
 let arenaWorker: NodeWorker;
@@ -122,8 +225,15 @@ const attachWorkers = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
+// CORS error handling middleware
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err.message.includes('CORS policy')) {
+    return res.status(403).json({ error: 'Not allowed by CORS' });
+  }
+  next(err);
+});
+
 export async function startServer() {
-  app.use(cors());
   app.use(express.json({ limit: '10mb' }));
 
   setupWorkers();
