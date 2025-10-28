@@ -10,8 +10,10 @@
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// In development, the proxy is used. In production, requests are same-origin.
+// API calls should always be relative paths.
+// In dev, Vite's proxy will catch them.
+// In prod, they'll go to the same server that's serving the client.
 export const API_BASE_URL = '';
 
-// In development, connect to the local server. In production, connect to the same host that served the page.
-export const SOCKET_URL = isProduction ? '/' : 'http://localhost:3001';
+// Socket URL should also be relative.
+export const SOCKET_URL = '/';

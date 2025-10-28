@@ -1,7 +1,8 @@
 /// <reference types="node" />
 
 // FIX: Import Request, Response, and NextFunction types from express to fix middleware and request/response typing issues.
-import express, { Request, Response, NextFunction } from 'express';
+// FIX: Import the Express type to explicitly type the app instance, resolving a cascade of type errors.
+import express, { Express, Request, Response, NextFunction } from 'express';
 import { Worker as NodeWorker } from 'worker_threads';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
@@ -32,13 +33,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- App & Server Initialization ---
-export const app = express();
+// FIX: Explicitly type the Express app to resolve middleware and request/response type inference issues.
+export const app: Express = express();
 const server = http.createServer(app);
 export { server };
 
 // --- Configuration ---
 const isProduction = process.env.NODE_ENV === 'production';
-const productionDomains = ['polymarket-cafe.sliplane.app'];
+const productionDomains = ['polymarket-cafe.sliplane.app', 'polymarketcafe.sliplane.app'];
 const devOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
@@ -61,7 +63,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         'default-src': ["'self'"],
-        'connect-src': ["'self'", 'https://*.sliplane.app', 'wss://*.sliplane.app'],
+        'connect-src': ["'self'", 'https://*.sliplane.app', 'wss://*.sliplane.app', 'blob:'],
         'script-src-elem': ["'self'", "https://aistudiocdn.com", "'sha256-jc7G1mO6iumy5+mUBzbiKkcDtWD3pvyxBCrV8DgQQe0='", "'sha256-f7e2FzTlLBcKV18x7AY/5TeX5EoQtT0BZxrV1/f1odI='"],
         'style-src': ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.bunny.net"],
         'font-src': ["'self'", "https://fonts.gstatic.com", "https://fonts.bunny.net"],
@@ -79,6 +81,7 @@ app.disable('x-powered-by');
 const corsOptions: cors.CorsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, success?: boolean) => void) => {
     if (!origin) return callback(null, true);
+    // Allow all sliplane.app subdomains in production for flexibility
     if (isProduction && origin.endsWith('.sliplane.app')) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     
@@ -175,7 +178,6 @@ function setupWorkers() {
 setupWorkers(); // Initialize workers before setting up routes
 
 // Middleware to attach workers to requests
-// FIX: Use imported Request, Response, and NextFunction types.
 const attachWorkers = (req: Request, res: Response, next: NextFunction) => {
   req.arenaWorker = arenaWorker;
   req.resolutionWorker = resolutionWorker;
@@ -188,25 +190,24 @@ app.use(attachWorkers);
 
 
 // --- API Routes ---
-// Must be attached before static file serving
+// This MUST be registered before the static file serving middleware.
 app.use('/api', apiRouter);
 
 
-// --- Production Static File Serving ---
-if (process.env.NODE_ENV === 'production') {
-  const clientPath = path.join(__dirname, '..', '..', 'client');
-  app.use(express.static(clientPath));
+// --- Production Static File Serving & SPA Fallback ---
+if (isProduction) {
+  const clientBuildPath = path.join(__dirname, '..', '..', 'client');
+  
+  // Serve static files (JS, CSS, images, etc.)
+  app.use(express.static(clientBuildPath));
 
-  // Catch-all for client-side routing
-  // FIX: Use imported Request, Response, and NextFunction types.
-  app.get('*', (req: Request, res: Response, next: NextFunction) => {
-    // If the request is for an API route, let it 404 naturally
-    if (req.path.startsWith('/api/')) {
-        return next();
-    }
-    res.sendFile(path.resolve(clientPath, 'index.html'));
+  // For any other GET request that doesn't match an API route or a static file,
+  // send the main index.html file. This is the catch-all for client-side routing.
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
   });
 }
+
 
 // --- Socket.IO Setup ---
 const socketConfig: any = {
@@ -264,12 +265,12 @@ io.on('connection', (socket) => {
 
 
 // --- Error Handling ---
-// FIX: Use imported Request, Response, and NextFunction types.
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (err && err.message && err.message.includes('CORS policy')) {
     return res.status(403).json({ error: 'Not allowed by CORS' });
   }
-  next(err);
+  console.error('[Server] Unhandled error:', err);
+  res.status(500).json({ error: 'Internal Server Error' });
 });
 
 process.on('uncaughtException', (error) => {
