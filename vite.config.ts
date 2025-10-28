@@ -17,7 +17,8 @@ export default defineConfig(({ mode }) => {
         // Explicitly define which environment variables should be available to the client
         NODE_ENV: process.env.NODE_ENV || mode,
         VITE_APP_TITLE: env.VITE_APP_TITLE,
-        // Add other client-side environment variables here
+        VITE_API_BASE_URL: env.VITE_API_BASE_URL,
+        VITE_SOCKET_URL: env.VITE_SOCKET_URL,
     };
 
     return {
@@ -42,7 +43,6 @@ export default defineConfig(({ mode }) => {
                     target: env.VITE_API_BASE_URL || 'http://localhost:3001',
                     changeOrigin: true,
                     secure: false,
-                    rewrite: (path) => path.replace(/^\/api/, '')
                 },
                 '/socket.io': {
                     target: env.VITE_SOCKET_URL || 'ws://localhost:3001',

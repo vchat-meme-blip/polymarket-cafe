@@ -15,13 +15,16 @@ import { usersCollection, agentsCollection } from './db.js';
 import { ApiKeyManager } from './services/apiKey.service.js';
 
 // Module augmentation for Express Request
-declare module 'express-serve-static-core' {
-  interface Request {
-    arenaWorker?: NodeWorker;
-    resolutionWorker?: NodeWorker;
-    dashboardWorker?: NodeWorker;
-    autonomyWorker?: NodeWorker;
-    marketWatcherWorker?: NodeWorker;
+// FIX: Switched to `declare global` to augment the Express.Request interface. This is a more robust method that avoids module resolution issues with 'express-serve-static-core' which can occur in complex build setups.
+declare global {
+  namespace Express {
+    interface Request {
+      arenaWorker?: NodeWorker;
+      resolutionWorker?: NodeWorker;
+      dashboardWorker?: NodeWorker;
+      autonomyWorker?: NodeWorker;
+      marketWatcherWorker?: NodeWorker;
+    }
   }
 }
 

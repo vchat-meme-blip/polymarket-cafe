@@ -2,7 +2,7 @@ export default {
   apps: [{
     name: "quants-cafe",
     cwd: "/app",  // Use absolute path in container
-    script: "dist/server/index.js",  // Main script to run
+    script: "dist/server/server/index.js",  // Main script to run
     interpreter: "node",  // Use Node.js as interpreter
     node_args: "--import=tsx",  // Pass Node.js arguments here
     instances: 1,

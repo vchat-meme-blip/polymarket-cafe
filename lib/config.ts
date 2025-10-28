@@ -8,18 +8,14 @@
 // application is running in a production or development build.
 // https://vitejs.dev/guide/env-and-mode.html
 
-// FIX: Reverted to using `process.env.NODE_ENV` for better compatibility
-// between client (Vite) and server (Node.js) environments.
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Use the production domain if in production, otherwise use the local server.
-// `process.env.VITE_PUBLIC_APP_URL` is supplied by Vite on the client and dotenv on the server.
-const PROD_DOMAIN = process.env.VITE_PUBLIC_APP_URL || 'https://polymarket-cafe.sliplane.app/';
-
+// For production, use the dedicated API URL from env. For development, use a relative path
+// which will be handled by the Vite proxy.
 export const API_BASE_URL = isProduction
-  ? `${PROD_DOMAIN}`
-  : 'http://localhost:3001';
+  ? process.env.VITE_API_BASE_URL || 'https://api.polymarketcafe.sliplane.app'
+  : '';
 
 export const SOCKET_URL = isProduction
-  ? `${PROD_DOMAIN}`
+  ? process.env.VITE_SOCKET_URL || 'https://api.polymarketcafe.sliplane.app'
   : 'http://localhost:3001';
