@@ -33,5 +33,3 @@ async function main() {
 if (isMainModule) {
   main().catch(console.error);
 }
-
-main().catch(console.error);
