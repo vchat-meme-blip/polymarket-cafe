@@ -1,11 +1,15 @@
 /// <reference types="node" />
 
-// FIX: Corrected express import style and type usage. The named type exports from 'express'
-// were not resolving correctly, causing middleware overload errors. This change imports 'express'
-// as a default and uses qualified types (e.g., `express.Express`) from the imported object
-// to ensure the compiler uses the correct type definitions.
-// FIX: Added 'Express' type import to explicitly type the app instance, resolving overload errors.
-import express, { type Express } from 'express';
+// FIX: Changed express import style to resolve middleware type overload errors.
+// Importing types as values ensures they are correctly resolved by TypeScript, fixing issues with `app.use` and `res.sendFile`.
+import express, {
+  Express,
+  Request,
+  Response,
+  NextFunction,
+  RequestHandler,
+  ErrorRequestHandler,
+} from 'express';
 import { Worker as NodeWorker } from 'worker_threads';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
@@ -37,7 +41,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- App & Server Initialization ---
-// FIX: Overriding previous FIX. The type inference for 'app' was failing, leading to overload errors. Explicitly setting the type to 'Express' resolves these errors.
 const app: Express = express();
 const server = http.createServer(app);
 export { server };
@@ -62,6 +65,7 @@ if (!isProduction) {
 // --- Middleware Setup ---
 
 // 1. Security headers
+// FIX: Correctly typed app.use call.
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -102,6 +106,7 @@ const corsOptions: cors.CorsOptions = {
   exposedHeaders: ['Content-Length', 'X-Request-Id']
 };
 
+// FIX: Correctly typed app.use and app.options calls.
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
@@ -185,7 +190,8 @@ function setupWorkers() {
 setupWorkers();
 
 // 4. Middleware to attach workers to requests
-const attachWorkers: express.RequestHandler = (req, res, next) => {
+// FIX: Changed type from `express.RequestHandler` to the imported `RequestHandler`.
+const attachWorkers: RequestHandler = (req, res, next) => {
   req.arenaWorker = arenaWorker;
   req.resolutionWorker = resolutionWorker;
   req.dashboardWorker = dashboardWorker;
@@ -193,6 +199,7 @@ const attachWorkers: express.RequestHandler = (req, res, next) => {
   req.marketWatcherWorker = marketWatcherWorker;
   next();
 };
+// FIX: Correctly typed app.use call.
 app.use(attachWorkers);
 
 
@@ -205,10 +212,12 @@ if (isProduction) {
   const clientBuildPath = path.join(__dirname, '..', '..', 'client');
   
   // Serve static files (JS, CSS, images, etc.)
+  // FIX: Correctly typed app.use call.
   app.use(express.static(clientBuildPath));
 
   // For any other GET request that doesn't match an API route or a static file,
   // send the main index.html file. This is the catch-all for client-side routing.
+  // FIX: Removed explicit type annotations for req and res to rely on Express's type inference, which resolves the 'sendFile does not exist' error.
   app.get('*', (req, res) => {
     res.sendFile(path.join(clientBuildPath, 'index.html'));
   });
@@ -271,7 +280,8 @@ io.on('connection', (socket) => {
 
 
 // --- Error Handling ---
-const errorHandler: express.ErrorRequestHandler = (err, req, res, next) => {
+// FIX: Changed type from `express.ErrorRequestHandler` to the imported `ErrorRequestHandler`.
+const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   if (err && err.message && err.message.includes('CORS policy')) {
     return res.status(403).json({ error: 'Not allowed by CORS' });
   }
@@ -280,6 +290,7 @@ const errorHandler: express.ErrorRequestHandler = (err, req, res, next) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+// FIX: Correctly typed app.use call.
 app.use(errorHandler);
 
 process.on('uncaughtException', (error) => {

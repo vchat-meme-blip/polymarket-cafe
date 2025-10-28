@@ -59,6 +59,9 @@ async function main() {
         case 'moveAgentToCafe':
           arenaDirector.moveAgentToCafe(message.payload.agentId);
           break;
+        case 'recallAgent':
+            arenaDirector.recallAgent(message.payload.agentId);
+            break;
         case 'createAndHostRoom':
           arenaDirector.createAndHostRoom(message.payload.agentId);
           break;

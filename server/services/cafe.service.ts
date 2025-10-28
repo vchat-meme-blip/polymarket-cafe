@@ -30,8 +30,10 @@ class CafeService {
     }
 
     public async createRoom(host: Agent): Promise<Room> {
+        const newId = new ObjectId();
         const newRoom: Room = {
-            id: `room-${new ObjectId().toHexString()}`,
+            _id: newId,
+            id: newId.toHexString(),
             agentIds: [host.id],
             hostId: host.id,
             topics: host.topics,
@@ -41,7 +43,8 @@ class CafeService {
             vibe: 'General Chat ☕️',
         };
         await roomsCollection.insertOne(newRoom as any);
-        return newRoom;
+        // Ensure the returned object has the string ID for immediate use
+        return { ...newRoom, id: newId.toHexString() };
     }
 }
 

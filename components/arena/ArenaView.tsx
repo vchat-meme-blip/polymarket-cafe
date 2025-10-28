@@ -133,7 +133,7 @@ export default function IntelExchangeView() {
     }
   };
   
-  const isUserAgentInCafe = agentLocations[userAgent.id] !== undefined;
+  const isUserAgentInCafe = agentLocations[userAgent.id] !== null;
 
   const CafeActionButtons = () => (
     <>

@@ -22,8 +22,7 @@
     "start": "NODE_ENV=production node dist/server/index.js",
     "start:pm2": "NODE_ENV=production pm2-runtime start ecosystem.config.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --ext .ts,.tsx --fix",
-    "reset-db": "tsx server/scripts/reset-db.ts"
+    "lint": "eslint . --ext .ts,.tsx --fix"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.16.0",

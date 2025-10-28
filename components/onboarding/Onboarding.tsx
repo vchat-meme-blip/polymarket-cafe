@@ -26,7 +26,7 @@ const TOTAL_STEPS = 3;
 export default function Onboarding() {
   const [step, setStep] = useState(1);
   const { setName: setUserName, handle, completeOnboarding } = useUser();
-  const { addAgent } = useAgent();
+  const { addAgent, setCurrent } = useAgent();
   const { closeOnboarding } = useUI();
   const [isBrainstorming, setIsBrainstorming] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -96,25 +96,19 @@ export default function Onboarding() {
     setIsSaving(true);
     setUserName(agent.name || handle || 'User');
     
-    // The client no longer creates the final agent object with an ID.
-    // It sends the current form data to the server.
     const agentDataToSend = createNewAgent({
       ...agent,
       templateId: selectedPreset,
     });
     
     try {
-      // The server is now the source of truth. It will create the agent,
-      // assign a proper ID, and return the final object.
       const { agent: savedAgent } = await apiService.saveNewAgent(agentDataToSend as Agent);
 
-      // Add the server-validated agent to our local state.
       addAgent(savedAgent);
+      setCurrent(savedAgent.id); // Set the new agent as active
       
-      // Now that the agent is successfully saved and in our state,
-      // we can complete the onboarding process.
       completeOnboarding();
-      closeOnboarding(); // This closes the modal
+      closeOnboarding();
 
     } catch (error) {
         console.error("Failed to save new agent:", error);

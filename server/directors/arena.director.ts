@@ -385,6 +385,10 @@ export class ArenaDirector {
         await this.processWanderingAgents(); // Immediately try to place them
     }
 
+    public async recallAgent(agentId: string) {
+        await this.moveAgent(agentId, null);
+    }
+
     public async kickAgent(payload: { agentId: string, roomId: string, ban?: boolean }) {
         const { agentId, roomId, ban } = payload;
         const currentRoomId = this.agentLocations.get(agentId);

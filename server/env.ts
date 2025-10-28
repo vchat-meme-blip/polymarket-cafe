@@ -5,7 +5,7 @@ import fs from 'node:fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.join(__dirname, '..');
+const projectRoot = path.join(__dirname, '..', '..'); // Adjusted to go up two levels from server/
 
 // Default configuration
 const defaultConfig = {
@@ -23,14 +23,14 @@ function loadEnv() {
     // Try loading .env.local first
     if (fs.existsSync(envLocalPath)) {
       dotenv.config({ path: envLocalPath });
-      console.log('[Env] Loaded .env.local');
+      console.log(`[Env] Loaded .env.local from ${envLocalPath}`);
       loaded = true;
     }
 
     // Then try .env
     if (!loaded && fs.existsSync(envPath)) {
       dotenv.config({ path: envPath });
-      console.log('[Env] Loaded .env');
+      console.log(`[Env] Loaded .env from ${envPath}`);
       loaded = true;
     }
 
