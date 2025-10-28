@@ -68,22 +68,33 @@ export { server };
 app.use(
   helmet({
     contentSecurityPolicy: {
+      useDefaults: true,
       directives: {
         'default-src': ["'self'"],
         'connect-src': [
           "'self'",
-          'https://*.sliplane.app', // Allows api. and polymarket-cafe. subdomains
-          'wss://*.sliplane.app', // Allows wss connections to api subdomain
+          'blob:',
+          'data:',
+          'https://*.sliplane.app',
+          'wss://*.sliplane.app',
+          'ws://localhost:*',
+          'http://localhost:*',
         ],
-        'script-src-elem': [ // More specific than script-src
+        'script-src': [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'"
+        ],
+        'script-src-elem': [
           "'self'",
           "https://aistudiocdn.com",
-          // Hashes from browser error logs. May be from Vite or browser extensions.
-          "'sha256-jc7G1mO6iumy5+mUBzbiKkcDtWD3pvyxBCrV8DgQQe0='",
-          "'sha256-f7e2FzTlLBcKV18x7AY/5TeX5EoQtT0BZxrV1/f1odI='",
+          "'unsafe-inline'"
         ],
-        'style-src': ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.bunny.net"],
-        'font-src': ["'self'", "https://fonts.gstatic.com", "https://fonts.bunny.net"],
+        'style-src': [
+          "'self'",
+          "'unsafe-inline'",
+          "https://fonts.googleapis.com"
+        ],
         'img-src': [
           "'self'",
           "data:",
