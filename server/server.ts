@@ -34,7 +34,7 @@ const __dirname = path.dirname(__filename);
 // Configure allowed origins based on environment
 const isProduction = process.env.NODE_ENV === 'production';
 const productionDomains = [
-  'polymarketcafe.sliplane.app',
+  'polymarket-cafe.sliplane.app',
   'polymarket-cafe.sliplane.app'
 ];
 
