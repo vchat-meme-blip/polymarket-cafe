@@ -457,8 +457,8 @@
 }
 
 
-/* --- NEW: Mobile Responsive Sidebar --- */
-@media (max-width: var(--breakpoint-sm)) {
+/* --- Mobile Responsive Sidebar --- */
+@media (max-width: 768px) {
   .appShell {
     flex-direction: column-reverse; /* Stack nav bar below content */
   }
@@ -534,8 +534,8 @@
   .mobileNavToggle {
     display: flex; /* Show on mobile */
     position: fixed;
-    bottom: 24px;
-    right: 24px;
+    bottom: 72px; /* Position above the nav bar */
+    right: 16px;
     z-index: 1001; /* Above other UI */
     background-color: var(--brand-primary);
     color: white;

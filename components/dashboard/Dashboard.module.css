@@ -80,10 +80,10 @@
 }
 
 .dashboardPanelTitle {
-  font-size: 16px; /* COMPACT FOR MOBILE */
+  font-size: 15px;
   font-weight: 500;
   color: var(--Neutral-90);
-  margin-bottom: 12px; /* COMPACT FOR MOBILE */
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -211,8 +211,8 @@
 }
 .agentActionsPanel .button {
   justify-content: flex-start;
-  padding: 10px 12px; /* COMPACT FOR MOBILE */
-  font-size: 14px; /* COMPACT FOR MOBILE */
+  padding: 10px 12px;
+  font-size: 14px;
   font-weight: 500;
   background-color: var(--Neutral-20);
   color: var(--Neutral-90);
@@ -222,7 +222,7 @@
   color: white;
 }
 .agentActionsPanel .button .icon {
-  font-size: 20px; /* COMPACT FOR MOBILE */
+  font-size: 20px;
   color: var(--brand-cyan);
 }
 
@@ -512,8 +512,8 @@
     display: none;
 }
 .tabButton {
-    padding: 12px 16px;
-    font-size: 14px;
+    padding: 10px 12px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--Neutral-60);
     position: relative;
@@ -538,7 +538,7 @@
 }
 
 .tabContent {
-    padding: 20px;
+    padding: 12px;
     overflow-y: auto;
     flex-grow: 1;
 }
@@ -635,7 +635,7 @@
     color: var(--Neutral-60);
 }
 .statItem .statValue {
-    font-size: 18px; /* COMPACT FOR MOBILE */
+    font-size: 18px;
     font-weight: bold;
     color: var(--Neutral-90);
 }
@@ -847,6 +847,13 @@
     }
     .portfolioStats .statValue {
         font-size: 20px;
+    }
+    .tabButton {
+        padding: 12px 16px;
+        font-size: 14px;
+    }
+    .tabContent {
+        padding: 20px;
     }
 }
 
