@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 // FIX: Import Agent type from canonical source.
 import type { Agent } from '../../lib/types/index.js';
 import { PRESET_AGENTS } from '../../lib/presets/agents';
-import { useUser, createNewAgent } from '../../lib/state';
+import { useUser, useAgent, useUI, createNewAgent } from '../../lib/state';
 import c from 'classnames';
 // FIX: Add .js extension for ES module compatibility.
 import { apiService } from '../../lib/services/api.service.js';
@@ -26,12 +26,13 @@ const TOTAL_STEPS = 3;
 export default function Onboarding() {
   const [step, setStep] = useState(1);
   const { setName: setUserName, handle, completeOnboarding } = useUser();
+  const { addAgent } = useAgent();
+  const { closeOnboarding } = useUI();
   const [isBrainstorming, setIsBrainstorming] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [personalityKeywords, setPersonalityKeywords] = useState('');
 
   const [selectedPreset, setSelectedPreset] = useState<string>('tony-pump');
-  // Default to TrenchBoudica preset
   const defaultPreset = PRESET_AGENTS.find(p => p.id === 'tony-pump') || PRESET_AGENTS[0];
   const [agent, setAgent] = useState<Partial<Agent>>({
     name: defaultPreset.name,
@@ -51,32 +52,16 @@ export default function Onboarding() {
     if (!personalityKeywords.trim()) return;
     setIsBrainstorming(true);
     try {
-      // The AI call is now routed through the apiService to ensure it hits the correct backend endpoint.
       const data = await apiService.brainstormPersonality(personalityKeywords);
       updateAgent({ personality: data.personality });
     } catch (error) {
       console.error('Error brainstorming personality:', error);
-      alert('Could not brainstorm a personality. Please try again.');
     } finally {
       setIsBrainstorming(false);
     }
   };
 
   const handleNext = () => {
-    if (step === 2) {
-      // Always sync fields from currently selected preset before entering step 3
-      const preset = PRESET_AGENTS.find(p => p.id === selectedPreset);
-      if (preset) {
-        updateAgent({
-          personality: preset.personality,
-          name: agent.name || preset.name,
-          voice: preset.voice,
-          instructions: preset.instructions,
-          topics: preset.topics,
-          wishlist: preset.wishlist,
-        });
-      }
-    }
     if (step < TOTAL_STEPS) {
       setStep(step + 1);
     }
@@ -88,32 +73,55 @@ export default function Onboarding() {
     }
   };
 
-  // When entering step 3, ensure personality is set from the selected preset
-  useEffect(() => {
-    if (step === 3) {
-      const preset = PRESET_AGENTS.find(p => p.id === selectedPreset);
-      if (preset && (!agent.personality || agent.personality.trim().length === 0)) {
-        updateAgent({ personality: preset.personality });
-      }
+  const handleSelectPreset = (presetId: string) => {
+    const preset = PRESET_AGENTS.find(p => p.id === presetId);
+    if (preset) {
+        setSelectedPreset(preset.id);
+        updateAgent({
+            modelUrl: preset.modelUrl,
+            // Only update the name if the user hasn't typed one
+            name: agent.name && step > 1 ? agent.name : preset.name, 
+            personality: preset.personality,
+            voice: preset.voice,
+            instructions: preset.instructions,
+            topics: preset.topics,
+            wishlist: preset.wishlist,
+            templateId: preset.id, // Keep track of the template
+        });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, selectedPreset]);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setUserName(agent.name || handle || 'User');
     
-    // Create agent using the selected preset as a template if available
-    const finalAgent = createNewAgent({
+    // The client no longer creates the final agent object with an ID.
+    // It sends the current form data to the server.
+    const agentDataToSend = createNewAgent({
       ...agent,
-      templateId: selectedPreset, // Pass the selected preset ID to use as a template
+      templateId: selectedPreset,
     });
     
-    await apiService.saveNewAgent(finalAgent);
-    
-    completeOnboarding();
-    setIsSaving(false);
+    try {
+      // The server is now the source of truth. It will create the agent,
+      // assign a proper ID, and return the final object.
+      const { agent: savedAgent } = await apiService.saveNewAgent(agentDataToSend);
+
+      // Add the server-validated agent to our local state.
+      addAgent(savedAgent);
+      
+      // Now that the agent is successfully saved and in our state,
+      // we can complete the onboarding process.
+      completeOnboarding();
+      closeOnboarding(); // This closes the modal
+
+    } catch (error) {
+        console.error("Failed to save new agent:", error);
+        alert("There was a problem creating your agent. Please try again.");
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const isStep1Valid = agent.name && agent.name.trim().length > 0;
@@ -192,19 +200,7 @@ export default function Onboarding() {
                                 type="button"
                                 key={preset.id}
                                 className={c(styles.modelOption, { [styles.active]: selectedPreset === preset.id })}
-                                onClick={() => {
-                                    setSelectedPreset(preset.id);
-                                    updateAgent({
-                                        modelUrl: preset.modelUrl,
-                                        name: preset.name,
-                                        personality: preset.personality,
-                                        voice: preset.voice,
-                                        instructions: preset.instructions,
-                                        topics: preset.topics,
-                                        wishlist: preset.wishlist,
-                                        // Don't copy the ID - we'll generate a new one
-                                    });
-                                }}
+                                onClick={() => handleSelectPreset(preset.id)}
                             >
                                 <div className={styles.presetName}>{preset.name}</div>
                                 <div className={styles.presetPersonality}>{preset.personality}</div>
@@ -286,7 +282,7 @@ export default function Onboarding() {
         </form>
         <div className={styles.digitalWave}>
             <svg viewBox="0 0 1440 320" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M0,160L48,181.3C96,203,192,245,288,250.7C384,256,480,224,576,213.3C672,203,768,213,864,202.7C960,192,1056,160,1152,149.3C1248,139,1344,149,1392,154.7L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+              <path d="M0,160L48,181.3C96,203,192,245,288,250.7C384,256,480,224,576,213.3C672,203,768,213,864,202.7C960,160,1056,160,1152,149.3C1248,139,1344,149,1392,154.7L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
             </svg>
         </div>
       </div>

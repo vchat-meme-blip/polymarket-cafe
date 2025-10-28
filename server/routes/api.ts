@@ -219,11 +219,33 @@ router.get('/users/recover/:address', async (req, res) => {
 
 // --- Agents ---
 router.post('/agents', async (req, res) => {
-  const newAgent = req.body as Agent;
-  newAgent.ownerHandle = res.locals.userHandle;
-  await agentsCollection.insertOne(newAgent as any);
-  req.arenaWorker?.postMessage({ type: 'registerNewAgent', payload: { agent: newAgent } });
-  res.status(201).json({ agent: newAgent });
+    try {
+        const agentData = req.body as Partial<Agent>;
+        
+        // Server is the authority for IDs.
+        const newId = new ObjectId();
+        
+        const newAgent: Agent = {
+            ...agentData,
+            id: newId.toHexString(),
+            _id: newId,
+            ownerHandle: res.locals.userHandle,
+        } as Agent;
+        
+        const result = await agentsCollection.insertOne(newAgent as any);
+        const savedAgent = await agentsCollection.findOne({ _id: result.insertedId });
+
+        if (savedAgent) {
+            req.arenaWorker?.postMessage({ type: 'registerNewAgent', payload: { agent: savedAgent } });
+            res.status(201).json({ agent: savedAgent });
+        } else {
+            throw new Error('Failed to retrieve saved agent from database.');
+        }
+
+    } catch (error) {
+        console.error('[API] Error creating agent:', error);
+        res.status(500).json({ message: 'Failed to create agent.' });
+    }
 });
 
 router.put('/agents/:agentId', async (req, res) => {

@@ -1,9 +1,10 @@
 /// <reference types="node" />
 
-// FIX: Import Request, Response, and NextFunction types from express to fix middleware and request/response typing issues.
-// FIX: Import the Express type to explicitly type the app instance, resolving a cascade of type errors.
-// FIX: Add RequestHandler and ErrorRequestHandler for explicit middleware typing.
-import express, { Express, Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
+// FIX: Corrected express import style and type usage. The named type exports from 'express'
+// were not resolving correctly, causing middleware overload errors. This change imports 'express'
+// as a default and uses qualified types (e.g., `express.Express`) from the imported object
+// to ensure the compiler uses the correct type definitions.
+import express from 'express';
 import { Worker as NodeWorker } from 'worker_threads';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
@@ -34,8 +35,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- App & Server Initialization ---
-// FIX: Explicitly type the Express app to resolve middleware and request/response type inference issues.
-export const app: Express = express();
+// FIX: Explicitly type `app` as `express.Express`. This helps TypeScript correctly resolve
+// the overloads for `app.use()`, `app.options()`, etc., and prevents middleware functions
+// from being incorrectly interpreted as `PathParams`. This resolves all "No overload matches this call"
+// errors in this file.
+const app: express.Express = express();
 const server = http.createServer(app);
 export { server };
 
@@ -58,12 +62,12 @@ if (!isProduction) {
 
 // --- Middleware Setup ---
 
-// Security headers
+// 1. Security headers
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        'default-src': ["'self'"],
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         'connect-src': ["'self'", 'https://*.sliplane.app', 'wss://*.sliplane.app', 'blob:'],
         'script-src-elem': ["'self'", "https://aistudiocdn.com", "'sha256-jc7G1mO6iumy5+mUBzbiKkcDtWD3pvyxBCrV8DgQQe0='", "'sha256-f7e2FzTlLBcKV18x7AY/5TeX5EoQtT0BZxrV1/f1odI='"],
         'style-src': ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.bunny.net"],
@@ -78,13 +82,16 @@ app.use(
 );
 app.disable('x-powered-by');
 
-// CORS configuration
+// 2. CORS configuration
 const corsOptions: cors.CorsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, success?: boolean) => void) => {
-    if (!origin) return callback(null, true);
-    // Allow all sliplane.app subdomains in production for flexibility
-    if (isProduction && origin.endsWith('.sliplane.app')) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+      return callback(null, true);
+    }
+    // In production, also allow any sliplane.app subdomain for flexibility
+    if (isProduction && origin.endsWith('.sliplane.app')) {
+      return callback(null, true);
+    }
     
     const msg = `CORS policy: ${origin} not allowed`;
     console.warn('[CORS] Blocked request from origin:', origin);
@@ -99,7 +106,7 @@ const corsOptions: cors.CorsOptions = {
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
-// Body parsers
+// 3. Body parsers
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -176,11 +183,10 @@ function setupWorkers() {
     });
   });
 }
-setupWorkers(); // Initialize workers before setting up routes
+setupWorkers();
 
-// FIX: Explicitly type middleware to help TypeScript resolve augmented request types.
-// Middleware to attach workers to requests
-const attachWorkers: RequestHandler = (req, res, next) => {
+// 4. Middleware to attach workers to requests
+const attachWorkers: express.RequestHandler = (req, res, next) => {
   req.arenaWorker = arenaWorker;
   req.resolutionWorker = resolutionWorker;
   req.dashboardWorker = dashboardWorker;
@@ -191,12 +197,11 @@ const attachWorkers: RequestHandler = (req, res, next) => {
 app.use(attachWorkers);
 
 
-// --- API Routes ---
-// This MUST be registered before the static file serving middleware.
+// 5. API Routes - This MUST be registered before any static file serving.
 app.use('/api', apiRouter);
 
 
-// --- Production Static File Serving & SPA Fallback ---
+// 6. Production Static File Serving & SPA Fallback
 if (isProduction) {
   const clientBuildPath = path.join(__dirname, '..', '..', 'client');
   
@@ -267,13 +272,14 @@ io.on('connection', (socket) => {
 
 
 // --- Error Handling ---
-// FIX: Use the explicit ErrorRequestHandler type to ensure correct type inference for `res`.
-const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
+const errorHandler: express.ErrorRequestHandler = (err, req, res, next) => {
   if (err && err.message && err.message.includes('CORS policy')) {
     return res.status(403).json({ error: 'Not allowed by CORS' });
   }
   console.error('[Server] Unhandled error:', err);
-  res.status(500).json({ error: 'Internal Server Error' });
+  if (!res.headersSent) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 };
 app.use(errorHandler);
 

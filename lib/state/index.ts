@@ -17,6 +17,8 @@ export * from './wallet.js';
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+// FIX: Import `ObjectId` from `mongodb` to resolve 'Cannot find name' errors when creating new agent IDs.
+import { ObjectId } from 'mongodb';
 import { PRESET_AGENTS, DEFAULT_VRM_URL, AVAILABLE_VOICES } from '../presets/agents.js';
 // FIX: Imported types from the canonical type definitions file.
 // FIX: Import AgentMode type from canonical source.
@@ -210,32 +212,9 @@ export const useUser = create(
 export const createNewAgent = (properties?: Partial<Agent>): Agent => {
   const { handle } = useUser.getState();
   
-  if (properties?.templateId) {
-    const preset = PRESET_AGENTS.find(p => p.id === properties.templateId);
-    if (preset) {
-      return {
-        ...preset,
-        ...properties,
-        id: Math.random().toString(36).substring(2, 15),
-        ownerHandle: handle,
-        isShilling: false,
-        shillInstructions: 'Shill the $QUANTS token...',
-        topics: preset.topics || properties.topics || ['Web3', 'AI', 'Startups'],
-        wishlist: preset.wishlist || properties.wishlist || ['$WIF', '$BONK'],
-        templateId: undefined,
-        bettingHistory: [],
-        currentPnl: 0,
-        // FIX: Add missing properties to conform to the Agent type.
-        bettingIntel: [],
-        marketWatchlists: [],
-        boxBalance: 0, // Deprecated
-        portfolio: {},   // Deprecated
-      };
-    }
-  }
-  
-  return {
-    id: Math.random().toString(36).substring(2, 15),
+  // The client no longer generates an ID. The server will do this.
+  const baseAgent = {
+    id: '', // Will be assigned by the server
     name: properties?.name || 'New Quant',
     personality: properties?.personality || '',
     instructions: properties?.instructions || "My goal is to be a great conversation partner...",
@@ -249,13 +228,29 @@ export const createNewAgent = (properties?: Partial<Agent>): Agent => {
     modelUrl: properties?.modelUrl || DEFAULT_VRM_URL,
     bettingHistory: [],
     currentPnl: 0,
-    // FIX: Add missing properties to conform to the Agent type.
     bettingIntel: [],
     marketWatchlists: [],
-    boxBalance: 0, // Deprecated
-    portfolio: {},   // Deprecated
+    boxBalance: 0, 
+    portfolio: {},   
     ...properties,
   };
+
+  if (properties?.templateId) {
+    const preset = PRESET_AGENTS.find(p => p.id === properties.templateId);
+    if (preset) {
+      return {
+        ...baseAgent,
+        ...preset,
+        ...properties, // User overrides (like name) come last
+        id: '', // Ensure ID is empty
+        ownerHandle: handle,
+        templateId: undefined, // Don't persist this
+        copiedFromId: preset.id,
+      };
+    }
+  }
+  
+  return baseAgent as Agent;
 };
 
 function getAgentById(id: string, personalAgents: Agent[], presetAgents: Agent[]) {
@@ -268,7 +263,6 @@ export const useAgent = create(
     availablePresets: Agent[];
     availablePersonal: Agent[];
     setCurrent: (agentId: string) => void;
-    // FIX: Added setCurrentAgentMode to the store type.
     setCurrentAgentMode: (mode: AgentMode) => void;
     addAgent: (agent: Agent) => void;
     update: (agentId: string, adjustments: Partial<Agent>) => void;
@@ -300,12 +294,10 @@ export const useAgent = create(
         }
       },
 
-      // FIX: Added implementation for setCurrentAgentMode to resolve errors where this function was called but not defined.
       setCurrentAgentMode: (mode: AgentMode) => {
         set(state => {
             const updatedCurrentAgent = { ...state.current, mode };
             
-            // Update the agent in the personal list if it exists there
             const updatedPersonalAgents = state.availablePersonal.map(agent =>
               agent.id === updatedCurrentAgent.id ? updatedCurrentAgent : agent
             );
@@ -327,7 +319,6 @@ export const useAgent = create(
             name: current.name,
             personality: current.personality,
             instructions: current.instructions,
-            id: `personal-${Math.random().toString(36).substring(2, 9)}`,
             copiedFromId: current.id,
             ownerHandle: handle,
           });
@@ -373,7 +364,6 @@ export type Toast = {
   intel?: BettingIntel; 
 };
 
-// FIX: Update ShareModalData to be more flexible, allowing for either room or leaderboard data.
 export type ShareModalData = {
   agent: Agent;
   room?: Room;
