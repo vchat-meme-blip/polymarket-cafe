@@ -10,10 +10,10 @@
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// API calls should always be relative paths.
-// In dev, Vite's proxy will catch them.
-// In prod, they'll go to the same server that's serving the client.
-export const API_BASE_URL = '';
+// In production, API calls should be relative paths to the current domain.
+// In development, they should point to the backend server defined in vite.config.js proxy.
+export const API_BASE_URL = isProduction ? '' : '/api';
 
-// Socket URL should also be relative.
-export const SOCKET_URL = '/';
+// In production, the socket connects to the same host.
+// In development, it uses the path proxied by vite.config.js.
+export const SOCKET_URL = isProduction ? '/' : '/';

@@ -22,24 +22,25 @@ import PredictionHubView from '../trading-floor/PredictionHubView.js';
 import LeaderboardView from '../leaderboard/LeaderboardView';
 import ShareModal from '../modals/ShareModal';
 import MarketDetailModal from '../modals/MarketDetailModal';
+import c from 'classnames';
 
 /**
  * The main application shell for authenticated users.
  */
 export default function AppShell() {
-  const { view, listeningOnRoomId, showRoomDetailModal, agentDossierId, showHelpModal, shareModalData, marketDetailModalData } = useUI();
+  const { view, listeningOnRoomId, showRoomDetailModal, agentDossierId, showHelpModal, shareModalData, marketDetailModalData, isMobileNavOpen, toggleMobileNav } = useUI();
 
   return (
     <div className={styles.appShell}>
       <Sidebar />
-      <div className={styles.appContent}>
+      <div className={c(styles.appContent, { [styles.appContentFull]: !isMobileNavOpen })}>
         {view === 'dashboard' && <Dashboard />}
         {view === 'agents' && <AgentsView />}
-        {view === 'intel-exchange' && <IntelExchangeView />}
         {view === 'prediction-hub' && <PredictionHubView />}
         {view === 'leaderboard' && <LeaderboardView />}
-        {view === 'mail' && <MailView />}
+        {view === 'intel-exchange' && <IntelExchangeView />}
         {view === 'bounty' && <BountyBoardView />}
+        {view === 'mail' && <MailView />}
       </div>
       {listeningOnRoomId && <ListenInModal />}
       {showRoomDetailModal && <RoomDetailModal />}
@@ -47,6 +48,14 @@ export default function AppShell() {
       {showHelpModal && <HelpModal />}
       {shareModalData && <ShareModal data={shareModalData} />}
       {marketDetailModalData && <MarketDetailModal market={marketDetailModalData} />}
+      
+      <button
+        className={c(styles.mobileNavToggle, { [styles.open]: isMobileNavOpen })}
+        onClick={toggleMobileNav}
+        aria-label={isMobileNavOpen ? 'Hide navigation' : 'Show navigation'}
+      >
+        <span className="icon">{isMobileNavOpen ? 'close' : 'menu'}</span>
+      </button>
     </div>
   );
 }

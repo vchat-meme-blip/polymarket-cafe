@@ -16,7 +16,7 @@ const ConnectWalletButton = () => {
     setIsConnecting(true);
     // In a real app, this would trigger a wallet adapter modal.
     // The state action now simulates a signature request.
-    await connectWallet('4p4h2h1q8z2z8z8y8f8e8d8c8b8a898887868584');
+    await connectWallet('4p4h2h1q8z2z8z8y8f8e8d8c8b8a898887868584'); 
     setIsConnecting(false);
   };
 
@@ -54,7 +54,7 @@ const ConnectWalletButton = () => {
  * A persistent sidebar for navigating between the main views of the application.
  */
 export default function Sidebar() {
-  const { view, setView, setIsSignedIn, setShowProfileView } = useUI();
+  const { view, setView, setIsSignedIn, setShowProfileView, isMobileNavOpen } = useUI();
   const { _setHandle } = useUser();
 
   function handleSignOut() {
@@ -63,7 +63,7 @@ export default function Sidebar() {
   }
 
   return (
-    <nav className={styles.sidebar}>
+    <nav className={c(styles.sidebar, { [styles.sidebarHidden]: !isMobileNavOpen })}>
       <div className={styles.sidebarTop}>
         <button
           className={c(styles.sidebarButton, { [styles.active]: view === 'dashboard' })}

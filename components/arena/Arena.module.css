@@ -96,9 +96,9 @@
 }
 .dropdownMenu {
     position: absolute;
-    bottom: 100%;
+    top: 100%; /* FIX: Expand downwards */
     right: 0;
-    margin-bottom: 8px;
+    margin-top: 8px; /* FIX: Add margin to the top */
     background: rgba(28, 31, 33, 0.9);
     backdrop-filter: blur(8px);
     border: 1px solid var(--Neutral-30);
@@ -112,7 +112,7 @@
     animation: dropdown-in 0.2s ease-out;
 }
 @keyframes dropdown-in {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(-10px); } /* FIX: Animate from above */
     to { opacity: 1; transform: translateY(0); }
 }
 .dropdownMenu .button {

@@ -10,6 +10,7 @@
   flex-grow: 1;
   height: 100%;
   position: relative; /* Needed for 3D canvas overlay */
+  transition: height 0.3s ease-in-out;
 }
 
 /* Sidebar */
@@ -451,6 +452,11 @@
     color: white;
 }
 
+.mobileNavToggle {
+  display: none;
+}
+
+
 /* --- NEW: Mobile Responsive Sidebar --- */
 @media (max-width: var(--breakpoint-sm)) {
   .appShell {
@@ -459,6 +465,9 @@
 
   .appContent {
     height: calc(100% - 60px); /* Full height minus nav bar */
+  }
+  .appContentFull {
+    height: 100%;
   }
 
   .sidebar {
@@ -469,6 +478,13 @@
     padding: 0 8px;
     border-right: none;
     border-top: 1px solid var(--Neutral-30);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    transition: transform 0.3s ease-in-out;
+  }
+  .sidebarHidden {
+    transform: translateY(100%);
   }
 
   .sidebarTop, .sidebarBottom {
@@ -513,5 +529,28 @@
   /* Hide wallet info from nav bar; it's in the profile modal */
   .walletBalance, .walletButtonContainer {
     display: none;
+  }
+
+  .mobileNavToggle {
+    display: flex; /* Show on mobile */
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1001; /* Above other UI */
+    background-color: var(--brand-primary);
+    color: white;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    justify-content: center;
+    align-items: center;
+  }
+  .mobileNavToggle .icon {
+    font-size: 28px;
+    transition: transform 0.3s ease;
+  }
+  .mobileNavToggle.open .icon {
+    transform: rotate(45deg);
   }
 }

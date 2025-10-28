@@ -389,6 +389,8 @@ export type BetSlipProposal = {
 
 
 export const useUI = create<{
+  isMobileNavOpen: boolean;
+  toggleMobileNav: () => void;
   showProfileView: boolean;
   setShowProfileView: (show: boolean) => void;
   agentDossierId: string | null;
@@ -450,6 +452,8 @@ export const useUI = create<{
   openIntelDossier: (intel: BettingIntel) => void;
   closeIntelDossier: () => void;
 }>(set => ({
+  isMobileNavOpen: true,
+  toggleMobileNav: () => set(state => ({ isMobileNavOpen: !state.isMobileNavOpen })),
   showProfileView: false,
   setShowProfileView: (show: boolean) => set({ showProfileView: show }),
   agentDossierId: null,
