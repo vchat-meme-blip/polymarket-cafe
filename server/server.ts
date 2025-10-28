@@ -1,6 +1,6 @@
 /// <reference types="node" />
 
-import express, { Request, Response, NextFunction } from 'express';
+import express from 'express';
 import { Worker as NodeWorker } from 'worker_threads';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
@@ -65,7 +65,38 @@ const server = http.createServer(app);
 export { server };
 
 // Security headers
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        'default-src': ["'self'"],
+        'connect-src': [
+          "'self'",
+          'https://*.sliplane.app', // Allows api. and polymarket-cafe. subdomains
+          'wss://*.sliplane.app', // Allows wss connections to api subdomain
+        ],
+        'script-src-elem': [ // More specific than script-src
+          "'self'",
+          "https://aistudiocdn.com",
+          // Hashes from browser error logs. May be from Vite or browser extensions.
+          "'sha256-jc7G1mO6iumy5+mUBzbiKkcDtWD3pvyxBCrV8DgQQe0='",
+          "'sha256-f7e2FzTlLBcKV18x7AY/5TeX5EoQtT0BZxrV1/f1odI='",
+        ],
+        'style-src': ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.bunny.net"],
+        'font-src': ["'self'", "https://fonts.gstatic.com", "https://fonts.bunny.net"],
+        'img-src': [
+          "'self'",
+          "data:",
+          "https://polymarket-upload.s3.us-east-2.amazonaws.com",
+          "https://assets.coingecko.com",
+        ],
+        'worker-src': ["'self'", "blob:"],
+        'object-src': ["'none'"],
+        'frame-ancestors': ["'none'"],
+      },
+    },
+  })
+);
 app.disable('x-powered-by');
 
 // CORS configuration
@@ -269,7 +300,8 @@ function setupWorkers() {
 }
 
 // FIX: Use explicitly imported Request, Response, and NextFunction types.
-const attachWorkers = (req: Request, res: Response, next: NextFunction) => {
+// FIX: Use explicit express types to resolve module augmentation issues.
+const attachWorkers = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   // Workers will be terminated by the process exit handler
   req.resolutionWorker = resolutionWorker;
   req.dashboardWorker = dashboardWorker;
@@ -279,7 +311,8 @@ const attachWorkers = (req: Request, res: Response, next: NextFunction) => {
 };
 
 // CORS error handling middleware
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+// FIX: Use explicit express types to resolve module augmentation issues.
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (err && err.message && err.message.includes('CORS policy')) {
     return res.status(403).json({ error: 'Not allowed by CORS' });
   }
@@ -317,7 +350,8 @@ export async function startServer() {
     const clientPath = path.join(__dirname, '..', '..', 'client');
     app.use(express.static(clientPath));
     // FIX: Use explicitly imported Request and Response types.
-    app.get('*', (req: Request, res: Response) => {
+    // FIX: Use explicit express types to resolve module augmentation issues.
+    app.get('*', (req: express.Request, res: express.Response) => {
       res.sendFile(path.resolve(clientPath, 'index.html'));
     });
   }
