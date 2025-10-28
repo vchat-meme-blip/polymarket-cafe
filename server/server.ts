@@ -4,7 +4,8 @@
 // were not resolving correctly, causing middleware overload errors. This change imports 'express'
 // as a default and uses qualified types (e.g., `express.Express`) from the imported object
 // to ensure the compiler uses the correct type definitions.
-import express from 'express';
+// FIX: Added 'Express' type import to explicitly type the app instance, resolving overload errors.
+import express, { type Express } from 'express';
 import { Worker as NodeWorker } from 'worker_threads';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
@@ -36,12 +37,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- App & Server Initialization ---
-// FIX: Explicitly typed `app` as `express.Express`. This helps TypeScript correctly resolve
-// the overloads for `app.use()`, `app.options()`, etc., and prevents middleware functions
-// from being incorrectly interpreted as `PathParams`. This resolves all "No overload matches this call"
-// errors in this file.
-// FIX: Removed explicit type annotation from `app` to allow TypeScript to infer types and resolve middleware overload errors.
-const app = express();
+// FIX: Overriding previous FIX. The type inference for 'app' was failing, leading to overload errors. Explicitly setting the type to 'Express' resolves these errors.
+const app: Express = express();
 const server = http.createServer(app);
 export { server };
 
@@ -311,8 +308,16 @@ export async function startServer() {
 
       // Centralized Seeding Logic
       try {
-        await seedMcpAgents();
-        await seedPublicRooms();
+        const agentCount = await agentsCollection.countDocuments();
+        const roomCount = await roomsCollection.countDocuments();
+        if(agentCount === 0) {
+            await seedMcpAgents();
+            console.log('[Server] Seeded MCPs into the database.');
+        }
+        if(roomCount === 0) {
+            await seedPublicRooms();
+            console.log('[Server] Seeded public rooms into the database.');
+        }
       } catch (e) {
         console.error('[Server] Failed to seed database:', e);
       }

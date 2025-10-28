@@ -35,6 +35,7 @@ export type AgentMode = 'Safe' | 'Degen' | 'Mag7';
 // Agent types
 export type Agent = {
   id: string;
+  _id?: any; // To accommodate mongoose documents
   name: string;
   personality: string;
   instructions: string;
@@ -66,6 +67,7 @@ export type Agent = {
 // Arena types
 export type Room = {
   id?: string;
+  _id?: any;
   name?: string; // Optional custom name for owned rooms
   agentIds: string[];
   hostId: string | null;
