@@ -1,6 +1,7 @@
 /// <reference types="node" />
 
-import express from 'express';
+// FIX: Import Request, Response, and NextFunction types from express to fix middleware and request/response typing issues.
+import express, { Request, Response, NextFunction } from 'express';
 import { Worker as NodeWorker } from 'worker_threads';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
@@ -15,7 +16,6 @@ import { usersCollection, agentsCollection } from './db.js';
 import { ApiKeyManager } from './services/apiKey.service.js';
 
 // Module augmentation for Express Request
-// FIX: Switched to `declare global` to augment the Express.Request interface. This is a more robust method that avoids module resolution issues with 'express-serve-static-core' which can occur in complex build setups.
 declare global {
   namespace Express {
     interface Request {
@@ -31,155 +31,76 @@ declare global {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Configure allowed origins based on environment
-const isProduction = process.env.NODE_ENV === 'production';
-const mainDomain = 'polymarket-cafe.sliplane.app';
+// --- App & Server Initialization ---
+export const app = express();
+const server = http.createServer(app);
+export { server };
 
-// Development origins
+// --- Configuration ---
+const isProduction = process.env.NODE_ENV === 'production';
+const productionDomains = ['polymarket-cafe.sliplane.app'];
 const devOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-  'http://192.168.10.135:5173',
-  `http://${mainDomain}`,
-  `https://${mainDomain}`,
-  `ws://${mainDomain}`,
-  `wss://${mainDomain}`
+  'http://192.168.10.135:5173'
 ];
-
-// Production origins
-const prodOrigins = [
-  `https://${mainDomain}`,
-  `wss://${mainDomain}`
-];
-
-// Combine origins based on environment
+const prodOrigins = productionDomains.map(domain => `https://${domain}`);
 const allowedOrigins = isProduction ? prodOrigins : [...devOrigins, ...prodOrigins];
 
-// Log allowed origins for debugging (only in development)
 if (!isProduction) {
   console.log('[Server] Running in development mode');
   console.log('[Server] Allowed CORS origins:', allowedOrigins);
 }
 
-// Create Express app and HTTP server
-export const app = express();
-const server = http.createServer(app);
+// --- Middleware Setup ---
 
-export { server };
-
-// Security headers (loosened for testing)
+// Security headers
 app.use(
   helmet({
-    contentSecurityPolicy: false, // Disable CSP for testing
+    contentSecurityPolicy: {
+      directives: {
+        'default-src': ["'self'"],
+        'connect-src': ["'self'", 'https://*.sliplane.app', 'wss://*.sliplane.app'],
+        'script-src-elem': ["'self'", "https://aistudiocdn.com", "'sha256-jc7G1mO6iumy5+mUBzbiKkcDtWD3pvyxBCrV8DgQQe0='", "'sha256-f7e2FzTlLBcKV18x7AY/5TeX5EoQtT0BZxrV1/f1odI='"],
+        'style-src': ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.bunny.net"],
+        'font-src': ["'self'", "https://fonts.gstatic.com", "https://fonts.bunny.net"],
+        'img-src': ["'self'", "data:", "https://polymarket-upload.s3.us-east-2.amazonaws.com", "https://assets.coingecko.com"],
+        'worker-src': ["'self'", "blob:"],
+        'object-src': ["'none'"],
+        'frame-ancestors': ["'none'"],
+      },
+    },
   })
 );
 app.disable('x-powered-by');
 
-// Very permissive CORS for testing
+// CORS configuration
 const corsOptions: cors.CorsOptions = {
-  origin: '*', // Allow all origins
-  credentials: true, // Still allow credentials if needed
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: '*', // Allow all headers
-  exposedHeaders: '*', // Expose all headers
-  maxAge: 600 // Cache preflight for 10 minutes
+  origin: (origin: string | undefined, callback: (err: Error | null, success?: boolean) => void) => {
+    if (!origin) return callback(null, true);
+    if (isProduction && origin.endsWith('.sliplane.app')) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    
+    const msg = `CORS policy: ${origin} not allowed`;
+    console.warn('[CORS] Blocked request from origin:', origin);
+    return callback(new Error(msg));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-handle', 'x-requested-with'],
+  exposedHeaders: ['Content-Length', 'X-Request-Id']
 };
 
-// Apply CORS middleware
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
-// Socket.IO configuration
-const socketConfig: any = {
-  cors: {
-    origin: (origin: string | undefined, callback: (err: Error | null, success?: boolean) => void) => {
-      // Allow all subdomains of sliplane.app in production
-      if (isProduction && origin && origin.endsWith('.sliplane.app')) {
-        return callback(null, true);
-      }
-      
-      // Check against allowed origins
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      
-      console.warn('[Socket.IO] Blocked connection from origin:', origin);
-      return callback(new Error('Not allowed by CORS'));
-    },
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["x-user-handle", "content-type", "authorization"],
-    credentials: true
-  },
-  allowEIO3: true,
-  transports: (process.env.WS_TRANSPORTS || 'websocket,polling').split(','),
-  path: process.env.WS_PATH || '/socket.io/',
-  serveClient: false,
-  connectTimeout: 30000,
-  pingTimeout: 25000,
-  pingInterval: 20000,
-};
+// Body parsers
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-// In development, allow all origins for easier testing
-if (!isProduction) {
-  console.log('[Socket.IO] Running in development mode - allowing all origins');
-  socketConfig.cors = {
-    origin: true,
-    credentials: true
-  };
-}
 
-// Create Socket.IO server instance
-const io = new SocketIOServer(server, socketConfig);
-
-// Add connection state change logging
-io.engine.on("connection_error", (err) => {
-  console.error('[Socket.IO] Connection error:', err.message);
-  console.error('Error details:', err);
-});
-
-// Handle WebSocket connections
-io.on('connection', (socket) => {
-  const clientAddress = socket.handshake.address;
-  const clientOrigin = socket.handshake.headers.origin || 'unknown';
-  
-  console.log(`[Socket.IO] New connection from ${clientAddress} (Origin: ${clientOrigin})`);
-  
-  // Handle authentication
-  socket.on('authenticate', async (handle: string) => {
-    try {
-      const user = await usersCollection.findOne({ handle });
-      if (user) {
-        // Leave any existing rooms
-        const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
-        rooms.forEach(room => socket.leave(room));
-        
-        // Join the user's room
-        await socket.join(handle);
-        console.log(`[Socket.IO] User ${handle} authenticated and joined room ${handle}`);
-        
-        // Send a confirmation message
-        socket.emit('authenticated', { success: true, handle });
-      } else {
-        console.log(`[Socket.IO] Authentication failed: User ${handle} not found`);
-        socket.emit('authentication_error', { error: 'User not found' });
-      }
-    } catch (error) {
-      console.error(`[Socket.IO] Authentication error for ${handle}:`, error);
-      socket.emit('authentication_error', { error: 'Internal server error' });
-    }
-  });
-  
-  socket.on('disconnect', (reason: string) => {
-    console.log(`[Socket.IO] Client ${socket.id} disconnected: ${reason}`);
-  });
-  
-  socket.on('error', (error: Error) => {
-    console.error(`[Socket.IO] Error from client ${socket.id}:`, error);
-  });
-});
-
-// Worker setup
+// --- Worker Setup ---
 let arenaWorker: NodeWorker;
 let resolutionWorker: NodeWorker;
 let dashboardWorker: NodeWorker;
@@ -251,105 +172,122 @@ function setupWorkers() {
     });
   });
 }
+setupWorkers(); // Initialize workers before setting up routes
 
-// FIX: Use explicitly imported Request, Response, and NextFunction types.
-// FIX: Use explicit express types to resolve module augmentation issues.
-const attachWorkers = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  // Workers will be terminated by the process exit handler
+// Middleware to attach workers to requests
+// FIX: Use imported Request, Response, and NextFunction types.
+const attachWorkers = (req: Request, res: Response, next: NextFunction) => {
+  req.arenaWorker = arenaWorker;
   req.resolutionWorker = resolutionWorker;
   req.dashboardWorker = dashboardWorker;
   req.autonomyWorker = autonomyWorker;
   req.marketWatcherWorker = marketWatcherWorker;
   next();
 };
+app.use(attachWorkers);
 
-// CORS error handling middleware
-// FIX: Use explicit express types to resolve module augmentation issues.
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+
+// --- API Routes ---
+// Must be attached before static file serving
+app.use('/api', apiRouter);
+
+
+// --- Production Static File Serving ---
+if (process.env.NODE_ENV === 'production') {
+  const clientPath = path.join(__dirname, '..', '..', 'client');
+  app.use(express.static(clientPath));
+
+  // Catch-all for client-side routing
+  // FIX: Use imported Request, Response, and NextFunction types.
+  app.get('*', (req: Request, res: Response, next: NextFunction) => {
+    // If the request is for an API route, let it 404 naturally
+    if (req.path.startsWith('/api/')) {
+        return next();
+    }
+    res.sendFile(path.resolve(clientPath, 'index.html'));
+  });
+}
+
+// --- Socket.IO Setup ---
+const socketConfig: any = {
+  cors: corsOptions,
+  allowEIO3: true,
+  transports: (process.env.WS_TRANSPORTS || 'websocket,polling').split(','),
+  path: process.env.WS_PATH || '/socket.io/',
+  serveClient: false,
+  connectTimeout: 30000,
+  pingTimeout: 25000,
+  pingInterval: 20000,
+};
+const io = new SocketIOServer(server, socketConfig);
+export { io };
+
+io.engine.on("connection_error", (err) => {
+  console.error('[Socket.IO] Connection error:', err.message);
+  console.error('Error details:', err);
+});
+
+io.on('connection', (socket) => {
+  const clientAddress = socket.handshake.address;
+  const clientOrigin = socket.handshake.headers.origin || 'unknown';
+  
+  console.log(`[Socket.IO] New connection from ${clientAddress} (Origin: ${clientOrigin})`);
+  
+  socket.on('authenticate', async (handle: string) => {
+    try {
+      const user = await usersCollection.findOne({ handle });
+      if (user) {
+        const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
+        rooms.forEach(room => socket.leave(room));
+        
+        await socket.join(handle);
+        console.log(`[Socket.IO] User ${handle} authenticated and joined room ${handle}`);
+        socket.emit('authenticated', { success: true, handle });
+      } else {
+        console.log(`[Socket.IO] Authentication failed: User ${handle} not found`);
+        socket.emit('authentication_error', { error: 'User not found' });
+      }
+    } catch (error) {
+      console.error(`[Socket.IO] Authentication error for ${handle}:`, error);
+      socket.emit('authentication_error', { error: 'Internal server error' });
+    }
+  });
+  
+  socket.on('disconnect', (reason: string) => {
+    console.log(`[Socket.IO] Client ${socket.id} disconnected: ${reason}`);
+  });
+  
+  socket.on('error', (error: Error) => {
+    console.error(`[Socket.IO] Error from client ${socket.id}:`, error);
+  });
+});
+
+
+// --- Error Handling ---
+// FIX: Use imported Request, Response, and NextFunction types.
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (err && err.message && err.message.includes('CORS policy')) {
     return res.status(403).json({ error: 'Not allowed by CORS' });
   }
   next(err);
 });
 
-// Export server and io instances for testing and module access
-export { io };
-
-// Global error handler for uncaught exceptions
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
-  // Don't crash the process in production
   if (process.env.NODE_ENV !== 'production') {
     process.exit(1);
   }
 });
 
-// Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
+// --- Server Start Logic ---
 export async function startServer() {
-  // Middleware setup
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true }));
-
-  // Setup workers and routes
-  setupWorkers();
-  app.use(attachWorkers);
-  app.use('/api', apiRouter);
-
-  if (process.env.NODE_ENV === 'production') {
-    const clientPath = path.join(__dirname, '..', '..', 'client');
-    app.use(express.static(clientPath));
-    // FIX: Use explicitly imported Request and Response types.
-    // FIX: Use explicit express types to resolve module augmentation issues.
-    app.get('*', (req: express.Request, res: express.Response) => {
-      res.sendFile(path.resolve(clientPath, 'index.html'));
-    });
-  }
-
-  // Socket.IO authentication and room joining
-  io.on('connection', async (socket) => {
-    console.log(`[Socket.IO] New connection from ${socket.id}`);
-    
-    socket.on('authenticate', async (handle) => {
-      try {
-        const user = await usersCollection.findOne({ handle });
-        if (user) {
-          // Leave any existing rooms
-          const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
-          rooms.forEach(room => socket.leave(room));
-          
-          // Join the user's room
-          await socket.join(handle);
-          console.log(`[Socket.IO] User ${handle} authenticated and joined room ${handle}`);
-          
-          // Send a confirmation message
-          socket.emit('authenticated', { success: true, handle });
-        } else {
-          console.log(`[Socket.IO] Authentication failed: User ${handle} not found`);
-          socket.emit('authentication_error', { error: 'User not found' });
-        }
-      } catch (error) {
-        console.error(`[Socket.IO] Authentication error for ${handle}:`, error);
-        socket.emit('authentication_error', { error: 'Internal server error' });
-      }
-    });
-    
-    socket.on('disconnect', (reason) => {
-      console.log(`[Socket.IO] Client ${socket.id} disconnected: ${reason}`);
-    });
-    
-    socket.on('error', (error) => {
-      console.error(`[Socket.IO] Error from client ${socket.id}:`, error);
-    });
-  });
-  
   const PORT = process.env.PORT || 3001;
   const HOST = process.env.HOST || '0.0.0.0';
   
-  // Only start the server if it's not already listening
   if (!server.listening) {
     server.listen(Number(PORT), HOST, async () => {
       console.log(`[Server] Server listening on http://${HOST}:${PORT}`);

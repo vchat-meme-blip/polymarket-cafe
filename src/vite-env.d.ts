@@ -1,4 +1,4 @@
-/// <reference types="vite/client" />
+// FIX: Removed the non-resolving vite/client type reference. The necessary types for import.meta.env are manually defined below.
 
 interface ImportMetaEnv {
   // API and App URLs
