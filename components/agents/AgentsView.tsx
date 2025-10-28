@@ -87,10 +87,10 @@ export default function AgentsView() {
           <View index={index + 1} track={{ current: (mainCanvasRef.current?.querySelector(`[data-vrm-index="${index}"]`) as HTMLElement) ?? null }}>
             <ambientLight intensity={1.5} />
             <directionalLight position={[3, 5, 2]} intensity={2} castShadow />
-            <group position={[0.2, 0.5, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI, 0]}>
+            <group position={[0, -0.8, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI, 0]}>
               <VrmModel modelUrl={agent.modelUrl || ''} isSpeaking={false} />
             </group>
-            <OrbitControls makeDefault enableZoom={false} enablePan={false} target={[0, 0.4, 0]} />
+            <OrbitControls makeDefault enableZoom={false} enablePan={false} target={[0, 0.8, 0]} />
           </View>
         ))}
       </Canvas>
