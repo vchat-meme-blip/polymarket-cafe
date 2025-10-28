@@ -21,26 +21,46 @@ export default function AgentActionsPanel() {
     apiService.sendAgentToCafe(userAgent.id);
   };
 
+  const handleRecallFromCafe = () => {
+    setActivity('IDLE');
+    apiService.request('/api/arena/recall-agent', {
+      method: 'POST',
+      body: JSON.stringify({ agentId: userAgent.id }),
+    });
+  };
+
   return (
     <div className={`${styles.dashboardPanel} ${styles.agentActionsPanel}`}>
       <h3 className={styles.dashboardPanelTitle}>
         <span className="icon">smart_toy</span>
         Agent Actions
       </h3>
-      <button
-        className="button"
-        onClick={handleSendToCafe}
-        disabled={isAgentInCafe}
-        title={isAgentInCafe ? 'Your agent is already in the Café' : 'Send your agent to find a room'}
-      >
-        <span className="icon">coffee</span>
-        Send to Café
-      </button>
+      
+      {isAgentInCafe ? (
+        <button
+          className="button"
+          onClick={handleRecallFromCafe}
+          title="Recall your agent from the Café back to an idle state"
+        >
+          <span className="icon">home</span>
+          Recall from Café
+        </button>
+      ) : (
+        <button
+          className="button"
+          onClick={handleSendToCafe}
+          title='Send your agent to the Café to find a room'
+        >
+          <span className="icon">coffee</span>
+          Send to Café
+        </button>
+      )}
+
       <button
         className="button"
         onClick={openCreateRoomModal}
         disabled={isAgentInCafe}
-         title={isAgentInCafe ? 'Your agent is already in the Café' : 'Create a new room with your agent as the host'}
+         title={isAgentInCafe ? 'Your agent must be recalled before hosting a new room' : 'Create a new room with your agent as the host'}
       >
         <span className="icon">add_comment</span>
         Create & Host Room

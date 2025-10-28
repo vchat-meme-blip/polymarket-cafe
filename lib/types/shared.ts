@@ -65,7 +65,7 @@ export type Agent = {
 
 // Arena types
 export type Room = {
-  id: string;
+  id?: string;
   name?: string; // Optional custom name for owned rooms
   agentIds: string[];
   hostId: string | null;

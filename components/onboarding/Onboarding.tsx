@@ -32,7 +32,9 @@ export default function Onboarding() {
   const [isSaving, setIsSaving] = useState(false);
   const [personalityKeywords, setPersonalityKeywords] = useState('');
 
+  // FIX: Access `id` property which now exists on Agent type.
   const [selectedPreset, setSelectedPreset] = useState<string>('tony-pump');
+  // FIX: Access `id` property which now exists on Agent type.
   const defaultPreset = PRESET_AGENTS.find(p => p.id === 'tony-pump') || PRESET_AGENTS[0];
   const [agent, setAgent] = useState<Partial<Agent>>({
     name: defaultPreset.name,
@@ -74,6 +76,7 @@ export default function Onboarding() {
   };
 
   const handleSelectPreset = (presetId: string) => {
+    // FIX: Access `id` property which now exists on Agent type.
     const preset = PRESET_AGENTS.find(p => p.id === presetId);
     if (preset) {
         setSelectedPreset(preset.id);
@@ -82,6 +85,7 @@ export default function Onboarding() {
             ...preset,
             // Only update the name if the user hasn't typed one or it's the default
             name: currentName && currentName !== defaultPreset.name ? currentName : preset.name,
+            // FIX: Access `id` property which now exists on Agent type.
             templateId: preset.id, // Keep track of the template
         });
     }
@@ -194,8 +198,11 @@ export default function Onboarding() {
                         {PRESET_AGENTS.map(preset => (
                             <button
                                 type="button"
+                                // FIX: Access `id` property which now exists on Agent type.
                                 key={preset.id}
+                                // FIX: Access `id` property which now exists on Agent type.
                                 className={c(styles.modelOption, { [styles.active]: selectedPreset === preset.id })}
+                                // FIX: Access `id` property which now exists on Agent type.
                                 onClick={() => handleSelectPreset(preset.id)}
                             >
                                 <div className={styles.presetName}>{preset.name}</div>

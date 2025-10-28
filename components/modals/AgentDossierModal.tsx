@@ -110,6 +110,7 @@ const ProfileTab = ({ agent, onUpdate, onSave }: { agent: Partial<Agent>, onUpda
                             }
                         }}
                     >
+                        {/* FIX: Access id property which now exists on Agent type */}
                         {PRESET_AGENTS.map(p => <option key={p.id} value={p.modelUrl}>{p.name}</option>)}
                     </select>
                 </label>

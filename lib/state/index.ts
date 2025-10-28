@@ -235,6 +235,7 @@ export const createNewAgent = (properties?: Partial<Agent>): Partial<Agent> => {
   };
 
   if (properties?.templateId) {
+    // FIX: Access `id` property which now exists on Agent type.
     const preset = PRESET_AGENTS.find(p => p.id === properties.templateId);
     if (preset) {
       return {
@@ -243,6 +244,7 @@ export const createNewAgent = (properties?: Partial<Agent>): Partial<Agent> => {
         ...properties, // User overrides (like name) come last
         ownerHandle: handle,
         templateId: undefined, // Don't persist this
+        // FIX: Access `id` property which now exists on Agent type.
         copiedFromId: preset.id,
       };
     }
@@ -267,6 +269,7 @@ export const useAgent = create(
     ensureCurrentAgentIsPersonal: () => Promise<string>;
   }>(
     (set, get) => ({
+      // FIX: Ensure initial state matches Agent and Agent[] types
       current: PRESET_AGENTS[0],
       availablePresets: PRESET_AGENTS,
       availablePersonal: [],

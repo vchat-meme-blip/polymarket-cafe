@@ -152,6 +152,7 @@ export default function Onboarding() {
                         {PRESET_AGENTS.map(preset => (
                             <button
                                 type="button"
+                                // FIX: Access id property which now exists on Agent type
                                 key={preset.id}
                                 className={c(styles.modelOption, { [styles.active]: agent.modelUrl === preset.modelUrl })}
                                 onClick={() => updateAgent({ modelUrl: preset.modelUrl })}

@@ -12,10 +12,15 @@ import Skybox from './Skybox';
 
 const agentTooltips: Record<string, { name: string; catchphrase: string }> = PRESET_AGENTS.reduce((acc, agent) => {
     let catchphrase = "Ready for action.";
+    // FIX: Access `id` property which now exists on Agent type.
     if (agent.id === 'the-stranger') catchphrase = "I speak in whispers and shadows.";
+    // FIX: Access `id` property which now exists on Agent type.
     if (agent.id === 'mexican-trump') catchphrase = 'My confidence is yuge.';
+    // FIX: Access `id` property which now exists on Agent type.
     if (agent.id === 'warlord-boudica') catchphrase = "I'm a survivor.";
+    // FIX: Access `id` property which now exists on Agent type.
     if (agent.id === 'tony-pump') catchphrase = "I don't follow trends, I set them.";
+    // FIX: Access `id` property which now exists on Agent type.
     acc[agent.id] = { name: agent.name, catchphrase };
     return acc;
 }, {} as Record<string, { name: string; catchphrase: string }>);
@@ -25,6 +30,7 @@ export default function PixarScene() {
   const [hoveredAgent, setHoveredAgent] = useState<string | null>(null);
 
   const agents = [TheStranger, MexicanTrump, TrenchBoudica, TonyPump];
+  // FIX: Access `id` property which now exists on Agent type.
   const initialTriggers = agents.reduce((acc, agent) => ({ ...acc, [agent.id]: 0 }), {});
   const [triggerKeys, setTriggerKeys] = useState<Record<string, number>>(initialTriggers);
 
@@ -32,8 +38,10 @@ export default function PixarScene() {
   useEffect(() => {
     const interval = setInterval(() => {
       const agentToTrigger = agents[Math.floor(Math.random() * agents.length)];
+      // FIX: Access `id` property which now exists on Agent type.
       setTriggerKeys((prev) => ({
         ...prev,
+        // FIX: Access `id` property which now exists on Agent type.
         [agentToTrigger.id]: (prev[agentToTrigger.id] || 0) + 1,
       }));
     }, 4000); // Trigger every 4 seconds
@@ -82,10 +90,14 @@ export default function PixarScene() {
             modelUrl={TheStranger.modelUrl!}
             idleUrl="/animations/idle_loop.vrma"
             triggerAnimationUrl="/animations/gesture_elegant.vrma"
+            // FIX: Access `id` property which now exists on Agent type.
             triggerKey={triggerKeys[TheStranger.id]}
+            // FIX: Access `id` property which now exists on Agent type.
             tooltipInfo={agentTooltips[TheStranger.id]}
+            // FIX: Access `id` property which now exists on Agent type.
             onPointerOver={() => setHoveredAgent(TheStranger.id)}
             onPointerOut={() => setHoveredAgent(null)}
+            // FIX: Access `id` property which now exists on Agent type.
             hovered={hoveredAgent === TheStranger.id}
         />
         
@@ -97,10 +109,14 @@ export default function PixarScene() {
             modelUrl={TrenchBoudica.modelUrl!}
             idleUrl="/animations/idle2.vrma"
             triggerAnimationUrl="/animations/gesture_peacesign.vrma"
+            // FIX: Access `id` property which now exists on Agent type.
             triggerKey={triggerKeys[TrenchBoudica.id]}
+            // FIX: Access `id` property which now exists on Agent type.
             tooltipInfo={agentTooltips[TrenchBoudica.id]}
+            // FIX: Access `id` property which now exists on Agent type.
             onPointerOver={() => setHoveredAgent(TrenchBoudica.id)}
             onPointerOut={() => setHoveredAgent(null)}
+            // FIX: Access `id` property which now exists on Agent type.
             hovered={hoveredAgent === TrenchBoudica.id}
         />
 
@@ -112,10 +128,14 @@ export default function PixarScene() {
             modelUrl={MexicanTrump.modelUrl!}
             idleUrl="/animations/gesture_shoot.vrma"
             triggerAnimationUrl="/animations/gesture_greeting.vrma"
+            // FIX: Access `id` property which now exists on Agent type.
             triggerKey={triggerKeys[MexicanTrump.id]}
+            // FIX: Access `id` property which now exists on Agent type.
             tooltipInfo={agentTooltips[MexicanTrump.id]}
+            // FIX: Access `id` property which now exists on Agent type.
             onPointerOver={() => setHoveredAgent(MexicanTrump.id)}
             onPointerOut={() => setHoveredAgent(null)}
+            // FIX: Access `id` property which now exists on Agent type.
             hovered={hoveredAgent === MexicanTrump.id}
             darkenFace={0.5}
         />
@@ -128,10 +148,14 @@ export default function PixarScene() {
             modelUrl={TonyPump.modelUrl!}
             idleUrl="/animations/idle_loop.vrma"
             triggerAnimationUrl="/animations/gesture_squat.vrma"
+            // FIX: Access `id` property which now exists on Agent type.
             triggerKey={triggerKeys[TonyPump.id]}
+            // FIX: Access `id` property which now exists on Agent type.
             tooltipInfo={agentTooltips[TonyPump.id]}
+            // FIX: Access `id` property which now exists on Agent type.
             onPointerOver={() => setHoveredAgent(TonyPump.id)}
             onPointerOut={() => setHoveredAgent(null)}
+            // FIX: Access `id` property which now exists on Agent type.
             hovered={hoveredAgent === TonyPump.id}
         />
       </group>

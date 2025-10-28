@@ -1,7 +1,3 @@
-// Load environment variables first
-import loadEnv from './load-env.js';
-loadEnv();
-
 import mongoose, { Collection, Document } from 'mongoose';
 import type {
   // Base types
@@ -32,9 +28,16 @@ import type {
   toSharedUser,
   toSharedAgent
 } from '../lib/types/mongodb.js';
+import { PRESET_AGENTS } from '../lib/presets/agents.js';
 
-// MONGODB_URI is now guaranteed to be set by load-env.ts
-const connectionString = process.env.MONGODB_URI!; // Non-null assertion is safe here
+const uri = process.env.MONGODB_URI;
+if (!uri) {
+  throw new Error('MONGODB_URI environment variable is not set.');
+}
+
+// Use the URI as-is without appending additional parameters
+// The connection options will be set in the mongoose.connect() call
+const connectionString = uri;
 
 // Collection references with proper typing
 export let usersCollection: Collection<UserDocument>;
@@ -137,19 +140,44 @@ process.on('SIGINT', async () => {
 export { mongoose as db };
 export default connectDB;
 
-export async function seedDatabase() {
-  const roomCount = await roomsCollection.countDocuments();
+export async function seedMcpAgents() {
+  const agentCount = await agentsCollection.countDocuments({ ownerHandle: { $exists: false } });
+  if (agentCount > 0) {
+    console.log('[DB Seeder] MCP agents already exist. Skipping seed.');
+    return;
+  }
+  
+  console.log('[DB Seeder] Seeding MCP agents...');
+  const mcpAgents = PRESET_AGENTS.map(agentTemplate => {
+    const newId = new mongoose.Types.ObjectId();
+    return {
+      ...agentTemplate,
+      _id: newId,
+      id: newId.toHexString(), // Ensure string ID is consistent
+    };
+  });
+  
+  if (mcpAgents.length > 0) {
+    await agentsCollection.insertMany(mcpAgents as any[]);
+    console.log(`[DB Seeder] Inserted ${mcpAgents.length} MCP agents.`);
+  }
+}
+
+export async function seedPublicRooms() {
+  const roomCount = await roomsCollection.countDocuments({ isOwned: { $ne: true } });
   if (roomCount > 0) {
-    console.log('[DB Seeder] Rooms collection is not empty. Skipping seed.');
+    console.log('[DB Seeder] Public rooms already exist. Skipping seed.');
     return;
   }
 
-  console.log('[DB Seeder] Rooms collection is empty. Seeding with default public rooms...');
+  console.log('[DB Seeder] Seeding with default public rooms...');
   const NUM_PUBLIC_ROOMS = 10;
   const newRooms: Room[] = [];
   for (let i = 0; i < NUM_PUBLIC_ROOMS; i++) {
+    const newId = new mongoose.Types.ObjectId();
     newRooms.push({
-      id: `room-public-${i}`,
+      _id: newId,
+      id: newId.toHexString(),
       agentIds: [],
       hostId: null,
       topics: [],
@@ -158,9 +186,16 @@ export async function seedDatabase() {
       activeOffer: null,
       vibe: 'General Chat ☕️',
       isOwned: false,
-    });
+    } as any);
   }
 
-  await roomsCollection.insertMany(newRooms as any[]);
-  console.log(`[DB Seeder] Inserted ${NUM_PUBLIC_ROOMS} public rooms into the database.`);
+  if (newRooms.length > 0) {
+    await roomsCollection.insertMany(newRooms as any[]);
+    console.log(`[DB Seeder] Inserted ${NUM_PUBLIC_ROOMS} public rooms.`);
+  }
+}
+
+export async function seedDatabase() {
+    await seedMcpAgents();
+    await seedPublicRooms();
 }

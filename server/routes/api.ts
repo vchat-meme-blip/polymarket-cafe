@@ -25,6 +25,7 @@ import { ObjectId } from 'mongodb';
 import OpenAI from 'openai';
 import { Readable } from 'stream';
 import { startOfToday, formatISO } from 'date-fns';
+import { seedDatabase } from '../db.js';
 
 const router = Router();
 
@@ -45,34 +46,24 @@ router.post('/system/reset-database', async (req, res) => {
     try {
         console.log('[API] Received request to reset database.');
         
-        // Ensure database connection is established
         if (!mongoose.connection.db) {
             throw new Error('Database connection not established');
         }
         
-        // Drop all collections
         const collections = await mongoose.connection.db.listCollections().toArray();
         await Promise.all(collections.map(async (collection: { name: string }) => {
-            await mongoose.connection.db?.dropCollection(collection.name);
-        }));
-        
-        console.log('[API] Database dropped successfully.');
-        
-        // Re-seed MCP agents
-        const mcpOps = PRESET_AGENTS.map(agent => ({
-            updateOne: {
-                filter: { id: agent.id },
-                update: { $setOnInsert: agent },
-                upsert: true
+            if (collection.name !== 'system.indexes') {
+                await mongoose.connection.db?.dropCollection(collection.name);
+                console.log(`[API] Dropped collection: ${collection.name}`);
             }
         }));
         
-        if (mcpOps.length > 0) {
-            await agentsCollection.bulkWrite(mcpOps as any);
-            console.log('[API] Re-seeded MCPs into the database.');
-        }
+        console.log('[API] All collections dropped.');
+        
+        // Re-run the comprehensive seeding logic
+        await seedDatabase();
 
-        res.status(200).json({ message: 'Database reset successfully.' });
+        res.status(200).json({ message: 'Database reset and re-seeded successfully.' });
     } catch (error) {
         console.error('[API] Error resetting database:', error);
         res.status(500).json({ message: 'Failed to reset database.' });
@@ -587,6 +578,11 @@ router.post('/autonomy/start-research', (req, res) => {
 router.post('/arena/send-to-cafe', (req, res) => {
   req.arenaWorker?.postMessage({ type: 'moveAgentToCafe', payload: req.body });
   res.status(202).send();
+});
+
+router.post('/arena/recall-agent', (req, res) => {
+    req.arenaWorker?.postMessage({ type: 'recallAgent', payload: req.body });
+    res.status(202).send();
 });
 
 router.post('/arena/create-room', (req, res) => {

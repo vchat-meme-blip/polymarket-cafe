@@ -15,8 +15,9 @@ import helmet from 'helmet';
 
 // Import routes and services
 import apiRouter from './routes/api.js';
-import { usersCollection, agentsCollection } from './db.js';
+import { usersCollection, agentsCollection, roomsCollection } from './db.js';
 import { ApiKeyManager } from './services/apiKey.service.js';
+import { seedMcpAgents, seedPublicRooms } from './db.js';
 
 // Module augmentation for Express Request
 declare global {
@@ -39,7 +40,8 @@ const __dirname = path.dirname(__filename);
 // the overloads for `app.use()`, `app.options()`, etc., and prevents middleware functions
 // from being incorrectly interpreted as `PathParams`. This resolves all "No overload matches this call"
 // errors in this file.
-const app: express.Express = express();
+// FIX: Removed explicit type annotation from `app` to allow TypeScript to infer types and resolve middleware overload errors.
+const app = express();
 const server = http.createServer(app);
 export { server };
 
@@ -307,26 +309,16 @@ export async function startServer() {
       console.log(`[Server] WebSocket path: ${socketConfig.path}`);
       console.log(`[Server] Allowed transports: ${socketConfig.transports.join(', ')}`);
 
+      // Centralized Seeding Logic
       try {
-        const { PRESET_AGENTS } = await import('../lib/presets/agents.js');
-        const mcpOps = PRESET_AGENTS.map(agent => ({
-          updateOne: {
-            filter: { id: agent.id },
-            update: { $setOnInsert: agent },
-            upsert: true
-          }
-        }));
-        
-        if (mcpOps.length > 0) {
-          await agentsCollection.bulkWrite(mcpOps as any);
-          console.log('[Server] Seeded MCPs into the database.');
-        }
+        await seedMcpAgents();
+        await seedPublicRooms();
       } catch (e) {
-        console.error('[Server] Failed to seed MCPs:', e);
+        console.error('[Server] Failed to seed database:', e);
       }
       
       // Setup worker intervals
-      setInterval(() => arenaWorker.postMessage({ type: 'tick' }), 5000); // Arena is fast-paced
+      setInterval(() => arenaWorker.postMessage({ type: 'tick' }), 10000); // Arena is slower paced now (10s)
       setInterval(() => resolutionWorker.postMessage({ type: 'tick' }), 5 * 60 * 1000); // 5min for resolution
       setInterval(() => dashboardWorker.postMessage({ type: 'tick' }), 30 * 1000); // 30s for dashboard agent
       setInterval(() => autonomyWorker.postMessage({ type: 'tick' }), 3 * 60 * 1000); // 3 minutes for autonomy
