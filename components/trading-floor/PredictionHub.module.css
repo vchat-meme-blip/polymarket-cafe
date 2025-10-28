@@ -34,7 +34,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    min-height: 60vh; /* Ensure console is usable */
+    min-height: 50vh; /* Reduced from 60vh for better mobile layout */
 }
 
 .panelHeader {
@@ -219,7 +219,7 @@
 
 
 /* Tablet styles */
-@media (min-width: 769px) {
+@media (min-width: 768px) {
     .predictionHubView {
         padding: 24px;
         overflow: hidden; /* Prevent scrolling on larger screens */

@@ -40,6 +40,8 @@
     z-index: 1;
     display: flex;
     flex-direction: column;
+    justify-content: center; /* CENTER THE MODEL */
+    align-items: center; /* CENTER THE MODEL */
 }
 
 .chatPanel {
@@ -71,17 +73,17 @@
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
-  padding: 20px;
+  padding: 16px; /* COMPACT FOR MOBILE */
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .dashboardPanelTitle {
-  font-size: 18px;
+  font-size: 16px; /* COMPACT FOR MOBILE */
   font-weight: 500;
   color: var(--Neutral-90);
-  margin-bottom: 16px;
+  margin-bottom: 12px; /* COMPACT FOR MOBILE */
   display: flex;
   align-items: center;
   gap: 8px;
@@ -209,8 +211,8 @@
 }
 .agentActionsPanel .button {
   justify-content: flex-start;
-  padding: 12px 16px;
-  font-size: 16px;
+  padding: 10px 12px; /* COMPACT FOR MOBILE */
+  font-size: 14px; /* COMPACT FOR MOBILE */
   font-weight: 500;
   background-color: var(--Neutral-20);
   color: var(--Neutral-90);
@@ -220,7 +222,7 @@
   color: white;
 }
 .agentActionsPanel .button .icon {
-  font-size: 24px;
+  font-size: 20px; /* COMPACT FOR MOBILE */
   color: var(--brand-cyan);
 }
 
@@ -633,7 +635,7 @@
     color: var(--Neutral-60);
 }
 .statItem .statValue {
-    font-size: 20px;
+    font-size: 18px; /* COMPACT FOR MOBILE */
     font-weight: bold;
     color: var(--Neutral-90);
 }
@@ -771,8 +773,8 @@
     padding: 0;
 }
 
-/* Phone styles (and wider) */
-@media (min-width: 468px) {
+/* Tablet and Desktop */
+@media (min-width: 768px) {
     .dashboardGrid {
         flex-direction: row;
         padding: 16px;
@@ -826,6 +828,25 @@
         position: relative;
         padding: 16px;
         border-top: 1px solid var(--Neutral-30);
+    }
+    
+    /* RESTORE SIZES FOR WIDER SCREENS */
+    .dashboardPanel {
+        padding: 20px;
+    }
+    .dashboardPanelTitle {
+        font-size: 18px;
+        margin-bottom: 16px;
+    }
+    .agentActionsPanel .button {
+        padding: 12px 16px;
+        font-size: 16px;
+    }
+    .agentActionsPanel .button .icon {
+        font-size: 24px;
+    }
+    .portfolioStats .statValue {
+        font-size: 20px;
     }
 }
 
