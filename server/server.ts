@@ -33,21 +33,25 @@ const __dirname = path.dirname(__filename);
 
 // Configure allowed origins based on environment
 const isProduction = process.env.NODE_ENV === 'production';
-const productionDomains = [
-  'polymarket-cafe.sliplane.app',
-  'polymarket-cafe.sliplane.app'
-];
+const mainDomain = 'polymarket-cafe.sliplane.app';
 
 // Development origins
 const devOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-  'http://192.168.10.135:5173'
+  'http://192.168.10.135:5173',
+  `http://${mainDomain}`,
+  `https://${mainDomain}`,
+  `ws://${mainDomain}`,
+  `wss://${mainDomain}`
 ];
 
-// Production origins - convert domains to https
-const prodOrigins = productionDomains.map(domain => `https://${domain}`);
+// Production origins
+const prodOrigins = [
+  `https://${mainDomain}`,
+  `wss://${mainDomain}`
+];
 
 // Combine origins based on environment
 const allowedOrigins = isProduction ? prodOrigins : [...devOrigins, ...prodOrigins];
@@ -64,84 +68,22 @@ const server = http.createServer(app);
 
 export { server };
 
-// Security headers
+// Security headers (loosened for testing)
 app.use(
   helmet({
-    contentSecurityPolicy: {
-      useDefaults: true,
-      directives: {
-        'default-src': ["'self'"],
-        'connect-src': [
-          "'self'",
-          'blob:',
-          'data:',
-          'https://*.sliplane.app',
-          'wss://*.sliplane.app',
-          'ws://localhost:*',
-          'http://localhost:*',
-        ],
-        'script-src': [
-          "'self'",
-          "'unsafe-inline'",
-          "'unsafe-eval'"
-        ],
-        'script-src-elem': [
-          "'self'",
-          "https://aistudiocdn.com",
-          "'unsafe-inline'"
-        ],
-        'style-src': [
-          "'self'",
-          "'unsafe-inline'",
-          "https://fonts.googleapis.com"
-        ],
-        'img-src': [
-          "'self'",
-          "data:",
-          "https://polymarket-upload.s3.us-east-2.amazonaws.com",
-          "https://assets.coingecko.com",
-        ],
-        'worker-src': ["'self'", "blob:"],
-        'object-src': ["'none'"],
-        'frame-ancestors': ["'none'"],
-      },
-    },
+    contentSecurityPolicy: false, // Disable CSP for testing
   })
 );
 app.disable('x-powered-by');
 
-// CORS configuration
+// Very permissive CORS for testing
 const corsOptions: cors.CorsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, success?: boolean) => void) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Allow all subdomains of sliplane.app in production
-    if (isProduction && origin.endsWith('.sliplane.app')) {
-      return callback(null, true);
-    }
-    
-    // Check against allowed origins
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    const msg = `CORS policy: ${origin} not allowed`;
-    console.warn('[CORS] Blocked request from origin:', origin);
-    return callback(new Error(msg));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'x-user-handle',
-    'x-requested-with'
-  ],
-  exposedHeaders: [
-    'Content-Length',
-    'X-Request-Id'
-  ]
+  origin: '*', // Allow all origins
+  credentials: true, // Still allow credentials if needed
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: '*', // Allow all headers
+  exposedHeaders: '*', // Expose all headers
+  maxAge: 600 // Cache preflight for 10 minutes
 };
 
 // Apply CORS middleware

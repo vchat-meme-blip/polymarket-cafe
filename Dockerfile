@@ -30,34 +30,16 @@ RUN echo "Building server..." && \
 FROM node:22-alpine
 
 # Install runtime dependencies
-RUN apk add --no-cache \
-    libusb \
-    udev \
-    curl \
-    tini \
-    && npm install -g npm@latest
+RUN apk add --no-cache libusb udev curl
 
 WORKDIR /app
 
 # Set production environment
-ENV NODE_ENV=production
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_SOCKET_URL=${VITE_SOCKET_URL}
+ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
 ENV DOCKER_ENV=true
-ENV PORT=3001
-ENV HOST=0.0.0.0
-ENV WS_PATH=/socket.io/
-ENV WS_TRANSPORTS=websocket,polling
-ENV COOKIE_DOMAIN=.sliplane.app
-
-# Application URLs - these should be set at runtime
-ENV VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:3001}
-ENV VITE_SOCKET_URL=${VITE_SOCKET_URL:-ws://localhost:3001}
-ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL:-http://localhost:3000}
-ENV NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
-ENV NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-ENV MONGODB_URI=${MONGODB_URI}
-
-# Set Node.js options
-ENV NODE_OPTIONS="--max-http-header-size=16384"
+ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
@@ -155,21 +137,12 @@ RUN set -e; \
 # Set working directory to the app root
 WORKDIR /app
 
-# Health check with WebSocket support
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/api/health || exit 1
+    CMD curl -f http://localhost:${PORT}/api/health || exit 1
 
-# Expose the HTTP and WebSocket ports
+# Expose the port your application will run on
 EXPOSE ${PORT}
-# WebSocket port (if using a separate port)
-# EXPOSE 3002
-
-# Set proper file permissions
-RUN chown -R node:node /app
-USER node
-
-# Set proper umask for file creation
-RUN umask 0002
 
 # Create a startup script with debug info and dynamic entry point detection
 RUN cat <<'EOF' > /app/startup.sh && \
@@ -240,12 +213,5 @@ log "🚀 Starting application..."
 exec node --no-warnings "$ENTRYPOINT_PATH"
 EOF
 
-# Start the application using tini as init system
-ENTRYPOINT ["/sbin/tini", "--"]
+# Start the application
 CMD ["/app/startup.sh"]
-
-# Add labels for better container management
-LABEL maintainer="Your Name <your.email@example.com>"
-LABEL org.opencontainers.image.source="https://github.com/yourusername/your-repo"
-LABEL org.opencontainers.image.description="Polymarket Cafe Application"
-LABEL org.opencontainers.image.licenses=MIT

@@ -43,9 +43,10 @@ export default defineConfig(({ mode }) => {
                     target: env.VITE_API_BASE_URL || 'http://localhost:3001',
                     changeOrigin: true,
                     secure: false,
+                    rewrite: (path) => path.replace(/^\/api/, '')
                 },
                 '/socket.io': {
-                    target: env.VITE_SOCKET_URL || 'ws://localhost:3001',
+                    target: env.VITE_SOCKET_URL ? env.VITE_SOCKET_URL.replace('wss://', 'https://').replace('ws://', 'http://') : 'http://localhost:3001',
                     // Required for WebSocket connections
                     ws: true,
                     changeOrigin: true,

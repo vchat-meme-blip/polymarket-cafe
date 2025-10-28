@@ -13,9 +13,9 @@ const isProduction = process.env.NODE_ENV === 'production';
 // For production, use the dedicated API URL from env. For development, use a relative path
 // which will be handled by the Vite proxy.
 export const API_BASE_URL = isProduction
-  ? process.env.VITE_API_BASE_URL || 'https://api.polymarket-cafe.sliplane.app'
+  ? process.env.VITE_API_BASE_URL || 'https://polymarket-cafe.sliplane.app'
   : '';
 
 export const SOCKET_URL = isProduction
-  ? process.env.VITE_SOCKET_URL || 'https://api.polymarket-cafe.sliplane.app'
-  : 'http://localhost:3001';
+  ? process.env.VITE_SOCKET_URL || 'wss://polymarket-cafe.sliplane.app'
+  : 'ws://localhost:3001';
