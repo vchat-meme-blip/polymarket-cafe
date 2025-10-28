@@ -1,10 +1,11 @@
 /// <reference types="node" />
 
 import './env.js';
-
 import connectDB, { seedDatabase } from './db.js';
-// FIX: Add .js extension to fix module resolution error.
 import { startServer } from './server.js';
+
+// Check if this is the main module
+const isMainModule = import.meta.url === `file://${process.argv[1]}`;
 
 async function main() {
   if (!process.env.MONGODB_URI || process.env.MONGODB_URI.trim() === '') {
@@ -12,7 +13,6 @@ async function main() {
     console.error('The server cannot start without a database connection string.');
     console.error('Please ensure you have a `.env.local` or `.env` file in the project root with the following content:');
     console.error('MONGODB_URI="your_mongodb_connection_string_here"\n');
-    // FIX: The global `process` object is available in Node.js environments without an explicit import.
     process.exit(1);
   }
 
@@ -25,9 +25,13 @@ async function main() {
     await startServer();
   } catch (error) {
     console.error('Failed to start server:', error);
-    // FIX: The global `process` object is available in Node.js environments without an explicit import.
     process.exit(1);
   }
+}
+
+// Only run main() if this is the main module
+if (isMainModule) {
+  main().catch(console.error);
 }
 
 main().catch(console.error);

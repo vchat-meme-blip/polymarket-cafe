@@ -1,20 +1,13 @@
 /// <reference types="node" />
 
+// FIX: Explicitly import Request, Response, and NextFunction to resolve type errors
+// with module augmentation and middleware signatures.
 import express, { Request, Response, NextFunction } from 'express';
 import { Worker as NodeWorker } from 'worker_threads';
-import http from 'http';
-import { Server as SocketIOServer } from 'socket.io';
-import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import helmet from 'helmet';
 
-// Import routes and services
-import apiRouter from './routes/api.js';
-import { usersCollection, agentsCollection } from './db.js';
-import { ApiKeyManager } from './services/apiKey.service.js';
-
-// Module augmentation for Express Request
+// FIX: Replaced global augmentation with module augmentation for 'express-serve-static-core'.
+// This is the recommended way to augment Express's Request object and resolves all
+// related type errors for req properties, app.use(), app.get(), and res.sendFile().
 declare module 'express-serve-static-core' {
   interface Request {
     arenaWorker?: NodeWorker;
@@ -25,6 +18,17 @@ declare module 'express-serve-static-core' {
   }
 }
 
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import helmet from 'helmet';
+
+import apiRouter from './routes/api.js';
+import { usersCollection, agentsCollection } from './db.js';
+import { ApiKeyManager } from './services/apiKey.service.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -32,7 +36,7 @@ const __dirname = path.dirname(__filename);
 const isProduction = process.env.NODE_ENV === 'production';
 const productionDomains = [
   'polymarketcafe.sliplane.app',
-  'polymarket-cafe.sliplane.app'
+  'polymarket-cafe.sliplane.app'  // Add all your production domains here
 ];
 
 // Development origins
@@ -55,53 +59,10 @@ if (!isProduction) {
   console.log('[Server] Allowed CORS origins:', allowedOrigins);
 }
 
-// Create Express app and HTTP server
 export const app = express();
 const server = http.createServer(app);
 
 export { server };
-
-// Security headers
-app.use(helmet());
-app.disable('x-powered-by');
-
-// CORS configuration
-const corsOptions: cors.CorsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, success?: boolean) => void) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Allow all subdomains of sliplane.app in production
-    if (isProduction && origin.endsWith('.sliplane.app')) {
-      return callback(null, true);
-    }
-    
-    // Check against allowed origins
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    const msg = `CORS policy: ${origin} not allowed`;
-    console.warn('[CORS] Blocked request from origin:', origin);
-    return callback(new Error(msg));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'x-user-handle',
-    'x-requested-with'
-  ],
-  exposedHeaders: [
-    'Content-Length',
-    'X-Request-Id'
-  ]
-};
-
-// Apply CORS middleware
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 
 // Socket.IO configuration
 const socketConfig: any = {
@@ -143,13 +104,7 @@ if (!isProduction) {
 }
 
 // Create Socket.IO server instance
-const io = new SocketIOServer(server, socketConfig);
-
-// Add connection state change logging
-io.engine.on("connection_error", (err) => {
-  console.error('[Socket.IO] Connection error:', err.message);
-  console.error('Error details:', err);
-});
+export const io = new SocketIOServer(server, socketConfig);
 
 // Handle WebSocket connections
 io.on('connection', (socket) => {
@@ -192,7 +147,137 @@ io.on('connection', (socket) => {
   });
 });
 
-// Worker setup
+// Security headers
+app.use(helmet());
+app.disable('x-powered-by');
+
+// CORS configuration
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow all subdomains of sliplane.app in production
+    if (isProduction && origin.endsWith('.sliplane.app')) {
+      return callback(null, true);
+    }
+    
+    // Check against allowed origins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    const msg = `CORS policy: ${origin} not allowed`;
+    console.warn('[CORS] Blocked request from origin:', origin);
+    return callback(new Error(msg));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'x-user-handle',
+    'x-requested-with'
+  ],
+  exposedHeaders: [
+    'Content-Length',
+    'X-Request-Id'
+  ]
+};
+
+// Apply CORS with options
+app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
+
+// Socket.IO configuration
+const socketConfig: any = {
+  cors: {
+    origin: (origin: string | undefined, callback: (err: Error | null, success?: boolean) => void) => {
+      // Allow all subdomains of sliplane.app in production
+      if (isProduction && origin && origin.endsWith('.sliplane.app')) {
+        return callback(null, true);
+      }
+      
+      // Check against allowed origins
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      
+      console.warn('[Socket.IO] Blocked connection from origin:', origin);
+      return callback(new Error('Not allowed by CORS'));
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["x-user-handle", "content-type", "authorization"],
+    credentials: true
+  },
+  allowEIO3: true,
+  transports: (process.env.WS_TRANSPORTS || 'websocket,polling').split(','),
+  path: process.env.WS_PATH || '/socket.io/',
+  serveClient: false,
+  connectTimeout: 30000,
+  pingTimeout: 25000,
+  pingInterval: 20000,
+};
+
+// In development, allow all origins for easier testing
+if (!isProduction) {
+  console.log('[Socket.IO] Running in development mode - allowing all origins');
+  socketConfig.cors = {
+    origin: true,
+    credentials: true
+  };
+}
+
+// Create Socket.IO server instance
+export const io = new SocketIOServer(server, socketConfig);
+
+// Handle WebSocket connections
+io.on('connection', (socket) => {
+  const clientAddress = socket.handshake.address;
+  const clientOrigin = socket.handshake.headers.origin || 'unknown';
+  
+  console.log(`[Socket.IO] New connection from ${clientAddress} (Origin: ${clientOrigin})`);
+  
+  // Handle authentication
+  socket.on('authenticate', async (handle: string) => {
+    try {
+      const user = await usersCollection.findOne({ handle });
+      if (user) {
+        // Leave any existing rooms
+        const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
+        rooms.forEach(room => socket.leave(room));
+        
+        // Join the user's room
+        await socket.join(handle);
+        console.log(`[Socket.IO] User ${handle} authenticated and joined room ${handle}`);
+        
+        // Send a confirmation message
+        socket.emit('authenticated', { success: true, handle });
+      } else {
+        console.log(`[Socket.IO] Authentication failed: User ${handle} not found`);
+        socket.emit('authentication_error', { error: 'User not found' });
+      }
+    } catch (error) {
+      console.error(`[Socket.IO] Authentication error for ${handle}:`, error);
+      socket.emit('authentication_error', { error: 'Internal server error' });
+    }
+  });
+  
+  socket.on('disconnect', (reason: string) => {
+    console.log(`[Socket.IO] Client ${socket.id} disconnected: ${reason}`);
+  });
+  
+  socket.on('error', (error: Error) => {
+    console.error(`[Socket.IO] Error from client ${socket.id}:`, error);
+  });
+});
+
+// Socket.IO connection handling is already set up above
+  console.log(`[Server] CORS enabled for origins: ${isProduction ? '*.sliplane.app' : allowedOrigins.join(', ')}`);
+});
+
 let arenaWorker: NodeWorker;
 let resolutionWorker: NodeWorker;
 let dashboardWorker: NodeWorker;
@@ -200,7 +285,7 @@ let autonomyWorker: NodeWorker;
 let marketWatcherWorker: NodeWorker;
 const apiKeyManager = new ApiKeyManager();
 
-function createWorker(workerPath: string): NodeWorker {
+function createWorker(workerPath: string) {
   const resolvedPath = path.resolve(__dirname, workerPath);
   return new NodeWorker(resolvedPath);
 }
@@ -267,7 +352,7 @@ function setupWorkers() {
 
 // FIX: Use explicitly imported Request, Response, and NextFunction types.
 const attachWorkers = (req: Request, res: Response, next: NextFunction) => {
-  // Workers will be terminated by the process exit handler
+  req.arenaWorker = arenaWorker;
   req.resolutionWorker = resolutionWorker;
   req.dashboardWorker = dashboardWorker;
   req.autonomyWorker = autonomyWorker;
@@ -277,14 +362,36 @@ const attachWorkers = (req: Request, res: Response, next: NextFunction) => {
 
 // CORS error handling middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  if (err && err.message && err.message.includes('CORS policy')) {
+  if (err.message.includes('CORS policy')) {
     return res.status(403).json({ error: 'Not allowed by CORS' });
   }
   next(err);
 });
 
 // Export server and io instances for testing and module access
-export { io };
+export const io = new SocketIOServer(server, socketConfig);
+
+// Add connection state change logging
+io.engine.on("connection_error", (err) => {
+  console.error('[Socket.IO] Connection error:', err.message);
+  console.error('Error details:', err);
+});
+
+// Log when a client connects
+io.on('connection', (socket) => {
+  const clientAddress = socket.handshake.address;
+  const clientOrigin = socket.handshake.headers.origin;
+  
+  console.log(`[Socket.IO] Client connected from ${clientAddress} (Origin: ${clientOrigin})`);
+  
+  socket.on('disconnect', (reason) => {
+    console.log(`[Socket.IO] Client disconnected. Reason: ${reason}`);
+  });
+  
+  socket.on('error', (error) => {
+    console.error('[Socket.IO] Socket error:', error);
+  });
+});
 
 // Global error handler for uncaught exceptions
 process.on('uncaughtException', (error) => {
