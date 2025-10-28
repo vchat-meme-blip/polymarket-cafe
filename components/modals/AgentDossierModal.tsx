@@ -21,7 +21,7 @@ import { useArenaStore } from '../../lib/state/arena.js';
 import { ttsService } from '../../lib/services/tts.service.js';
 import { useAutonomyStore } from '../../lib/state/autonomy.js';
 
-const ProfileTab = ({ agent, onUpdate, onSave }: { agent: Agent, onUpdate: (updates: Partial<Agent>) => void, onSave: () => void }) => {
+const ProfileTab = ({ agent, onUpdate, onSave }: { agent: Partial<Agent>, onUpdate: (updates: Partial<Agent>) => void, onSave: () => void }) => {
     const [isBrainstorming, setIsBrainstorming] = useState(false);
     const [personalityKeywords, setPersonalityKeywords] = useState('');
     const [voices, setVoices] = useState<VoiceProfile[]>(() => [...AVAILABLE_VOICES]);
@@ -186,7 +186,7 @@ const ProfileTab = ({ agent, onUpdate, onSave }: { agent: Agent, onUpdate: (upda
     );
 };
 
-const OperationsTab = ({ agent, onUpdate }: { agent: Agent, onUpdate: (updates: Partial<Agent>) => void }) => {
+const OperationsTab = ({ agent, onUpdate }: { agent: Partial<Agent>, onUpdate: (updates: Partial<Agent>) => void }) => {
     return (
         <div className={styles.operationsContainer}>
             <h4>Autonomous Behavior Configuration</h4>
@@ -363,7 +363,7 @@ const LedgerAndReportTab = ({ agentId }: { agentId: string }) => {
     );
 };
 
-const IntelBriefingTab = ({ agent }: { agent: Agent }) => {
+const IntelBriefingTab = ({ agent }: { agent: Partial<Agent> }) => {
     const { addToast } = useUI();
     const [isSaving, setIsSaving] = useState(false);
     const [market, setMarket] = useState('');
@@ -393,7 +393,7 @@ const IntelBriefingTab = ({ agent }: { agent: Agent }) => {
         }
         setIsSaving(true);
         try {
-            await apiService.addBettingIntel(agent.id, {
+            await apiService.addBettingIntel(agent.id!, {
                 market,
                 content,
                 sourceDescription: source,
@@ -502,7 +502,8 @@ export default function AgentDossierModal({ agentId }: { agentId: string }) {
     const initialAgentData = availablePersonal.find(a => a.id === agentId) || 
                              (isCreatingAgentInDossier ? createNewAgent({ id: agentId }) : null);
                              
-    const [formData, setFormData] = useState<Agent | null>(initialAgentData);
+    // FIX: Changed state to hold Partial<Agent> to correctly handle incomplete objects during creation.
+    const [formData, setFormData] = useState<Partial<Agent> | null>(initialAgentData);
 
     if (!formData) {
         console.error("Dossier opened for a non-existent agent!");
@@ -512,17 +513,30 @@ export default function AgentDossierModal({ agentId }: { agentId: string }) {
 
     const handleSave = async () => {
         setIsSaving(true);
-
-        // Optimistic UI update
+    
         if (isCreatingAgentInDossier) {
-            const finalAgent = { ...formData, ownerHandle: handle };
-            useAgent.getState().addAgent(finalAgent as Agent);
-            await apiService.saveNewAgent(finalAgent as Agent);
+            // FIX: The server now generates the agent ID.
+            // We call the API, get the saved agent with a real ID, and then add it to the local store.
+            // This avoids optimistic updates with temporary IDs and fixes the type error.
+            const agentToCreate = { ...formData, ownerHandle: handle };
+            try {
+                const { agent: savedAgent } = await apiService.saveNewAgent(agentToCreate);
+                useAgent.getState().addAgent(savedAgent);
+            } catch (error) {
+                console.error('Failed to create agent:', error);
+                // Optionally add a toast message for the user
+            }
         } else {
+            // FIX: Add a guard to ensure formData and its id exist before updating.
+            if (!formData.id) {
+                console.error("Cannot update agent without an ID.");
+                setIsSaving(false);
+                return;
+            }
             useAgent.getState().update(formData.id, formData);
             await apiService.updateAgent(formData.id, formData);
         }
-
+    
         setIsSaving(false);
         closeAgentDossier();
     };
@@ -540,10 +554,10 @@ export default function AgentDossierModal({ agentId }: { agentId: string }) {
                     <button className={c(styles.tabButton, { [styles.active]: activeTab === 'activity' })} onClick={() => setActiveTab('activity')} disabled={isCreatingAgentInDossier}>Ledger & Report</button>
                 </div>
                 <div className={styles.modalContent}>
-                    {activeTab === 'profile' && <ProfileTab agent={formData} onUpdate={(updates) => setFormData(prev => prev ? {...prev, ...updates} : null)} onSave={handleSave} />}
+                    {activeTab === 'profile' && <ProfileTab agent={formData as Agent} onUpdate={(updates) => setFormData(prev => prev ? {...prev, ...updates} : null)} onSave={handleSave} />}
                     {activeTab === 'intel' && <IntelBriefingTab agent={formData} />}
                     {activeTab === 'operations' && <OperationsTab agent={formData} onUpdate={(updates) => setFormData(prev => prev ? {...prev, ...updates} : null)} />}
-                    {activeTab === 'activity' && <LedgerAndReportTab agentId={formData.id} />}
+                    {activeTab === 'activity' && <LedgerAndReportTab agentId={formData.id!} />}
                 </div>
             </div>
         </Modal>

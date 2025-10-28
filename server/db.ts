@@ -1,3 +1,7 @@
+// Load environment variables first
+import loadEnv from './load-env.js';
+loadEnv();
+
 import mongoose, { Collection, Document } from 'mongoose';
 import type {
   // Base types
@@ -29,14 +33,8 @@ import type {
   toSharedAgent
 } from '../lib/types/mongodb.js';
 
-const uri = process.env.MONGODB_URI;
-if (!uri) {
-  throw new Error('MONGODB_URI environment variable is not set.');
-}
-
-// Use the URI as-is without appending additional parameters
-// The connection options will be set in the mongoose.connect() call
-const connectionString = uri;
+// MONGODB_URI is now guaranteed to be set by load-env.ts
+const connectionString = process.env.MONGODB_URI!; // Non-null assertion is safe here
 
 // Collection references with proper typing
 export let usersCollection: Collection<UserDocument>;

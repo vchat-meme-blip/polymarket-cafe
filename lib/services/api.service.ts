@@ -83,7 +83,8 @@ class ApiService {
   }
 
   // --- Agents ---
-  async saveNewAgent(agent: Agent): Promise<{ agent: Agent }> {
+  // FIX: Changed agent type from Agent to Partial<Agent> because the client does not create the ID.
+  async saveNewAgent(agent: Partial<Agent>): Promise<{ agent: Agent }> {
     return this.request<{ agent: Agent }>('/api/agents', {
       method: 'POST',
       body: JSON.stringify(agent),

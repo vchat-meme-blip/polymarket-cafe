@@ -8,7 +8,8 @@ import { useState } from 'react';
 // FIX: The 'Agent' type is not exported from 'presets'. It is now imported from its correct source file 'lib/types/index.js'.
 import type { Agent } from '../lib/types/index.js';
 import { PRESET_AGENTS } from '../lib/presets/agents';
-import { useUser, createNewAgent } from '../lib/state';
+// FIX: Added useAgent import to manage agent state.
+import { useUser, createNewAgent, useAgent } from '../lib/state';
 import c from 'classnames';
 // FIX: Add .js extension for ES module compatibility.
 import { apiService } from '../lib/services/api.service.js';
@@ -83,10 +84,17 @@ export default function Onboarding() {
       modelUrl: agent.modelUrl,
     });
     
-    await apiService.saveNewAgent(finalAgent);
-    
-    completeOnboarding();
-    setIsSaving(false);
+    // FIX: Awaited agent creation and added the agent returned from the server to the state store.
+    try {
+        const { agent: savedAgent } = await apiService.saveNewAgent(finalAgent);
+        useAgent.getState().addAgent(savedAgent);
+        completeOnboarding();
+    } catch (error) {
+        console.error("Failed to save agent:", error);
+        alert("There was a problem creating your agent. Please try again.");
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const isStep1Valid = agent.name && agent.name.trim().length > 0;

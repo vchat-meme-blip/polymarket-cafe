@@ -77,15 +77,11 @@ export default function Onboarding() {
     const preset = PRESET_AGENTS.find(p => p.id === presetId);
     if (preset) {
         setSelectedPreset(preset.id);
+        const currentName = agent.name;
         updateAgent({
-            modelUrl: preset.modelUrl,
-            // Only update the name if the user hasn't typed one
-            name: agent.name && step > 1 ? agent.name : preset.name, 
-            personality: preset.personality,
-            voice: preset.voice,
-            instructions: preset.instructions,
-            topics: preset.topics,
-            wishlist: preset.wishlist,
+            ...preset,
+            // Only update the name if the user hasn't typed one or it's the default
+            name: currentName && currentName !== defaultPreset.name ? currentName : preset.name,
             templateId: preset.id, // Keep track of the template
         });
     }
@@ -106,7 +102,7 @@ export default function Onboarding() {
     try {
       // The server is now the source of truth. It will create the agent,
       // assign a proper ID, and return the final object.
-      const { agent: savedAgent } = await apiService.saveNewAgent(agentDataToSend);
+      const { agent: savedAgent } = await apiService.saveNewAgent(agentDataToSend as Agent);
 
       // Add the server-validated agent to our local state.
       addAgent(savedAgent);

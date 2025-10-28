@@ -35,7 +35,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- App & Server Initialization ---
-// FIX: Explicitly type `app` as `express.Express`. This helps TypeScript correctly resolve
+// FIX: Explicitly typed `app` as `express.Express`. This helps TypeScript correctly resolve
 // the overloads for `app.use()`, `app.options()`, etc., and prevents middleware functions
 // from being incorrectly interpreted as `PathParams`. This resolves all "No overload matches this call"
 // errors in this file.

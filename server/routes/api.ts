@@ -220,15 +220,15 @@ router.get('/users/recover/:address', async (req, res) => {
 // --- Agents ---
 router.post('/agents', async (req, res) => {
     try {
-        const agentData = req.body as Partial<Agent>;
+        const agentData = req.body as Omit<Agent, 'id' | '_id'>;
         
         // Server is the authority for IDs.
         const newId = new ObjectId();
         
         const newAgent: Agent = {
             ...agentData,
-            id: newId.toHexString(),
-            _id: newId,
+            id: newId.toHexString(), // The string representation for client-side use
+            _id: newId, // The ObjectId for database use
             ownerHandle: res.locals.userHandle,
         } as Agent;
         

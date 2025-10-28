@@ -393,13 +393,13 @@ export class ArenaDirector {
             console.log(`[ArenaDirector] Kicking agent ${agentId} from room ${roomId}. Ban: ${!!ban}`);
             await this.moveAgent(agentId, null);
             
-            if (ban) {
+            if (ban && mongoose.Types.ObjectId.isValid(agentId)) {
                 const room = this.rooms.get(roomId);
                 if (room) {
                     room.bannedAgentIds = [...(room.bannedAgentIds || []), agentId];
                     this.rooms.set(roomId, room);
                     await roomsCollection.updateOne(
-                        { id: roomId },
+                        { _id: new mongoose.Types.ObjectId(roomId) },
                         { $addToSet: { bannedAgentIds: new mongoose.Types.ObjectId(agentId) } }
                     );
                     this.emitToMain?.({ type: 'socketEmit', event: 'roomUpdated', payload: { room } });
@@ -440,7 +440,7 @@ export class ArenaDirector {
         }
 
         // Remove from old room if they were in one
-        if (fromRoomId) {
+        if (fromRoomId && mongoose.Types.ObjectId.isValid(fromRoomId)) {
             const fromRoom = this.rooms.get(fromRoomId);
             if (fromRoom) {
                 fromRoom.agentIds = fromRoom.agentIds.filter(id => id !== agentId);
@@ -489,7 +489,7 @@ export class ArenaDirector {
         }
 
         // Add to new room
-        if (toRoomId) {
+        if (toRoomId && mongoose.Types.ObjectId.isValid(toRoomId)) {
             const toRoom = this.rooms.get(toRoomId);
             if (toRoom && toRoom.agentIds.length < 2 && !toRoom.agentIds.includes(agentId)) {
                 toRoom.agentIds.push(agentId);
@@ -497,8 +497,8 @@ export class ArenaDirector {
                 this.rooms.set(toRoomId, toRoom);
                 
                 // Convert agentIds to ObjectId for database operation
-                const agentIdsAsObjectIds = toRoom.agentIds.map(id => new ObjectId(id));
-                const hostIdObj = toRoom.hostId ? new ObjectId(toRoom.hostId) : null;
+                const agentIdsAsObjectIds = toRoom.agentIds.filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new ObjectId(id));
+                const hostIdObj = toRoom.hostId && mongoose.Types.ObjectId.isValid(toRoom.hostId) ? new ObjectId(toRoom.hostId) : null;
                 
                 await roomsCollection.updateOne(
                     { _id: new ObjectId(toRoomId) }, 
@@ -521,6 +521,11 @@ export class ArenaDirector {
     }
     
     private async handleCreateOffer(seller: Agent, buyer: Agent, room: Room, args: { intel_id: string; price: number }) {
+        if (!mongoose.Types.ObjectId.isValid(args.intel_id) || !mongoose.Types.ObjectId.isValid(seller.id)) {
+            console.warn(`[ArenaDirector] Invalid ID format for intel or seller in createOffer.`);
+            return;
+        }
+
         const intel = await bettingIntelCollection.findOne({ 
             _id: new ObjectId(args.intel_id), 
             ownerAgentId: new ObjectId(seller.id), 
@@ -559,8 +564,13 @@ export class ArenaDirector {
 
     private async handleAcceptOffer(buyer: Agent, seller: Agent, room: Room, args: { offer_id: string }) {
         const offer = room.activeOffer;
-        if (!offer) {
+        if (!offer || !offer.intelId) {
             console.warn(`[ArenaDirector] No active offer to accept in room ${room.id}`);
+            return;
+        }
+        
+        if (!mongoose.Types.ObjectId.isValid(buyer.id) || !mongoose.Types.ObjectId.isValid(seller.id) || !mongoose.Types.ObjectId.isValid(offer.intelId) || !mongoose.Types.ObjectId.isValid(room.id)) {
+            console.warn(`[ArenaDirector] Invalid ID format for buyer, seller, intel, or room in acceptOffer.`);
             return;
         }
 

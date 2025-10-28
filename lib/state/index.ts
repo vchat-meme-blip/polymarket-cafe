@@ -209,12 +209,11 @@ export const useUser = create(
 /**
  * Agents
  */
-export const createNewAgent = (properties?: Partial<Agent>): Agent => {
+export const createNewAgent = (properties?: Partial<Agent>): Partial<Agent> => {
   const { handle } = useUser.getState();
   
-  // The client no longer generates an ID. The server will do this.
-  const baseAgent = {
-    id: '', // Will be assigned by the server
+  // The client no longer generates an ID. It only assembles the data to be sent.
+  const baseAgent: Partial<Agent> = {
     name: properties?.name || 'New Quant',
     personality: properties?.personality || '',
     instructions: properties?.instructions || "My goal is to be a great conversation partner...",
@@ -242,7 +241,6 @@ export const createNewAgent = (properties?: Partial<Agent>): Agent => {
         ...baseAgent,
         ...preset,
         ...properties, // User overrides (like name) come last
-        id: '', // Ensure ID is empty
         ownerHandle: handle,
         templateId: undefined, // Don't persist this
         copiedFromId: preset.id,
@@ -250,7 +248,7 @@ export const createNewAgent = (properties?: Partial<Agent>): Agent => {
     }
   }
   
-  return baseAgent as Agent;
+  return baseAgent;
 };
 
 function getAgentById(id: string, personalAgents: Agent[], presetAgents: Agent[]) {
@@ -323,7 +321,7 @@ export const useAgent = create(
             ownerHandle: handle,
           });
           
-          const { agent: savedAgent } = await apiService.saveNewAgent(newPersonalAgent);
+          const { agent: savedAgent } = await apiService.saveNewAgent(newPersonalAgent as Agent);
           useAgent.setState({ availablePersonal: [...get().availablePersonal, savedAgent] });
           set({ current: savedAgent });
           return savedAgent.id;
