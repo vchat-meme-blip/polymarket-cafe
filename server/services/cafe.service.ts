@@ -1,6 +1,7 @@
 import { Agent, Room } from '../../lib/types/index.js';
 import { roomsCollection } from '../db.js';
 import { shuffle } from 'lodash';
+import { ObjectId } from 'mongodb';
 
 class CafeService {
     public findWanderingAgents(
@@ -30,7 +31,7 @@ class CafeService {
 
     public async createRoom(host: Agent): Promise<Room> {
         const newRoom: Room = {
-            id: `room-${Math.random().toString(36).substring(2, 7)}`,
+            id: `room-${new ObjectId().toHexString()}`,
             agentIds: [host.id],
             hostId: host.id,
             topics: host.topics,

@@ -261,6 +261,8 @@ export class ArenaDirector {
             }
         } catch (error) {
             console.error(`[ArenaDirector] Error in processConversation for room ${room?.id}:`, error);
+        } finally {
+            this.setThinking(speaker.id, false);
         }
     }
 
@@ -705,6 +707,7 @@ export class ArenaDirector {
                 rooms: Array.from(this.rooms.values()),
                 agentLocations: Object.fromEntries(this.agentLocations),
                 thinkingAgents: Array.from(this.thinkingAgents),
+                systemPaused: this.systemPaused,
             }
         });
     }

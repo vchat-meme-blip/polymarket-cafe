@@ -47,6 +47,28 @@ const ThinkingIndicator = () => {
   );
 };
 
+const CooldownHologram = () => {
+    const ref = useRef<any>(null);
+    useFrame(({ clock }) => {
+        if (ref.current) {
+            ref.current.fillOpacity = 0.6 + 0.4 * Math.sin(clock.getElapsedTime() * 3);
+        }
+    });
+    return (
+        <Text
+            ref={ref}
+            position={[0, 0.8, 0]}
+            fontSize={0.25}
+            color="#ff4757"
+            anchorX="center"
+            anchorY="middle"
+            material-toneMapped={false}
+        >
+            SYSTEM COOLDOWN
+        </Text>
+    );
+};
+
 const HolographicOffer = ({ offer }: { offer: Offer }) => {
   const ref = useRef<any>(null);
   useFrame(({ clock }) => { if (ref.current) { ref.current.fillOpacity = 0.5 + 0.5 * Math.sin(clock.getElapsedTime() * 5); } });
@@ -78,7 +100,8 @@ type RoomSceneProps = { room: RoomType; };
 function RoomScene({ room }: RoomSceneProps) {
     const { availablePresets, availablePersonal } = useAgent();
     const allAgents = useMemo(() => [...availablePresets, ...availablePersonal], [availablePresets, availablePersonal]);
-    const { thinkingAgents, agentConversations, lastSyncTimestamp } = useArenaStore();
+    // FIX: Add `systemPaused` to the store selector to resolve property not found error.
+    const { thinkingAgents, agentConversations, lastSyncTimestamp, systemPaused } = useArenaStore();
     const roomAgents = room.agentIds.map(id => getAgentById(id, allAgents)).filter((a): a is Agent => !!a);
     const vibeColor = useMemo(() => new THREE.Color(VIBE_COLORS[room.vibe || 'General Chat ☕️'] || '#9b59b6'), [room.vibe]);
     
@@ -182,8 +205,9 @@ function RoomScene({ room }: RoomSceneProps) {
                 <cylinderGeometry args={[0.5, 0.4, 0.7, 16]}/>
                 <meshStandardMaterial color="#ffffff" roughness={0.1} metalness={0.2} />
             </mesh>
-
-            {room.activeOffer && <HolographicOffer key={offerKey} offer={room.activeOffer} />}
+            
+            {systemPaused && <CooldownHologram />}
+            {room.activeOffer && !systemPaused && <HolographicOffer key={offerKey} offer={room.activeOffer} />}
             
             {roomAgents.map((agent, index) => {
                 const isSpeaking = latestTurn?.agentId === agent.id;

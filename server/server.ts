@@ -2,7 +2,8 @@
 
 // FIX: Import Request, Response, and NextFunction types from express to fix middleware and request/response typing issues.
 // FIX: Import the Express type to explicitly type the app instance, resolving a cascade of type errors.
-import express, { Express, Request, Response, NextFunction } from 'express';
+// FIX: Add RequestHandler and ErrorRequestHandler for explicit middleware typing.
+import express, { Express, Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
 import { Worker as NodeWorker } from 'worker_threads';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
@@ -177,8 +178,9 @@ function setupWorkers() {
 }
 setupWorkers(); // Initialize workers before setting up routes
 
+// FIX: Explicitly type middleware to help TypeScript resolve augmented request types.
 // Middleware to attach workers to requests
-const attachWorkers = (req: Request, res: Response, next: NextFunction) => {
+const attachWorkers: RequestHandler = (req, res, next) => {
   req.arenaWorker = arenaWorker;
   req.resolutionWorker = resolutionWorker;
   req.dashboardWorker = dashboardWorker;
@@ -265,13 +267,15 @@ io.on('connection', (socket) => {
 
 
 // --- Error Handling ---
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+// FIX: Use the explicit ErrorRequestHandler type to ensure correct type inference for `res`.
+const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   if (err && err.message && err.message.includes('CORS policy')) {
     return res.status(403).json({ error: 'Not allowed by CORS' });
   }
   console.error('[Server] Unhandled error:', err);
   res.status(500).json({ error: 'Internal Server Error' });
-});
+};
+app.use(errorHandler);
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);

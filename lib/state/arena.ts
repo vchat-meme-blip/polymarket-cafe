@@ -32,6 +32,7 @@ export type ArenaState = {
   lastSyncTimestamp: number; // When the last worldState sync happened
   tradeHistory: TradeRecord[];
   lastTradeDetails: TradeRecord | null;
+  systemPaused: boolean;
   hydrate: (data?: ServerHydrationData) => void;
   // Actions initiated by client UI
   moveAgentToRoom: (agentId: string, roomId: string) => void;
@@ -42,7 +43,8 @@ export type ArenaState = {
   updateRoomFromSocket: (room: Room) => void;
   addRoom: (room: Room) => void;
   recordActivityInRoom: (roomId: string) => void;
-  syncWorldState: (worldState: { rooms: Room[], agentLocations: Record<string, string | null>, thinkingAgents: string[] }) => void;
+  // FIX: Add systemPaused to the syncWorldState signature.
+  syncWorldState: (worldState: { rooms: Room[], agentLocations: Record<string, string | null>, thinkingAgents: string[], systemPaused: boolean }) => void;
   recordTrade: (trade: TradeRecord) => void;
   setLastTradeDetails: (trade: TradeRecord | null) => void;
   removeRoom: (roomId: string) => void;
@@ -159,6 +161,7 @@ export const useArenaStore = create(
         lastSyncTimestamp: Date.now(),
         tradeHistory: [],
         lastTradeDetails: null,
+        systemPaused: false,
 
         hydrate: (data) => set(state => {
           if (!data || !Array.isArray(data.rooms)) {
@@ -246,6 +249,7 @@ export const useArenaStore = create(
             rooms: worldState.rooms,
             agentLocations: worldState.agentLocations,
             thinkingAgents: new Set(worldState.thinkingAgents),
+            systemPaused: worldState.systemPaused,
             // Track when the last sync happened
             lastSyncTimestamp: Date.now()
           };
