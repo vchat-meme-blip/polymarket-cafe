@@ -176,39 +176,42 @@ export function VrmModel({ modelUrl, animationUrl, idleUrl, triggerAnimationUrl,
 
   // Effect for robust auto-scaling and optional grounding
   useEffect(() => {
-    if (vrm) {
-      // Defer execution to ensure scene graph is updated
+    if (vrm?.scene) {
       const timeoutId = setTimeout(() => {
         if (!vrm.scene) return;
         
-        // --- 1. Sizing Pass ---
-        // Standard target height for all VRM models across the application
-        const TARGET_HEIGHT = 1.75; // Target height in scene units (meters)
+        // --- Sizing Pass ---
         const box = new THREE.Box3().setFromObject(vrm.scene);
         const currentHeight = box.max.y - box.min.y;
-        
-        if (currentHeight > 0.1) { // Avoid division by zero or tiny values
-            const scaleFactor = TARGET_HEIGHT / currentHeight;
-            vrm.scene.scale.set(scaleFactor, scaleFactor, scaleFactor);
-        } else {
-            console.warn(`[VrmModel] Invalid height for ${modelUrl}. Sizing skipped.`);
+        if (currentHeight > 0.1) {
+            const scaleFactor = 1.65 / currentHeight;
+            vrm.scene.scale.setScalar(scaleFactor);
         }
         
-        // --- 2. Grounding Pass (only if not disabled) ---
-        // For Café rooms, we want to skip this step to maintain the position set by ArenaAgent
+        // --- Grounding Pass (Robust & Corrected) ---
         if (!disableAutoGrounding) {
-          // We MUST update the world matrix after scaling to get the new bounding box
-          vrm.scene.updateMatrixWorld(true); 
+          // After scaling, update matrix to get new world-space box
+          vrm.scene.updateMatrixWorld(true);
           const postScaleBox = new THREE.Box3().setFromObject(vrm.scene);
           
           if (!postScaleBox.isEmpty()) {
-              // Apply standard grounding plus any additional vertical offset
-              vrm.scene.position.y = -postScaleBox.min.y + verticalOffset;
-          } else {
-              console.warn(`[VrmModel] Could not calculate bounding box for ${modelUrl}. Model may not be grounded correctly.`);
+            // The goal is to move the model so that its feet (the minimum y of its bounding box)
+            // are at the y=0 origin of its parent container.
+            const center = postScaleBox.getCenter(new THREE.Vector3());
+            const size = postScaleBox.getSize(new THREE.Vector3());
+
+            // The model's position property is its center. To move its bottom to y=0,
+            // we need to set its center to be at y = half its height.
+            // However, the bounding box is in WORLD coordinates. We need to adjust the LOCAL position.
+            // The adjustment is the difference between the model's current world center.y and its desired world center.y
+            const desiredCenterY = postScaleBox.min.y + size.y / 2; // This is where the center *should* be to be grounded
+            const worldOffset = center.y - desiredCenterY;
+
+            // Since the parent group is not scaled, a world offset on Y is the same as a local offset.
+            vrm.scene.position.y -= worldOffset;
+            vrm.scene.position.y += verticalOffset;
           }
         } else if (verticalOffset !== 0) {
-          // Even with auto-grounding disabled, still apply vertical offset if specified
           vrm.scene.position.y += verticalOffset;
         }
       }, 0);
