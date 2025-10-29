@@ -1,6 +1,11 @@
 // Load environment variables first
-import loadEnv from '../load-env.js';
-loadEnv();
+import { config } from 'dotenv';
+import path from 'path';
+
+// Load .env file from project root
+const envPath = path.resolve(process.cwd(), '.env.local');
+config({ path: envPath });
+console.log(`Loading environment from: ${envPath}`);
 
 import connectDB from '../db.js';
 import mongoose, { Connection } from 'mongoose';
@@ -33,13 +38,6 @@ async function resetDatabase() {
     }
     
     console.log('Database reset complete!');
-    console.log('Re-seeding initial data...');
-    
-    // Re-run the seed function to create initial data
-    const { seedDatabase } = await import('../db.js');
-    await seedDatabase();
-    
-    console.log('Database reset and re-seeded successfully!');
     process.exit(0);
   } catch (error) {
     console.error('Error resetting database:', error);

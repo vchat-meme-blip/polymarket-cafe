@@ -53,6 +53,9 @@ async function main() {
         case 'tick':
           arenaDirector.tick();
           break;
+        case 'reinitialize':
+          arenaDirector.initialize(emitToMain);
+          break;
         case 'getWorldState':
           arenaDirector.getWorldState();
           break;

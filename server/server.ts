@@ -23,7 +23,7 @@ import helmet from 'helmet';
 import apiRouter from './routes/api.js';
 import { usersCollection, agentsCollection, roomsCollection } from './db.js';
 import { ApiKeyManager } from './services/apiKey.service.js';
-import { seedMcpAgents, seedPublicRooms } from './db.js';
+import { seedMcpAgents } from './db.js';
 
 // Module augmentation for Express Request
 declare global {
@@ -66,7 +66,6 @@ if (!isProduction) {
 // --- Middleware Setup ---
 
 // 1. Security headers
-// FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -107,14 +106,11 @@ const corsOptions: cors.CorsOptions = {
   exposedHeaders: ['Content-Length', 'X-Request-Id']
 };
 
-// FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
 app.use(cors(corsOptions) as any);
 app.options('*', cors(corsOptions) as any);
 
 // 3. Body parsers
-// FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
 app.use(express.json({ limit: '10mb' }) as any);
-// FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
 app.use(express.urlencoded({ extended: true }) as any);
 
 
@@ -193,7 +189,6 @@ function setupWorkers() {
 setupWorkers();
 
 // 4. Middleware to attach workers to requests
-// FIX: Changed type from `express.RequestHandler` to the imported `RequestHandler`.
 const attachWorkers: RequestHandler = (req, res, next) => {
   req.arenaWorker = arenaWorker;
   req.resolutionWorker = resolutionWorker;
@@ -202,7 +197,6 @@ const attachWorkers: RequestHandler = (req, res, next) => {
   req.marketWatcherWorker = marketWatcherWorker;
   next();
 };
-// FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
 app.use(attachWorkers as any);
 
 
@@ -215,12 +209,10 @@ if (isProduction) {
   const clientBuildPath = path.join(__dirname, '..', '..', 'client');
   
   // Serve static files (JS, CSS, images, etc.)
-  // FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
   app.use(express.static(clientBuildPath) as any);
 
   // For any other GET request that doesn't match an API route or a static file,
   // send the main index.html file. This is the catch-all for client-side routing.
-  // FIX: Removed explicit type annotations for req and res to rely on Express's type inference, which resolves the 'sendFile does not exist' error.
   app.get('*', (req, res) => {
     res.sendFile(path.join(clientBuildPath, 'index.html'));
   });
@@ -283,7 +275,6 @@ io.on('connection', (socket) => {
 
 
 // --- Error Handling ---
-// FIX: Changed type from `express.ErrorRequestHandler` to the imported `ErrorRequestHandler`.
 const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   if (err && err.message && err.message.includes('CORS policy')) {
     return res.status(403).json({ error: 'Not allowed by CORS' });
@@ -293,7 +284,6 @@ const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
-// FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
 app.use(errorHandler as any);
 
 process.on('uncaughtException', (error) => {
@@ -323,14 +313,9 @@ export async function startServer() {
       // Centralized Seeding Logic
       try {
         const agentCount = await agentsCollection.countDocuments();
-        const roomCount = await roomsCollection.countDocuments();
         if(agentCount === 0) {
             await seedMcpAgents();
             console.log('[Server] Seeded MCPs into the database.');
-        }
-        if(roomCount === 0) {
-            await seedPublicRooms();
-            console.log('[Server] Seeded public rooms into the database.');
         }
       } catch (e) {
         console.error('[Server] Failed to seed database:', e);

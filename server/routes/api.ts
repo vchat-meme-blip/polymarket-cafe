@@ -63,6 +63,9 @@ router.post('/system/reset-database', async (req, res) => {
         // Re-run the comprehensive seeding logic
         await seedDatabase();
 
+        // Tell workers to re-initialize their state from the now-fresh DB
+        req.arenaWorker?.postMessage({ type: 'reinitialize' });
+
         res.status(200).json({ message: 'Database reset and re-seeded successfully.' });
     } catch (error) {
         console.error('[API] Error resetting database:', error);

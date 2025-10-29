@@ -72,6 +72,14 @@ export class ArenaDirector {
     public async initialize(emitCallback: EmitToMainThread) {
         this.emitToMain = emitCallback;
         console.log('[ArenaDirector] Initializing and loading state from DB...');
+        
+        // Clear existing in-memory state before reloading
+        this.agents.clear();
+        this.rooms.clear();
+        this.agentLocations.clear();
+        this.conversations.clear();
+        this.thinkingAgents.clear();
+        this.isInitialized = false;
 
         // Load all agents
         const allAgents = await agentsCollection.find({}).toArray();
@@ -94,7 +102,6 @@ export class ArenaDirector {
             const roomId = room._id.toString();
             const roomData: Room = {
                 ...room,
-                // FIX: Cast `room` to `any` to access the `id` property. The `RoomDocument` type incorrectly omits the `id` field, which exists on the documents in the database, causing a type error.
                 id: (room as any).id || roomId, // Use custom ID if it exists
                 _id: room._id,
                 hostId: room.hostId?.toString() || null,
@@ -199,7 +206,6 @@ export class ArenaDirector {
                 await this.moveAgent(hostAgent.id, room.id);
             } else if (!shouldBeInRoom && isAgentInRoom) {
                 console.log(`[ArenaDirector] Agent ${hostAgent.name} is ending their shift. Leaving owned room ${room.id}.`);
-                // FIX: Corrected undefined 'agentId' to 'hostAgent.id'.
                 await this.moveAgent(hostAgent.id, null);
             }
         }
@@ -229,7 +235,6 @@ export class ArenaDirector {
             // Handle tool calls first
             if (toolCalls && toolCalls.length > 0) {
                 for (const toolCall of toolCalls) {
-                    // FIX: Added a type guard to ensure toolCall is of type 'function' before accessing 'function' property, resolving a TypeScript error where the type was not being narrowed correctly.
                     if (toolCall.type === 'function') {
                         if (toolCall.function.name === 'create_intel_offer') {
                             await this.handleCreateOffer(speaker, listener, room, JSON.parse(toolCall.function.arguments));
@@ -270,18 +275,17 @@ export class ArenaDirector {
         }
     }
     
-    // FIX: Overhauled wandering agent logic. It now strictly fills existing rooms first and only creates new rooms as a last resort, preventing room explosion and ensuring ceil(agents/2) logic.
     private async processWanderingAgents() {
         try {
-            // Get all agents that should be in the public pool
             const wanderingAgents = shuffle(
                 Array.from(this.agents.values()).filter(agent => {
                     const isWandering = this.agentLocations.get(agent.id) === null;
                     if (!isWandering) return false;
 
+                    // Don't move agents who are supposed to be in their owned room but are wandering for some reason
                     const ownedRoom = Array.from(this.rooms.values()).find(r => r.isOwned && r.ownerHandle === agent.ownerHandle);
                     if (ownedRoom && isWithinOperatingHours(agent.operatingHours)) {
-                        return false; // Should be in their store
+                        return false; 
                     }
                     return true;
                 })
@@ -291,44 +295,41 @@ export class ArenaDirector {
 
             let availableWanderers = [...wanderingAgents];
 
-            // Phase 1: Fill any public rooms that have only one occupant
+            // 1. Fill single-occupant public rooms
             const singleOccupantRooms = Array.from(this.rooms.values()).filter(
                 room => !room.isOwned && room.agentIds.length === 1
             );
-
             for (const room of singleOccupantRooms) {
                 if (availableWanderers.length === 0) break;
                 const joiner = availableWanderers.pop()!;
-                console.log(`[ArenaDirector] Agent ${joiner.name} is joining single-occupant room ${room.name || room.id}.`);
+                console.log(`[ArenaDirector] Moving wandering agent ${joiner.name} to fill room ${room.id}.`);
                 await this.moveAgent(joiner.id, room.id);
             }
 
-            // Phase 2: Use existing empty public rooms for remaining pairs
-            const emptyPublicRooms = Array.from(this.rooms.values()).filter(
+            // 2. Pair remaining wanderers into empty public rooms
+            let emptyPublicRooms = Array.from(this.rooms.values()).filter(
                 room => !room.isOwned && room.agentIds.length === 0
             );
-
             while (availableWanderers.length >= 2 && emptyPublicRooms.length > 0) {
                 const agent1 = availableWanderers.pop()!;
                 const agent2 = availableWanderers.pop()!;
                 const targetRoom = emptyPublicRooms.pop()!;
-                console.log(`[ArenaDirector] Pairing ${agent1.name} and ${agent2.name} in existing empty room ${targetRoom.name || targetRoom.id}.`);
+                console.log(`[ArenaDirector] Pairing ${agent1.name} and ${agent2.name} into empty room ${targetRoom.id}.`);
                 await this.moveAgent(agent1.id, targetRoom.id);
                 await this.moveAgent(agent2.id, targetRoom.id);
             }
 
-            // Phase 3: If pairs still remain, create new rooms for them as a last resort
+            // 3. If still wanderers left, create new rooms for pairs
             while (availableWanderers.length >= 2) {
                 const agent1 = availableWanderers.pop()!;
                 const agent2 = availableWanderers.pop()!;
-                console.log(`[ArenaDirector] No empty rooms left. Creating new room for ${agent1.name} and ${agent2.name}.`);
+                
+                console.log(`[ArenaDirector] No empty rooms. Creating new room for ${agent1.name} and ${agent2.name}.`);
                 const newRoomId = await this.createAndHostRoom(agent1.id, true);
                 if (newRoomId) {
                     await this.moveAgent(agent2.id, newRoomId);
                 }
             }
-            
-            // Any single remaining agent will continue wandering until the next tick.
 
         } catch (error) {
             console.error('[ArenaDirector] Error in processWanderingAgents:', error);
@@ -374,12 +375,10 @@ export class ArenaDirector {
         }
     }
 
-    // FIX: Updated to generate sequential names and IDs for new public rooms, fixing the "?" ID bug.
     public async createAndHostRoom(agentId: string, silent = false): Promise<string | null> {
         const agent = this.agents.get(agentId);
         if (!agent) return null;
     
-        // Determine the next public room number
         const publicRooms = Array.from(this.rooms.values()).filter(r => r.id?.startsWith('public-'));
         const roomNumbers = publicRooms.map(r => parseInt(r.id!.split('-')[1], 10)).filter(n => !isNaN(n));
         const newRoomNumber = roomNumbers.length > 0 ? Math.max(...roomNumbers) + 1 : 1;
@@ -401,30 +400,25 @@ export class ArenaDirector {
     private async moveAgent(agentId: string, toRoomId: string | null) {
         const fromRoomId = this.agentLocations.get(agentId);
         
-        // Agent is already where they need to be.
         if (fromRoomId === toRoomId) return;
 
-        // --- Update 'from' room ---
         if (fromRoomId) {
             const fromRoom = this.rooms.get(fromRoomId);
             if (fromRoom) {
                 fromRoom.agentIds = fromRoom.agentIds.filter(id => id !== agentId);
                 
-                // If room becomes empty but is owned, just clear host if host left.
                 if (fromRoom.agentIds.length === 0) {
                     fromRoom.hostId = null;
-                    fromRoom.activeOffer = null; // Clear offer when room is empty
+                    fromRoom.activeOffer = null; 
                     this.conversations.delete(fromRoom.id);
                 } else if (fromRoom.hostId === agentId) {
-                    // If host leaves, make the other agent the host.
                     fromRoom.hostId = fromRoom.agentIds[0];
                 }
                 
                 this.rooms.set(fromRoomId, fromRoom);
                 
-                // Persist changes to DB
                 if (fromRoom.agentIds.length === 0 && !fromRoom.isOwned) {
-                    this.rooms.delete(fromRoomId); // Also delete from memory
+                    this.rooms.delete(fromRoomId); 
                     await roomsCollection.deleteOne({ _id: new ObjectId(fromRoom._id) });
                 } else {
                      await roomsCollection.updateOne(
@@ -441,7 +435,6 @@ export class ArenaDirector {
             }
         }
 
-        // --- Update 'to' room ---
         if (toRoomId) {
             const toRoom = this.rooms.get(toRoomId);
             if (toRoom && toRoom.agentIds.length < 2 && !toRoom.agentIds.includes(agentId)) {
@@ -449,7 +442,6 @@ export class ArenaDirector {
                 this.agentLocations.set(agentId, toRoomId);
                 this.rooms.set(toRoomId, toRoom);
                 
-                // Persist changes to DB
                 await roomsCollection.updateOne(
                     { _id: new ObjectId(toRoom._id) }, 
                     { $addToSet: { agentIds: new ObjectId(agentId) } }
@@ -459,7 +451,6 @@ export class ArenaDirector {
                 this.agentLocations.set(agentId, null);
             }
         } else {
-            // Moving to wandering state
             this.agentLocations.set(agentId, null);
         }
         
@@ -521,20 +512,17 @@ export class ArenaDirector {
             return;
         }
 
-        // Convert string IDs to ObjectId for database operations
         const buyerId = new ObjectId(buyer.id);
         const sellerId = new ObjectId(seller.id);
         const intelId = new ObjectId(offer.intelId);
         const roomId = new ObjectId(room._id);
 
-        // Get the original intel
         const originalIntel = await bettingIntelCollection.findOne({ _id: intelId });
         if (!originalIntel) {
             console.warn(`[ArenaDirector] Intel ${offer.intelId} not found`);
             return;
         }
 
-        // Create a new intel record for the buyer
         const newIntelForBuyer = {
             ...originalIntel,
             _id: new ObjectId(),
@@ -548,12 +536,10 @@ export class ArenaDirector {
             updatedAt: new Date()
         };
 
-        // Insert the new intel record for the buyer
         const { insertedId } = await bettingIntelCollection.insertOne(newIntelForBuyer);
         const savedIntel = await bettingIntelCollection.findOne({ _id: insertedId });
 
         if (savedIntel && buyer.ownerHandle) {
-            // Notify the buyer's owner of the new intel
             this.emitToMain?.({
                 type: 'socketEmit',
                 event: 'newIntel',
@@ -562,7 +548,6 @@ export class ArenaDirector {
             });
         }
 
-        // Update PNL for both agents
         await agentsCollection.bulkWrite([
             { 
                 updateOne: { 
@@ -578,13 +563,11 @@ export class ArenaDirector {
             }
         ]);
         
-        // Update intel PNL for the original piece of intel
         await bettingIntelCollection.updateOne(
             { _id: intelId }, 
             { $inc: { 'pnlGenerated.amount': offer.price } }
         );
 
-        // Create trade record
         const trade: TradeRecord = {
             fromId: seller.id,
             toId: buyer.id,
@@ -596,7 +579,6 @@ export class ArenaDirector {
             roomId: roomId.toString()
         };
 
-        // Clear the offer
         room.activeOffer = null;
         this.rooms.set(room.id, room);
         await roomsCollection.updateOne(
@@ -604,7 +586,6 @@ export class ArenaDirector {
             { $set: { activeOffer: null } }
         );
 
-        // Emit events
         this.emitToMain?.({ 
             type: 'socketEmit', 
             event: 'tradeExecuted', 
@@ -617,7 +598,6 @@ export class ArenaDirector {
             payload: { room } 
         });
 
-        // Send notifications
         await this.sendTradeNotifications(seller, buyer, trade);
     }
 

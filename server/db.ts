@@ -31,6 +31,10 @@ import type {
 } from '../lib/types/mongodb.js';
 import { PRESET_AGENTS } from '../lib/presets/agents.js';
 
+// Load environment variables first
+import loadEnv from './load-env.js';
+loadEnv();
+
 const uri = process.env.MONGODB_URI;
 if (!uri) {
   throw new Error('MONGODB_URI environment variable is not set.');
