@@ -94,7 +94,7 @@ export default function AgentsView() {
             <group position={[0.2, 0.5, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI, 0]}>
               <VrmModel modelUrl={agent.modelUrl || ''} isSpeaking={false} />
             </group>
-            <OrbitControls makeDefault enableZoom={false} enablePan={false} target={[0.5, 0.5, 0]} />
+            <OrbitControls makeDefault enableZoom={false} enablePan={false} target={[0.5, -0.5, 0]} />
           </View>
         ))}
       </Canvas>
