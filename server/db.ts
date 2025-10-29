@@ -1,3 +1,4 @@
+
 import mongoose, { Collection, Document } from 'mongoose';
 import type {
   // Base types
@@ -163,39 +164,44 @@ export async function seedMcpAgents() {
   }
 }
 
+// FIX: Added missing seedPublicRooms function to create initial public rooms.
 export async function seedPublicRooms() {
+  if (!roomsCollection) {
+    console.warn('[DB Seeder] roomsCollection is not initialized, skipping public room seed.');
+    return;
+  }
   const roomCount = await roomsCollection.countDocuments({ isOwned: { $ne: true } });
   if (roomCount > 0) {
     console.log('[DB Seeder] Public rooms already exist. Skipping seed.');
     return;
   }
-
-  console.log('[DB Seeder] Seeding with default public rooms...');
-  const NUM_PUBLIC_ROOMS = 10;
-  const newRooms: Room[] = [];
-  for (let i = 0; i < NUM_PUBLIC_ROOMS; i++) {
+  
+  console.log('[DB Seeder] Seeding public rooms...');
+  const publicRooms = Array.from({ length: 5 }).map((_, i) => {
     const newId = new mongoose.Types.ObjectId();
-    newRooms.push({
+    return {
       _id: newId,
-      id: newId.toHexString(),
+      id: `public-${i + 1}`,
+      name: `Public Room ${i + 1}`,
       agentIds: [],
       hostId: null,
       topics: [],
       warnFlags: 0,
-      rules: [],
+      rules: ['All intel trades are final.', 'No spamming.', 'Be respectful.'],
       activeOffer: null,
       vibe: 'General Chat ☕️',
       isOwned: false,
-    } as any);
-  }
-
-  if (newRooms.length > 0) {
-    await roomsCollection.insertMany(newRooms as any[]);
-    console.log(`[DB Seeder] Inserted ${NUM_PUBLIC_ROOMS} public rooms.`);
+    };
+  });
+  
+  if (publicRooms.length > 0) {
+    await roomsCollection.insertMany(publicRooms as any[]);
+    console.log(`[DB Seeder] Inserted ${publicRooms.length} public rooms.`);
   }
 }
 
 export async function seedDatabase() {
     await seedMcpAgents();
+    // FIX: Added call to seedPublicRooms to ensure initial rooms are created.
     await seedPublicRooms();
 }

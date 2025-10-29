@@ -41,6 +41,7 @@ export default function ArenaAgent({ agent, isSpeaking }: ArenaAgentProps) {
             idleUrl={idleAnimation}
             triggerAnimationUrl="/animations/gesture_talk.vrma"
             triggerKey={animationTriggerKey}
+            disableAutoGrounding={false}
         />
     );
 };

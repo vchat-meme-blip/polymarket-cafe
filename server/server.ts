@@ -1,3 +1,4 @@
+
 /// <reference types="node" />
 
 // FIX: Changed express import style to resolve middleware type overload errors.
@@ -111,8 +112,10 @@ app.use(cors(corsOptions) as any);
 app.options('*', cors(corsOptions) as any);
 
 // 3. Body parsers
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
+app.use(express.json({ limit: '10mb' }) as any);
+// FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
+app.use(express.urlencoded({ extended: true }) as any);
 
 
 // --- Worker Setup ---
