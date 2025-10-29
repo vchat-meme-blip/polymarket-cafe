@@ -152,13 +152,35 @@ function setupWorkers() {
         }
       } else if (message.type === 'requestApiKey') {
         const key = apiKeyManager.getKey();
+        const allOnCooldown = apiKeyManager.areAllKeysOnCooldown();
+
+        if (key === null && allOnCooldown) {
+            const PAUSE_DURATION_MS = 15000; // Pause for 15 seconds
+            console.log(`[Server] All API keys are on cooldown. Initiating system-wide pause for ${PAUSE_DURATION_MS / 1000}s.`);
+            
+            const pauseUntil = Date.now() + PAUSE_DURATION_MS;
+
+            // Broadcast pause to relevant workers
+            arenaWorker.postMessage({ type: 'systemPause', payload: { until: pauseUntil } });
+            autonomyWorker.postMessage({ type: 'systemPause', payload: { until: pauseUntil } });
+            dashboardWorker.postMessage({ type: 'systemPause', payload: { until: pauseUntil } });
+
+            // Schedule a resume broadcast
+            setTimeout(() => {
+                console.log('[Server] System-wide pause ended. Resuming operations.');
+                arenaWorker.postMessage({ type: 'systemResume' });
+                autonomyWorker.postMessage({ type: 'systemResume' });
+                dashboardWorker.postMessage({ type: 'systemResume' });
+            }, PAUSE_DURATION_MS);
+        }
+
         worker.postMessage({
           type: 'apiKeyResponse',
           payload: {
             key,
             requestId: message.payload.requestId,
             agentId: message.payload.agentId,
-            allKeysOnCooldown: key === null && apiKeyManager.areAllKeysOnCooldown()
+            allKeysOnCooldown: allOnCooldown
           }
         });
       } else if (message.type === 'reportRateLimit') {

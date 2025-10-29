@@ -1,4 +1,5 @@
 
+
 import { agentsCollection, bettingIntelCollection, usersCollection } from '../db.js';
 import { ObjectId } from 'mongodb';
 import type { Agent } from '../../lib/types/shared.js';
@@ -14,14 +15,28 @@ export class AutonomyDirector {
     private emitToMain?: EmitToMainThread;
     private isTicking = false;
     private agentStates: Map<string, { lastActionTime: number; isBusy: boolean }> = new Map();
+    private systemPaused = false;
+    private pauseUntil = 0;
 
     public initialize(emitCallback: EmitToMainThread) {
         this.emitToMain = emitCallback;
         console.log('[AutonomyDirector] Initialized.');
     }
 
+    public handleSystemPause(until: number) {
+        this.systemPaused = true;
+        this.pauseUntil = until;
+    }
+
+    public handleSystemResume() {
+        this.systemPaused = false;
+    }
+
     public async tick() {
-        if (this.isTicking) return;
+        if (this.isTicking || (this.systemPaused && Date.now() < this.pauseUntil)) {
+             if (this.systemPaused) console.log('[AutonomyDirector] Tick skipped due to system pause.');
+             return;
+        }
         this.isTicking = true;
         console.log('[AutonomyDirector] Starting autonomy tick...');
         
@@ -205,7 +220,7 @@ export class AutonomyDirector {
         };
         
         try {
-            await bettingIntelCollection.insertOne(document as BettingIntelDocument);
+            await bettingIntelCollection.insertOne(document as any);
             return document.toShared();
         } catch (error) {
             console.error('Error saving intel:', error);

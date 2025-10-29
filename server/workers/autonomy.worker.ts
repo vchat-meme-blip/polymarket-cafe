@@ -9,6 +9,8 @@ if (!parentPort) {
 }
 
 const autonomyDirector = new AutonomyDirector();
+let systemPaused = false;
+let pauseUntil = 0;
 
 async function main() {
   await connectDB();
@@ -22,6 +24,23 @@ async function main() {
   // Add null check before using parentPort
   if (parentPort) {
     parentPort.on('message', (message: { type: string; payload: any; }) => {
+      if (message.type === 'systemPause') {
+        systemPaused = true;
+        pauseUntil = message.payload.until;
+        autonomyDirector.handleSystemPause(pauseUntil);
+        return;
+      }
+      if (message.type === 'systemResume') {
+          systemPaused = false;
+          autonomyDirector.handleSystemResume();
+          return;
+      }
+
+      if (systemPaused && Date.now() < pauseUntil) {
+          console.log(`[AutonomyWorker] Ignoring message type '${message.type}' - system paused.`);
+          return;
+      }
+
       switch (message.type) {
         case 'tick':
           autonomyDirector.tick();

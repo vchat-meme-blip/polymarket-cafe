@@ -23,13 +23,28 @@ export class DashboardAgentDirector {
     private emitToMain?: EmitToMainThread;
     private agentStates: Map<string, { lastActionTime: number; isBusy: boolean }> = new Map();
     private readonly ACTION_COOLDOWN = 2 * 60 * 1000; // 2 minutes
+    private systemPaused = false;
+    private pauseUntil = 0;
 
     public initialize(emitCallback: EmitToMainThread) {
         this.emitToMain = emitCallback;
         console.log('[DashboardDirector] Initialized.');
     }
 
+    public handleSystemPause(until: number) {
+        this.systemPaused = true;
+        this.pauseUntil = until;
+    }
+
+    public handleSystemResume() {
+        this.systemPaused = false;
+    }
+
     public async tick() {
+        if (this.systemPaused && Date.now() < this.pauseUntil) {
+            console.log('[DashboardDirector] Tick skipped due to system pause.');
+            return;
+        }
         try {
             const userDocs = await usersCollection.find({ currentAgentId: { $exists: true, $ne: null as any } }).toArray();
             for (const userDoc of userDocs) {
@@ -71,30 +86,24 @@ export class DashboardAgentDirector {
         // Convert MongoDB document to Agent type
         const agent: Agent = {
             id: agentDoc.id,
-            name: agentDoc.name || 'Unnamed Agent',
+            name: agentDoc.name,
             personality: agentDoc.personality || '',
             instructions: agentDoc.instructions || '',
             voice: agentDoc.voice || 'default',
-            topics: Array.isArray(agentDoc.topics) ? agentDoc.topics : [],
-            wishlist: Array.isArray(agentDoc.wishlist) ? agentDoc.wishlist : [],
+            topics: Array.isArray(agentDoc.topics) ? [...agentDoc.topics] : [],
+            wishlist: Array.isArray(agentDoc.wishlist) ? [...agentDoc.wishlist] : [],
             reputation: typeof agentDoc.reputation === 'number' ? agentDoc.reputation : 0,
             isShilling: !!agentDoc.isShilling,
             shillInstructions: agentDoc.shillInstructions || '',
             modelUrl: agentDoc.modelUrl || '',
             bettingHistory: [], // Initialize as empty array since we don't need the actual bets here
             currentPnl: typeof agentDoc.currentPnl === 'number' ? agentDoc.currentPnl : 0,
+            ownerHandle: agentDoc.ownerHandle,
+            // Add any other required Agent properties with defaults
             bettingIntel: [],
             marketWatchlists: [],
-            boxBalance: typeof agentDoc.boxBalance === 'number' ? agentDoc.boxBalance : 0,
-            portfolio: agentDoc.portfolio || {},
-            // Optional fields
-            ownerHandle: agentDoc.ownerHandle,
-            isProactive: agentDoc.isProactive,
-            trustedRoomIds: agentDoc.trustedRoomIds,
-            operatingHours: agentDoc.operatingHours,
-            mode: agentDoc.mode,
-            templateId: agentDoc.templateId,
-            copiedFromId: agentDoc.copiedFromId
+            boxBalance: 0,
+            portfolio: {}
         };
 
         agentState.isBusy = true;

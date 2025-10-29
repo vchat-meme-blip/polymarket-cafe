@@ -10,6 +10,8 @@ if (!parentPort) {
 }
 
 const dashboardDirector = new DashboardAgentDirector();
+let systemPaused = false;
+let pauseUntil = 0;
 
 async function main() {
   await connectDB();
@@ -23,7 +25,18 @@ async function main() {
   parentPort?.on('message', (message: { type: string; payload: any; }) => {
     if (message.type === 'apiKeyResponse') {
       apiKeyProvider.handleMessage(message);
+    } else if (message.type === 'systemPause') {
+        systemPaused = true;
+        pauseUntil = message.payload.until;
+        dashboardDirector.handleSystemPause(pauseUntil);
+    } else if (message.type === 'systemResume') {
+        systemPaused = false;
+        dashboardDirector.handleSystemResume();
     } else {
+      if (systemPaused && Date.now() < pauseUntil) {
+          console.log(`[DashboardWorker] Ignoring message type '${message.type}' - system paused.`);
+          return;
+      }
       switch (message.type) {
         case 'tick':
           dashboardDirector.tick();
