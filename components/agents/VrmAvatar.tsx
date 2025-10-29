@@ -176,39 +176,46 @@ export function VrmModel({ modelUrl, animationUrl, idleUrl, triggerAnimationUrl,
 
   // Effect for robust auto-scaling and optional grounding
   useEffect(() => {
-    if (vrm) {
-      // Defer execution to ensure scene graph is updated
+    if (vrm?.scene) {
       const timeoutId = setTimeout(() => {
         if (!vrm.scene) return;
         
         // --- 1. Sizing Pass ---
-        // Standard target height for all VRM models across the application
-        const TARGET_HEIGHT = 1.75; // Target height in scene units (meters)
+        const TARGET_HEIGHT = 1.75;
         const box = new THREE.Box3().setFromObject(vrm.scene);
         const currentHeight = box.max.y - box.min.y;
         
-        if (currentHeight > 0.1) { // Avoid division by zero or tiny values
+        if (currentHeight > 0.1) {
             const scaleFactor = TARGET_HEIGHT / currentHeight;
-            vrm.scene.scale.set(scaleFactor, scaleFactor, scaleFactor);
+            vrm.scene.scale.setScalar(scaleFactor);
         } else {
             console.warn(`[VrmModel] Invalid height for ${modelUrl}. Sizing skipped.`);
         }
         
-        // --- 2. Grounding Pass (only if not disabled) ---
-        // For Café rooms, we want to skip this step to maintain the position set by ArenaAgent
+        // --- 2. Grounding Pass (Robust & Corrected) ---
         if (!disableAutoGrounding) {
-          // We MUST update the world matrix after scaling to get the new bounding box
-          vrm.scene.updateMatrixWorld(true); 
+          // After scaling, update matrix to get new world-space box
+          vrm.scene.updateMatrixWorld(true);
           const postScaleBox = new THREE.Box3().setFromObject(vrm.scene);
           
           if (!postScaleBox.isEmpty()) {
-              // Apply standard grounding plus any additional vertical offset
-              vrm.scene.position.y = -postScaleBox.min.y + verticalOffset;
-          } else {
-              console.warn(`[VrmModel] Could not calculate bounding box for ${modelUrl}. Model may not be grounded correctly.`);
+            // Get the model's world position and the world position of its lowest point ("feet")
+            const modelWorldPos = vrm.scene.getWorldPosition(new THREE.Vector3());
+            const feetWorldY = postScaleBox.min.y;
+            
+            // Calculate the difference in the Y-axis. This is the offset of the feet
+            // from the model's origin, in world units.
+            const feetOffsetFromOrigin = feetWorldY - modelWorldPos.y;
+            
+            // Adjust the model's LOCAL position to counteract this offset.
+            // This effectively moves the model up or down so its feet align with its origin plane (y=0).
+            vrm.scene.position.y -= feetOffsetFromOrigin;
+
+            // Apply any additional vertical offset
+            vrm.scene.position.y += verticalOffset;
           }
         } else if (verticalOffset !== 0) {
-          // Even with auto-grounding disabled, still apply vertical offset if specified
+          // If auto-grounding is disabled, just apply the manual offset
           vrm.scene.position.y += verticalOffset;
         }
       }, 0);

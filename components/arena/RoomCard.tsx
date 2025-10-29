@@ -106,7 +106,7 @@ function RoomScene({ room }: RoomSceneProps) {
     const vibeColor = useMemo(() => new THREE.Color(VIBE_COLORS[room.vibe || 'General Chat ☕️'] || '#9b59b6'), [room.vibe]);
     
     const wallpaperUrl = useMemo(() => {
-        const roomNumber = parseInt(room.id.replace(/\D/g, ''), 10) || 0;
+        const roomNumber = parseInt((room.id || '').replace(/\D/g, ''), 10) || 0;
         return WALLPAPER_URLS[roomNumber % WALLPAPER_URLS.length];
     }, [room.id]);
 

@@ -66,23 +66,23 @@ const ProfileTab = ({ agent, onUpdate, onSave }: { agent: Partial<Agent>, onUpda
                 <div className={styles.previewRenderer}>
                     <div style={{ position: 'relative', width: '100%', height: '300px' }}>
                         <Canvas
-                            camera={{ position: [0, 1.3, 3], fov: 50 }}
+                            camera={{ position: [0, 1.0, 2.5], fov: 40 }}
                             gl={{ antialias: true, alpha: true }}
                             shadows
                         >
                             <ambientLight intensity={1.5} />
                             <directionalLight position={[3, 1, 2]} intensity={2} castShadow />
-                            <group position={[0.2, 0, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI, 0]} scale={1.0}>
+                            <group position={[0, -0.8, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0.2 : (0.2 + Math.PI), 0]} scale={1.0}>
                                 <VrmModel 
                                     modelUrl={agent.modelUrl || ''} 
-                                    isSpeaking={true}
-                                    disableAutoGrounding={true}
+                                    isSpeaking={false}
+                                    disableAutoGrounding={false}
                                 />
                             </group>
                             <OrbitControls
                                 enableZoom={false}
                                 enablePan={false}
-                                target={[0, 0.3, 0]}
+                                target={[0, 0.9, 0]}
                             />
                         </Canvas>
                     </div>
