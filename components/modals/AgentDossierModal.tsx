@@ -82,7 +82,7 @@ const ProfileTab = ({ agent, onUpdate, onSave }: { agent: Partial<Agent>, onUpda
                             <OrbitControls
                                 enableZoom={false}
                                 enablePan={false}
-                                target={[0, 0.9, 0]}
+                                target={[0, 0.5, 0]}
                             />
                         </Canvas>
                     </div>
