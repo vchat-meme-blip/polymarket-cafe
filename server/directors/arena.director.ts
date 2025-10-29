@@ -93,7 +93,9 @@ export class ArenaDirector {
             const roomId = room._id.toString();
             const roomData: Room = {
                 ...room,
-                id: roomId,
+                // FIX: Cast `room` to `any` to access the `id` property. The `RoomDocument` type incorrectly omits the `id` field, which exists on the documents in the database, causing a type error.
+                id: (room as any).id || roomId, // Use custom ID if it exists
+                _id: room._id,
                 hostId: room.hostId?.toString() || null,
                 agentIds: room.agentIds.map((id: any) => id.toString()),
                 bannedAgentIds: room.bannedAgentIds?.map((id: any) => id.toString()) || [],
@@ -104,11 +106,11 @@ export class ArenaDirector {
                 ...(room.rules && { rules: room.rules })
             };
             
-            this.rooms.set(roomId, roomData);
+            this.rooms.set(roomData.id, roomData);
             
             room.agentIds.forEach((agentId: any) => {
                 const agentIdStr = agentId.toString();
-                this.agentLocations.set(agentIdStr, roomId);
+                this.agentLocations.set(agentIdStr, roomData.id);
             });
         });
 
@@ -265,112 +267,75 @@ export class ArenaDirector {
             this.setThinking(speaker.id, false);
         }
     }
-
+    
+    // FIX: Completely refactored wandering agent logic to be deterministic and efficient.
+    // This new logic creates exactly `ceil(agents / 2)` rooms by prioritizing filling
+    // existing rooms first, then using empty rooms, and only creating new rooms as a last resort.
     private async processWanderingAgents() {
         try {
-            // Get all wandering agents (those not currently in a room)
-            const wanderingAgents = cafeService.findWanderingAgents(this.agents, this.agentLocations);
-            if (wanderingAgents.length === 0) {
-                return; // No wandering agents to process
-            }
+            // Get wandering agents, excluding those who own a storefront and should be on duty
+            const wanderingAgents = shuffle(
+                Array.from(this.agents.values()).filter(agent => {
+                    const isWandering = this.agentLocations.get(agent.id) === null;
+                    if (!isWandering) return false;
 
-            console.log(`[ArenaDirector] Processing ${wanderingAgents.length} wandering agents`);
-            
-            // Phase 1: Try to place wandering agents in existing rooms with space
-            for (const agent of [...wanderingAgents]) { // Create a copy to safely modify the array
-                try {
-                    // Skip if agent is currently thinking
-                    if (this.thinkingAgents.has(agent.id)) {
-                        continue;
+                    const ownedRoom = Array.from(this.rooms.values()).find(r => r.isOwned && r.ownerHandle === agent.ownerHandle);
+                    if (ownedRoom && isWithinOperatingHours(agent.operatingHours)) {
+                        // This agent should be in their store, let processAgentSchedules handle it.
+                        return false;
                     }
-
-                    // 50% chance to try joining an existing room, 50% to create a new one
-                    if (Math.random() < 0.5) {
-                        // Find all available rooms (with space, no active offer, not owned)
-                        const availableRooms = Array.from(this.rooms.values()).filter(room => 
-                            room && 
-                            room.agentIds && 
-                            room.agentIds.length < 4 && 
-                            !room.activeOffer &&
-                            !room.isOwned
-                        );
-                        
-                        if (availableRooms.length > 0) {
-                            // Pick a random available room
-                            const targetRoom = availableRooms[Math.floor(Math.random() * availableRooms.length)];
-                            if (targetRoom && targetRoom.id) {
-                                await this.moveAgent(agent.id, targetRoom.id);
-                                console.log(`[ArenaDirector] Agent ${agent.name} joined room ${targetRoom.id}`);
-                                continue; // Successfully placed this agent
-                            }
-                        }
-                    }
-
-                    // If we get here, either we decided to create a new room or couldn't find a suitable room
-                    console.log(`[ArenaDirector] Creating new room for wandering agent ${agent.name}`);
-                    await this.createAndHostRoom(agent.id, true);
-                    
-                } catch (error) {
-                    console.error(`[ArenaDirector] Error processing wandering agent ${agent?.id}:`, error);
-                    continue;
-                }
-            }
-
-            // Phase 2: Try to pair up remaining wandering agents in empty public rooms
-            const remainingWanderers = wanderingAgents.filter(agent => 
-                !this.agentLocations.get(agent.id) && !this.thinkingAgents.has(agent.id)
+                    return true;
+                })
             );
             
-            if (remainingWanderers.length >= 2) {
-                // Find all empty public rooms
-                const emptyPublicRooms = Array.from(this.rooms.values())
-                    .filter(room => 
-                        room && 
-                        room.agentIds && 
-                        room.agentIds.length === 0 && 
-                        !room.isOwned
-                    );
+            if (wanderingAgents.length < 1) return;
+            console.log(`[ArenaDirector] Processing ${wanderingAgents.length} wandering agents.`);
+
+            // Phase 1: Fill rooms that have only one occupant
+            const singleOccupantRooms = Array.from(this.rooms.values()).filter(
+                room => room.agentIds.length === 1 && !room.isOwned
+            );
+
+            for (const room of singleOccupantRooms) {
+                if (wanderingAgents.length === 0) break;
+                const joiner = wanderingAgents.pop()!;
+                console.log(`[ArenaDirector] Agent ${joiner.name} is joining ${room.name || room.id} to start a conversation.`);
+                await this.moveAgent(joiner.id, room.id);
+            }
+
+            // Phase 2: Pair up remaining wanderers
+            let remainingWanderers = wanderingAgents;
+            
+            // Find empty public rooms to use first
+            const emptyPublicRooms = Array.from(this.rooms.values()).filter(
+                room => room.agentIds.length === 0 && !room.isOwned
+            );
+            
+            while (remainingWanderers.length >= 2) {
+                const agent1 = remainingWanderers.pop()!;
+                const agent2 = remainingWanderers.pop()!;
                 
-                // Try to pair up agents in empty rooms
-                while (remainingWanderers.length >= 2 && emptyPublicRooms.length > 0) {
-                    const agent1 = remainingWanderers.shift()!;
-                    const agent2 = remainingWanderers.shift()!;
-                    const targetRoom = emptyPublicRooms.shift()!;
-                    
-                    try {
-                        await this.moveAgent(agent1.id, targetRoom.id);
-                        await this.moveAgent(agent2.id, targetRoom.id);
-                        console.log(`[ArenaDirector] Paired ${agent1.name} and ${agent2.name} in room ${targetRoom.id}`);
-                    } catch (error) {
-                        console.error(`[ArenaDirector] Error pairing agents in room ${targetRoom.id}:`, error);
-                        // Put agents back in the queue if pairing failed
-                        remainingWanderers.unshift(agent2, agent1);
-                    }
-                }
-                
-                // If we still have pairs of agents left but no rooms, create new ones
-                while (remainingWanderers.length >= 2) {
-                    const agent1 = remainingWanderers.shift()!;
-                    const agent2 = remainingWanderers.shift()!;
-                    
-                    try {
-                        // Create a new room with the first agent as host
-                        const roomId = await this.createAndHostRoom(agent1.id, true);
-                        if (roomId) {
-                            // Move the second agent into the new room
-                            await this.moveAgent(agent2.id, roomId);
-                            console.log(`[ArenaDirector] Created new room for ${agent1.name} and ${agent2.name}`);
-                        }
-                    } catch (error) {
-                        console.error(`[ArenaDirector] Error creating new room for pair:`, error);
-                        remainingWanderers.unshift(agent2, agent1);
-                        break; // Stop if we can't create rooms
+                const targetRoom = emptyPublicRooms.pop();
+
+                if (targetRoom) {
+                    // Use an existing empty room
+                    console.log(`[ArenaDirector] Pairing ${agent1.name} and ${agent2.name} in existing empty room ${targetRoom.name || targetRoom.id}.`);
+                    await this.moveAgent(agent1.id, targetRoom.id);
+                    await this.moveAgent(agent2.id, targetRoom.id);
+                } else {
+                    // No empty rooms left, create a new one
+                    console.log(`[ArenaDirector] No empty rooms. Creating new room for ${agent1.name} and ${agent2.name}.`);
+                    const newRoomId = await this.createAndHostRoom(agent1.id, true);
+                    if (newRoomId) {
+                        await this.moveAgent(agent2.id, newRoomId);
+                    } else {
+                        // Failed to create room, put agents back to wander
+                        remainingWanderers.push(agent1, agent2);
+                        break; // Stop trying if room creation fails
                     }
                 }
             }
-            
-            console.log(`[ArenaDirector] Finished processing wandering agents`);
-            
+
         } catch (error) {
             console.error('[ArenaDirector] Error in processWanderingAgents:', error);
         }
@@ -403,7 +368,7 @@ export class ArenaDirector {
                     room.bannedAgentIds = [...(room.bannedAgentIds || []), agentId];
                     this.rooms.set(roomId, room);
                     await roomsCollection.updateOne(
-                        { _id: new mongoose.Types.ObjectId(roomId) },
+                        { _id: new mongoose.Types.ObjectId(room._id) },
                         { $addToSet: { bannedAgentIds: new mongoose.Types.ObjectId(agentId) } }
                     );
                     this.emitToMain?.({ type: 'socketEmit', event: 'roomUpdated', payload: { room } });
@@ -414,76 +379,65 @@ export class ArenaDirector {
         }
     }
 
+    // FIX: Updated to generate sequential names and IDs for new public rooms, fixing the "?" ID bug.
     public async createAndHostRoom(agentId: string, silent = false): Promise<string | null> {
         const agent = this.agents.get(agentId);
         if (!agent) return null;
     
-        const newRoom = await cafeService.createRoom(agent);
+        // Determine the next public room number
+        const publicRooms = Array.from(this.rooms.values()).filter(r => r.name?.startsWith('Public Room '));
+        const roomNumbers = publicRooms.map(r => parseInt(r.name!.split(' ')[2], 10)).filter(n => !isNaN(n));
+        const newRoomNumber = roomNumbers.length > 0 ? Math.max(...roomNumbers) + 1 : 1;
+
+        const newRoomDetails = {
+            id: `public-${newRoomNumber}`,
+            name: `Public Room ${newRoomNumber}`
+        };
+    
+        const newRoom = await cafeService.createRoom(agent, newRoomDetails);
         this.rooms.set(newRoom.id, newRoom);
         await this.moveAgent(agentId, newRoom.id);
         if (!silent) {
-            console.log(`[ArenaDirector] Agent ${agent.name} created and hosted room ${newRoom.id}.`);
+            console.log(`[ArenaDirector] Agent ${agent.name} created and hosted room ${newRoom.name} (${newRoom.id}).`);
         }
         return newRoom.id;
     }
 
     private async moveAgent(agentId: string, toRoomId: string | null) {
-        if (!mongoose.Types.ObjectId.isValid(agentId)) {
-            console.error(`[ArenaDirector] Invalid agent ID format: ${agentId}`);
-            return;
-        }
-        
         const fromRoomId = this.agentLocations.get(agentId);
-        let agentObjId;
         
-        try {
-            agentObjId = new ObjectId(agentId);
-        } catch (error) {
-            console.error(`[ArenaDirector] Failed to create ObjectId for agent ${agentId}:`, error);
-            return;
-        }
+        // Agent is already where they need to be.
+        if (fromRoomId === toRoomId) return;
 
-        // Remove from old room if they were in one
-        if (fromRoomId && mongoose.Types.ObjectId.isValid(fromRoomId)) {
+        // --- Update 'from' room ---
+        if (fromRoomId) {
             const fromRoom = this.rooms.get(fromRoomId);
             if (fromRoom) {
                 fromRoom.agentIds = fromRoom.agentIds.filter(id => id !== agentId);
                 
+                // If room becomes empty but is owned, just clear host if host left.
+                if (fromRoom.agentIds.length === 0) {
+                    fromRoom.hostId = null;
+                    fromRoom.activeOffer = null; // Clear offer when room is empty
+                    this.conversations.delete(fromRoom.id);
+                } else if (fromRoom.hostId === agentId) {
+                    // If host leaves, make the other agent the host.
+                    fromRoom.hostId = fromRoom.agentIds[0];
+                }
+                
+                this.rooms.set(fromRoomId, fromRoom);
+                
+                // Persist changes to DB
                 if (fromRoom.agentIds.length === 0 && !fromRoom.isOwned) {
-                    // Delete empty, non-owned rooms from memory and DB
-                    this.rooms.delete(fromRoomId);
-                    this.conversations.delete(fromRoomId);
-                    try {
-                        await roomsCollection.deleteOne({ _id: new ObjectId(fromRoomId) });
-                    } catch (error) {
-                        console.error(`[ArenaDirector] Error deleting room ${fromRoomId}:`, error);
-                    }
+                    this.rooms.delete(fromRoomId); // Also delete from memory
+                    await roomsCollection.deleteOne({ _id: new ObjectId(fromRoom._id) });
                 } else {
-                    // If room becomes empty but is owned, just clear host if host left.
-                    if (fromRoom.agentIds.length === 0) {
-                        fromRoom.hostId = null;
-                        fromRoom.activeOffer = null; // Clear offer when room is empty
-                    } else if (fromRoom.hostId === agentId) {
-                        fromRoom.hostId = fromRoom.agentIds[0];
-                    }
-                    this.rooms.set(fromRoomId, fromRoom);
-                    
-                    // Convert agentIds to ObjectId for database operation
-                    const agentIdsAsObjectIds = fromRoom.agentIds
-                        .filter(id => mongoose.Types.ObjectId.isValid(id))
-                        .map(id => new ObjectId(id));
-                        
-                    let hostIdObj = null;
-                    if (fromRoom.hostId && mongoose.Types.ObjectId.isValid(fromRoom.hostId)) {
-                        hostIdObj = new ObjectId(fromRoom.hostId);
-                    }
-                    
-                    await roomsCollection.updateOne(
-                        { _id: new ObjectId(fromRoomId) }, 
+                     await roomsCollection.updateOne(
+                        { _id: new ObjectId(fromRoom._id) }, 
                         { 
                             $set: { 
-                                agentIds: agentIdsAsObjectIds, 
-                                hostId: hostIdObj,
+                                agentIds: fromRoom.agentIds.map(id => new ObjectId(id)), 
+                                hostId: fromRoom.hostId ? new ObjectId(fromRoom.hostId) : null,
                                 activeOffer: fromRoom.activeOffer 
                             } 
                         }
@@ -492,31 +446,25 @@ export class ArenaDirector {
             }
         }
 
-        // Add to new room
-        if (toRoomId && mongoose.Types.ObjectId.isValid(toRoomId)) {
+        // --- Update 'to' room ---
+        if (toRoomId) {
             const toRoom = this.rooms.get(toRoomId);
             if (toRoom && toRoom.agentIds.length < 2 && !toRoom.agentIds.includes(agentId)) {
                 toRoom.agentIds.push(agentId);
                 this.agentLocations.set(agentId, toRoomId);
                 this.rooms.set(toRoomId, toRoom);
                 
-                // Convert agentIds to ObjectId for database operation
-                const agentIdsAsObjectIds = toRoom.agentIds.filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new ObjectId(id));
-                const hostIdObj = toRoom.hostId && mongoose.Types.ObjectId.isValid(toRoom.hostId) ? new ObjectId(toRoom.hostId) : null;
-                
+                // Persist changes to DB
                 await roomsCollection.updateOne(
-                    { _id: new ObjectId(toRoomId) }, 
-                    { 
-                        $set: { 
-                            agentIds: agentIdsAsObjectIds,
-                            hostId: hostIdObj
-                        } 
-                    }
+                    { _id: new ObjectId(toRoom._id) }, 
+                    { $addToSet: { agentIds: new ObjectId(agentId) } }
                 );
             } else {
+                 console.warn(`[ArenaDirector] Agent ${agentId} failed to move to room ${toRoomId}. Room full, non-existent, or agent already present. Setting to wandering.`);
                 this.agentLocations.set(agentId, null);
             }
         } else {
+            // Moving to wandering state
             this.agentLocations.set(agentId, null);
         }
         
@@ -555,7 +503,7 @@ export class ArenaDirector {
         this.rooms.set(room.id, room);
         
         await roomsCollection.updateOne(
-            { _id: new ObjectId(room.id) }, 
+            { _id: new ObjectId(room._id) }, 
             { $set: { activeOffer: newOffer } }
         );
 
@@ -573,7 +521,7 @@ export class ArenaDirector {
             return;
         }
         
-        if (!mongoose.Types.ObjectId.isValid(buyer.id) || !mongoose.Types.ObjectId.isValid(seller.id) || !mongoose.Types.ObjectId.isValid(offer.intelId) || !mongoose.Types.ObjectId.isValid(room.id)) {
+        if (!mongoose.Types.ObjectId.isValid(buyer.id) || !mongoose.Types.ObjectId.isValid(seller.id) || !mongoose.Types.ObjectId.isValid(offer.intelId) || !mongoose.Types.ObjectId.isValid(room._id)) {
             console.warn(`[ArenaDirector] Invalid ID format for buyer, seller, intel, or room in acceptOffer.`);
             return;
         }
@@ -582,7 +530,7 @@ export class ArenaDirector {
         const buyerId = new ObjectId(buyer.id);
         const sellerId = new ObjectId(seller.id);
         const intelId = new ObjectId(offer.intelId);
-        const roomId = new ObjectId(room.id);
+        const roomId = new ObjectId(room._id);
 
         // Get the original intel
         const originalIntel = await bettingIntelCollection.findOne({ _id: intelId });

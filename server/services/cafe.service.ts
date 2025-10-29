@@ -29,11 +29,12 @@ class CafeService {
         return null;
     }
 
-    public async createRoom(host: Agent): Promise<Room> {
-        const newId = new ObjectId();
+    public async createRoom(host: Agent, details?: { id: string; name: string }): Promise<Room> {
+        const newObjectId = new ObjectId();
         const newRoom: Room = {
-            _id: newId,
-            id: newId.toHexString(),
+            _id: newObjectId,
+            id: details?.id ?? newObjectId.toHexString(),
+            name: details?.name, // Name can be undefined if not provided
             agentIds: [host.id],
             hostId: host.id,
             topics: host.topics,
@@ -44,7 +45,7 @@ class CafeService {
         };
         await roomsCollection.insertOne(newRoom as any);
         // Ensure the returned object has the string ID for immediate use
-        return { ...newRoom, id: newId.toHexString() };
+        return { ...newRoom, id: newRoom.id };
     }
 }
 

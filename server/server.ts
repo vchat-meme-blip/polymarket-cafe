@@ -65,7 +65,7 @@ if (!isProduction) {
 // --- Middleware Setup ---
 
 // 1. Security headers
-// FIX: Correctly typed app.use call.
+// FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -81,7 +81,7 @@ app.use(
         'frame-ancestors': ["'none'"],
       },
     },
-  })
+  }) as any
 );
 app.disable('x-powered-by');
 
@@ -106,9 +106,9 @@ const corsOptions: cors.CorsOptions = {
   exposedHeaders: ['Content-Length', 'X-Request-Id']
 };
 
-// FIX: Correctly typed app.use and app.options calls.
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+// FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
+app.use(cors(corsOptions) as any);
+app.options('*', cors(corsOptions) as any);
 
 // 3. Body parsers
 app.use(express.json({ limit: '10mb' }));
@@ -199,8 +199,8 @@ const attachWorkers: RequestHandler = (req, res, next) => {
   req.marketWatcherWorker = marketWatcherWorker;
   next();
 };
-// FIX: Correctly typed app.use call.
-app.use(attachWorkers);
+// FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
+app.use(attachWorkers as any);
 
 
 // 5. API Routes - This MUST be registered before any static file serving.
@@ -212,8 +212,8 @@ if (isProduction) {
   const clientBuildPath = path.join(__dirname, '..', '..', 'client');
   
   // Serve static files (JS, CSS, images, etc.)
-  // FIX: Correctly typed app.use call.
-  app.use(express.static(clientBuildPath));
+  // FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
+  app.use(express.static(clientBuildPath) as any);
 
   // For any other GET request that doesn't match an API route or a static file,
   // send the main index.html file. This is the catch-all for client-side routing.
@@ -290,8 +290,8 @@ const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
-// FIX: Correctly typed app.use call.
-app.use(errorHandler);
+// FIX: Cast middleware to `any` to resolve TypeScript overload errors due to type conflicts.
+app.use(errorHandler as any);
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
