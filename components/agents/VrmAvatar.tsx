@@ -45,7 +45,7 @@ type VrmModelProps = {
   verticalOffset?: number; // optional vertical offset to apply after auto-grounding
 };
 
-export function VrmModel({ modelUrl, animationUrl, idleUrl, triggerAnimationUrl, talkAnimationUrl, triggerKey, isSpeaking, lookAtTarget, darkenFace, disableAutoGrounding, verticalOffset = 0 }: VrmModelProps) {
+export function VrmModel({ modelUrl, animationUrl, idleUrl, triggerAnimationUrl, talkAnimationUrl, triggerKey, isSpeaking, lookAtTarget, darkenFace, disableAutoGrounding, verticalOffset = 0 }: VrmModelProps): JSX.Element {
   const { vrm, loading, error } = useVrm(modelUrl);
   const idleAnimation = useVrmAnimation(idleUrl || animationUrl || '/animations/idle2.vrma', vrm);
     const talkAnimation = useVrmAnimation(talkAnimationUrl || '/animations/talk.vrma', vrm);
@@ -176,47 +176,56 @@ export function VrmModel({ modelUrl, animationUrl, idleUrl, triggerAnimationUrl,
 
   // Effect for robust auto-scaling and optional grounding
   useEffect(() => {
-    if (vrm?.scene) {
-      const timeoutId = setTimeout(() => {
-        if (!vrm.scene) return;
+    if (!vrm?.scene) return;
+    
+    const setupModel = () => {
+      try {
+        // Reset scale and position first
+        vrm.scene.scale.set(1, 1, 1);
+        vrm.scene.position.set(0, 0, 0);
+        vrm.scene.updateMatrixWorld(true);
         
-        // --- Sizing Pass ---
+        // Get initial bounding box
         const box = new THREE.Box3().setFromObject(vrm.scene);
         const currentHeight = box.max.y - box.min.y;
+        
+        // Only scale if we have a valid height
         if (currentHeight > 0.1) {
-            const scaleFactor = 1.65 / currentHeight;
-            vrm.scene.scale.setScalar(scaleFactor);
+          const targetHeight = 1.75; // Standard target height for all models
+          const scaleFactor = targetHeight / currentHeight;
+          vrm.scene.scale.set(scaleFactor, scaleFactor, scaleFactor);
         }
         
-        // --- Grounding Pass (Robust & Corrected) ---
+        // Update world matrix after scaling
+        vrm.scene.updateMatrixWorld(true);
+        
         if (!disableAutoGrounding) {
-          // After scaling, update matrix to get new world-space box
-          vrm.scene.updateMatrixWorld(true);
+          // Get new bounding box after scaling
           const postScaleBox = new THREE.Box3().setFromObject(vrm.scene);
           
           if (!postScaleBox.isEmpty()) {
-            // The goal is to move the model so that its feet (the minimum y of its bounding box)
-            // are at the y=0 origin of its parent container.
-            const center = postScaleBox.getCenter(new THREE.Vector3());
-            const size = postScaleBox.getSize(new THREE.Vector3());
-
-            // The model's position property is its center. To move its bottom to y=0,
-            // we need to set its center to be at y = half its height.
-            // However, the bounding box is in WORLD coordinates. We need to adjust the LOCAL position.
-            // The adjustment is the difference between the model's current world center.y and its desired world center.y
-            const desiredCenterY = postScaleBox.min.y + size.y / 2; // This is where the center *should* be to be grounded
-            const worldOffset = center.y - desiredCenterY;
-
-            // Since the parent group is not scaled, a world offset on Y is the same as a local offset.
-            vrm.scene.position.y -= worldOffset;
-            vrm.scene.position.y += verticalOffset;
+            // Calculate vertical offset to ground the model
+            const modelBottom = postScaleBox.min.y;
+            vrm.scene.position.y = -modelBottom + verticalOffset;
           }
         } else if (verticalOffset !== 0) {
           vrm.scene.position.y += verticalOffset;
         }
-      }, 0);
-      return () => clearTimeout(timeoutId);
-    }
+        
+        console.log(`Model loaded: ${modelUrl}`, { 
+          position: vrm.scene.position, 
+          scale: vrm.scene.scale,
+          grounded: !disableAutoGrounding
+        });
+      } catch (err) {
+        console.error('Error setting up VRM model:', err);
+      }
+    };
+    
+    // Small delay to ensure the model is fully loaded
+    const timeoutId = setTimeout(setupModel, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, [vrm, modelUrl, disableAutoGrounding, verticalOffset]);
 
   useFrame((state, delta) => {

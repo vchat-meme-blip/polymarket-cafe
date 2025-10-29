@@ -213,7 +213,7 @@ function RoomScene({ room }: RoomSceneProps) {
                 const isSpeaking = latestTurn?.agentId === agent.id;
                 const isThinking = thinkingAgents.has(agent.id);
                 
-                const position: [number, number, number] = [1.5 * (index === 0 ? -1 : 1), -0.1, 0.85];
+                const position: [number, number, number] = [1.5 * (index === 0 ? -1 : 1), -0.35, 0.8];
                 const rotationOffset = agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI;
                 // Statically face slightly inwards to be more stable than dynamic lookAt
                 const facingRotation = index === 0 ? Math.PI / 12 : -Math.PI / 12;
