@@ -44,7 +44,7 @@ export type ArenaState = {
   addRoom: (room: Room) => void;
   recordActivityInRoom: (roomId: string) => void;
   // FIX: Add systemPaused to the syncWorldState signature.
-  syncWorldState: (worldState: { rooms: Room[], agentLocations: Record<string, string | null>, thinkingAgents: string[], systemPaused: boolean }) => void;
+  syncWorldState: (worldState: { rooms: Room[], agentLocations: Record<string, string | null>, thinkingAgents: string[], systemPaused?: boolean }) => void;
   recordTrade: (trade: TradeRecord) => void;
   setLastTradeDetails: (trade: TradeRecord | null) => void;
   removeRoom: (roomId: string) => void;
@@ -221,7 +221,7 @@ export const useArenaStore = create(
               // Update the activeConversations timestamp for this room to ensure UI updates
               activeConversations: { 
                 ...state.activeConversations, 
-                [updatedRoom.id]: Date.now() 
+                [updatedRoom.id!]: Date.now() 
               }
             };
           } else {
@@ -231,7 +231,7 @@ export const useArenaStore = create(
               // Initialize activeConversations for this room
               activeConversations: { 
                 ...state.activeConversations, 
-                [updatedRoom.id]: Date.now() 
+                [updatedRoom.id!]: Date.now() 
               }
             };
           }
@@ -249,7 +249,7 @@ export const useArenaStore = create(
             rooms: worldState.rooms,
             agentLocations: worldState.agentLocations,
             thinkingAgents: new Set(worldState.thinkingAgents),
-            systemPaused: worldState.systemPaused,
+            systemPaused: worldState.systemPaused || false,
             // Track when the last sync happened
             lastSyncTimestamp: Date.now()
           };
@@ -259,8 +259,8 @@ export const useArenaStore = create(
           const updatedActiveConversations = { ...state.activeConversations };
           worldState.rooms.forEach(room => {
             // If this room isn't in activeConversations or has newer activity, update it
-            if (!updatedActiveConversations[room.id]) {
-              updatedActiveConversations[room.id] = Date.now();
+            if (!updatedActiveConversations[room.id!]) {
+              updatedActiveConversations[room.id!] = Date.now();
             }
           });
           

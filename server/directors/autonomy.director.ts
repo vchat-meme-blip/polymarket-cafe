@@ -1,3 +1,4 @@
+
 import { agentsCollection, bettingIntelCollection, usersCollection } from '../db.js';
 import mongoose from 'mongoose';
 import { Agent, BettingIntel } from '../../lib/types/index.js';
@@ -52,12 +53,13 @@ export class AutonomyDirector {
                         if (agentDoc) {
                             // Convert the MongoDB document to our Agent type
                             const agent: Agent = {
-                                ...agentDoc,
-                                // Initialize bettingHistory as an empty array since we don't need it here
-                                // If you need the actual bets, you'll need to populate them
-                                bettingHistory: []
+                                ...(agentDoc as any),
+                                id: agentDoc._id.toString(), // Ensure id is a string
+                                bettingHistory: [], // bettingHistory needs to be populated if needed
+                                bettingIntel: [], // bettingIntel needs to be populated if needed
+                                marketWatchlists: [], // marketWatchlists needs to be populated if needed
                             };
-                            await this.decideAndExecuteNextAction(agent);
+                            await this.processAgentAutonomy(agent);
                         }
                     }
                 }
@@ -66,159 +68,110 @@ export class AutonomyDirector {
             console.error('[AutonomyDirector] Error during tick:', error);
         } finally {
             this.isTicking = false;
+            console.log('[AutonomyDirector] Finished autonomy tick.');
         }
     }
 
-    private async decideAndExecuteNextAction(agent: Agent) {
-        const agentState = this.agentStates.get(agent.id) || { lastActionTime: 0, isBusy: false };
-        const ACTION_COOLDOWN = 5 * 60 * 1000; // 5 minutes
+    public async startResearch(agentId: string) {
+        const agentDoc = await agentsCollection.findOne({ id: agentId });
+        if (agentDoc) {
+            // Convert agentDoc to Agent type
+            const agent: Agent = {
+                ...(agentDoc as any),
+                id: agentDoc._id.toString(),
+                bettingHistory: [], // bettingHistory needs to be populated if needed
+                bettingIntel: [], // bettingIntel needs to be populated if needed
+                marketWatchlists: [], // marketWatchlists needs to be populated if needed
+            };
+            this.setAgentBusy(agent.id, true);
+            
+            try {
+                const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
+                if (newIntel && agent.ownerHandle) {
+                    const savedIntel = await this.saveIntel(newIntel as BettingIntel);
+                    
+                    if(savedIntel) {
+                        const message = `🔬 Research complete! Your agent, ${agent.name}, has new intel on "${savedIntel.market}".`;
+                        await notificationService.logAndSendNotification({
+                            userId: agent.ownerHandle,
+                            agentId: agent.id,
+                            type: 'agentResearch',
+                            message,
+                        });
+                        this.emitToMain?.({ type: 'socketEmit', event: 'newIntel', payload: { intel: savedIntel }, room: agent.ownerHandle });
+                    }
+                }
+            } catch (error) {
+                console.error(`[AutonomyDirector] Error during manual research for agent ${agent.name}:`, error);
+            } finally {
+                this.setAgentBusy(agent.id, false);
+            }
+        }
+    }
 
-        if (agentState.isBusy || Date.now() - agentState.lastActionTime < ACTION_COOLDOWN) {
+    private async processAgentAutonomy(agent: Agent) {
+        const state = this.agentStates.get(agent.id) || { lastActionTime: 0, isBusy: false };
+        const RESEARCH_COOLDOWN = 15 * 60 * 1000; // 15 minutes
+
+        if (state.isBusy || Date.now() - state.lastActionTime < RESEARCH_COOLDOWN) {
             return;
         }
 
-        agentState.isBusy = true;
-        this.agentStates.set(agent.id, agentState);
+        console.log(`[AutonomyDirector] Processing autonomy for agent: ${agent.name}`);
+        this.setAgentBusy(agent.id, true);
 
         try {
-            const actionRoll = Math.random();
+            const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
+            if (newIntel && agent.ownerHandle) {
+                const savedIntel = await this.saveIntel(newIntel as BettingIntel);
+                if (savedIntel) {
+                    const message = `🔬 Your agent, ${agent.name}, autonomously discovered new intel on "${savedIntel.market}".`;
+                    await notificationService.logAndSendNotification({
+                        userId: agent.ownerHandle,
+                        agentId: agent.id,
+                        type: 'agentResearch',
+                        message,
+                    });
+                    this.emitToMain?.({ type: 'socketEmit', event: 'newIntel', payload: { intel: savedIntel }, room: agent.ownerHandle });
 
-            if (actionRoll < 0.6) { // 60% chance to research
-                console.log(`[AutonomyDirector] Action for ${agent.name}: RESEARCH_MARKET`);
-                await this.executeResearch(agent);
-            } else if (actionRoll < 0.9) { // 30% chance to go to cafe
-                console.log(`[AutonomyDirector] Action for ${agent.name}: GO_TO_CAFE`);
-                await this.executeGoToCafe(agent);
-            } else { // 10% chance to engage user
-                console.log(`[AutonomyDirector] Action for ${agent.name}: ENGAGE_USER`);
-                await this.executeEngageUser(agent);
+                    // Proactive engagement
+                    if (agent.isProactive) {
+                        const user = await usersCollection.findOne({ handle: agent.ownerHandle });
+                        // FIX: Corrected typo from 'agentEngagements' to 'agentEngagement' to match the Notification type definition.
+                        if (user?.notificationSettings?.agentEngagements) {
+                            const engagementMessage = await aiService.generateProactiveEngagementMessage(agent, savedIntel);
+                            if (engagementMessage) {
+                                await notificationService.logAndSendNotification({
+                                    userId: agent.ownerHandle,
+                                    agentId: agent.id,
+                                    type: 'agentEngagement',
+                                    message: engagementMessage
+                                });
+                            }
+                        }
+                    }
+                }
             }
-
+        } catch (error) {
+            console.error(`[AutonomyDirector] Error during autonomy processing for agent ${agent.name}:`, error);
         } finally {
-            agentState.isBusy = false;
-            agentState.lastActionTime = Date.now();
-            this.agentStates.set(agent.id, agentState);
+            this.setAgentBusy(agent.id, false);
         }
     }
 
-    private async executeResearch(agent: Agent) {
-        const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
-        if (newIntel && agent.ownerHandle) {
-            const intelWithId = { ...newIntel, id: `bettingintel-${new ObjectId().toHexString()}` };
-            const { insertedId } = await bettingIntelCollection.insertOne(intelWithId as any);
-            const savedIntel = await bettingIntelCollection.findOne({ _id: insertedId });
-            
-            this.emitToMain?.({
-                type: 'socketEmit',
-                event: 'newIntel',
-                payload: { intel: savedIntel },
-                room: agent.ownerHandle
-            });
-
-            const message = `🔬 Your agent, ${agent.name}, has completed its research and discovered new intel on the market: "${savedIntel!.market}"`;
-            await notificationService.logAndSendNotification({
-                userId: agent.ownerHandle,
-                agentId: agent.id,
-                type: 'agentResearch',
-                message,
-            });
+    private setAgentBusy(agentId: string, isBusy: boolean) {
+        const state = this.agentStates.get(agentId) || { lastActionTime: 0, isBusy: false };
+        state.isBusy = isBusy;
+        if (!isBusy) {
+            state.lastActionTime = Date.now();
         }
+        this.agentStates.set(agentId, state);
     }
 
-    private async executeGoToCafe(agent: Agent) {
-        this.emitToMain?.({
-            type: 'forwardToWorker',
-            worker: 'arena',
-            message: { type: 'moveAgentToCafe', payload: { agentId: agent.id } }
-        });
-        
-        if (agent.ownerHandle) {
-            const message = `☕️ Your agent, ${agent.name}, is heading to the Intel Exchange to look for alpha.`;
-             await notificationService.logAndSendNotification({
-                userId: agent.ownerHandle,
-                agentId: agent.id,
-// FIX: Corrected typo from 'agentEngagements' to 'agentEngagement' to match the Notification type definition.
-                type: 'agentEngagement',
-                message,
-            });
-        }
-    }
-    
-    private async executeEngageUser(agent: Agent) {
-        if (!agent.ownerHandle) return;
-
-        // Create a query that works with both string and ObjectId
-        const query: any = { 
-            $or: [
-                { ownerAgentId: agent.id },
-                { ownerAgentId: new mongoose.Types.ObjectId(agent.id) }
-            ]
-        };
-        
-        const recentIntel = await bettingIntelCollection
-            .find(query)
-            .sort({ createdAt: -1 })
-            .limit(1)
-            .toArray();
-        if (recentIntel.length === 0) return;
-
-        const intelDoc = recentIntel[0];
-        // Map the document to our BettingIntel type
-        const intel: BettingIntel = {
-            id: intelDoc._id.toString(),
-            ownerAgentId: intelDoc.ownerAgentId.toString(),
-            market: intelDoc.market,
-            content: intelDoc.content,
-            sourceDescription: intelDoc.sourceDescription,
-            isTradable: Boolean(intelDoc.isTradable),
-            createdAt: intelDoc.createdAt ? intelDoc.createdAt.getTime() : Date.now(),
-            pnlGenerated: intelDoc.pnlGenerated || { amount: 0, currency: 'USD' },
-            sourceAgentId: intelDoc.sourceAgentId?.toString(),
-            pricePaid: intelDoc.pricePaid,
-            bountyId: intelDoc.bountyId?.toString(),
-            ownerHandle: intelDoc.ownerHandle,
-            sourceUrls: intelDoc.sourceUrls || []
-        };
-        
-        const engagementMessage = await aiService.generateProactiveEngagementMessage(agent, intel);
-
-        if (engagementMessage) {
-            const message = `💡 Your agent, ${agent.name}, has a thought: "${engagementMessage}"`;
-            await notificationService.logAndSendNotification({
-                userId: agent.ownerHandle,
-                agentId: agent.id,
-                type: 'agentEngagement',
-                message,
-            });
-        }
-    }
-
-    public startResearch(agentId: string) {
-        console.log(`[AutonomyDirector] Manual research trigger for agent ${agentId}.`);
-        agentsCollection.findOne({ id: agentId }).then(agentDoc => {
-            if (agentDoc) {
-                // Convert the MongoDB document to our Agent type with all required fields
-                const agent: Agent = {
-                    id: agentDoc.id,
-                    name: agentDoc.name || 'Unnamed Agent',
-                    personality: agentDoc.personality || '',
-                    instructions: agentDoc.instructions || '',
-                    voice: agentDoc.voice || 'default',
-                    topics: Array.isArray(agentDoc.topics) ? agentDoc.topics : [],
-                    wishlist: Array.isArray(agentDoc.wishlist) ? agentDoc.wishlist : [],
-                    reputation: typeof agentDoc.reputation === 'number' ? agentDoc.reputation : 0,
-                    isShilling: !!agentDoc.isShilling,
-                    shillInstructions: agentDoc.shillInstructions || '',
-                    modelUrl: agentDoc.modelUrl || '',
-                    bettingHistory: [],
-                    currentPnl: typeof agentDoc.currentPnl === 'number' ? agentDoc.currentPnl : 0,
-                    bettingIntel: [],
-                    marketWatchlists: [],
-                    boxBalance: typeof agentDoc.boxBalance === 'number' ? agentDoc.boxBalance : 0,
-                    portfolio: agentDoc.portfolio || {}
-                };
-                this.executeResearch(agent);
-            }
-        });
+    private async saveIntel(intel: BettingIntel): Promise<BettingIntel | null> {
+        const newId = new ObjectId();
+        const intelWithId: BettingIntel = { ...intel, id: newId.toHexString() };
+        await bettingIntelCollection.insertOne({ ...intelWithId, _id: newId });
+        return intelWithId;
     }
 }

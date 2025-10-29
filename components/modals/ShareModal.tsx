@@ -77,7 +77,7 @@ export default function ShareModal({ data }: { data: ShareModalData }) {
                                 >
                                     <ambientLight intensity={1.5} />
                                     <directionalLight position={[3, 5, 2]} intensity={2} castShadow />
-                                    <group position={[0.2, 0, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI, 0]}>
+                                    <group position={[0, -0.8, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI, 0]}>
                                         <VrmModel modelUrl={agent.modelUrl || ''} isSpeaking={false} />
                                     </group>
                                 </Canvas>
@@ -87,7 +87,7 @@ export default function ShareModal({ data }: { data: ShareModalData }) {
                                 <div className={styles.shareRank}>#{rank}</div>
                                 <div className={styles.shareScore}>{score.toLocaleString()} Score</div>
                                 <div className={styles.shareFooter}>
-                                    <span className="icon">coffee</span> Quants Café
+                                    <span className="icon">coffee</span> Poly Cafe
                                 </div>
                             </div>
                         </div>

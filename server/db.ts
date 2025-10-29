@@ -1,3 +1,4 @@
+/// <reference types="node" />
 
 import mongoose, { Collection, Document } from 'mongoose';
 import type {

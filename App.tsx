@@ -66,6 +66,7 @@ function App() {
         try {
           const { success } = await apiService.bootstrap(persistedHandle);
           if (success) {
+            setIsSignedIn(true);
             socketService.connect();
           }
         } catch (error) {

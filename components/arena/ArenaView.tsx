@@ -95,9 +95,9 @@ export default function IntelExchangeView() {
     } else {
         const firstActiveRoom = rooms.find(r => r.agentIds.length > 0);
         if (firstActiveRoom) {
-            setFocusedRoomId(firstActiveRoom.id || null);
+            setFocusedRoomId(firstActiveRoom.id);
         } else if (rooms.length > 0) {
-            setFocusedRoomId(rooms[0].id || null);
+            setFocusedRoomId(rooms[0].id);
         }
     }
     }, [rooms, focusedRoomId, initialArenaFocus, setInitialArenaFocus]);
@@ -127,7 +127,7 @@ export default function IntelExchangeView() {
     const activeRooms = rooms.filter(r => r.agentIds.length > 0 && r.id !== focusedRoomId);
     if (activeRooms.length > 0) {
       const randomRoom = activeRooms[Math.floor(Math.random() * activeRooms.length)];
-      setFocusedRoomId(randomRoom.id || null);
+      setFocusedRoomId(randomRoom.id);
     } else {
       alert("No other active rooms found. The simulation is just getting started!");
     }
@@ -190,7 +190,7 @@ export default function IntelExchangeView() {
       {focusedRoom?.id && (
         <RoomCardActions
           onListenIn={() => focusedRoom.id && openListenInModal(focusedRoom.id)}
-          onShowDetails={() => setShowRoomDetailModal(focusedRoom.id || null)}
+          onShowDetails={() => setShowRoomDetailModal(focusedRoom?.id || null)}
           isConversationActive={isFocusedRoomActive}
         />
       )}

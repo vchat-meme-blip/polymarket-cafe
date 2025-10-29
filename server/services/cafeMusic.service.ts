@@ -57,6 +57,16 @@ class CafeMusicService {
   private cache = new Map<string, CafeMusicTrack>();
   private inflight = new Map<string, Promise<CafeMusicTrack>>();
 
+  private async generateTrack(roomId: string, prompt: string): Promise<CafeMusicTrack> {
+    const musicStream = await elevenLabsService.composeMusic({
+      prompt,
+      musicLengthMs: DEFAULT_TRACK_LENGTH_MS,
+    });
+    const buffer = await streamToBuffer(musicStream);
+    const expiresAt = Date.now() + DEFAULT_TRACK_TTL_MS;
+    return { buffer, prompt, expiresAt };
+  }
+
   public async getTrack(roomId: string, options: { forceRefresh?: boolean } = {}): Promise<CafeMusicTrack> {
     if (!elevenLabsService.isConfigured()) {
       throw new Error('ElevenLabs service is not configured');
@@ -88,24 +98,6 @@ class CafeMusicService {
     } finally {
       this.inflight.delete(roomId);
     }
-  }
-
-  public clear(roomId: string) {
-    this.cache.delete(roomId);
-  }
-
-  public clearAll() {
-    this.cache.clear();
-  }
-
-  private async generateTrack(roomId: string, prompt: string): Promise<CafeMusicTrack> {
-    const stream = await elevenLabsService.composeMusic({ prompt, musicLengthMs: DEFAULT_TRACK_LENGTH_MS });
-    const buffer = await streamToBuffer(stream);
-    return {
-      buffer,
-      prompt,
-      expiresAt: Date.now() + DEFAULT_TRACK_TTL_MS
-    };
   }
 }
 

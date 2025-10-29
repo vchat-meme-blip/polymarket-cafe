@@ -44,16 +44,13 @@ class ApiKeyProvider {
     
     return new Promise((resolve) => {
       // Set a timeout to prevent indefinite waiting
-      // FIX: Use `global.setTimeout` to resolve type conflict between Node.js (returns NodeJS.Timeout) and browser (returns number) environments.
-      // DEV-FIX: Cast to 'any' to work around a broken type environment where `global.setTimeout` still resolves to a `number`.
-      // FIX: Cast `setTimeout` return value to `any` to resolve type conflict between Node.js (`NodeJS.Timeout`) and browser (`number`) environments, which was causing a type error in a misconfigured TypeScript environment.
       const timeout = global.setTimeout(() => {
         console.warn(`[ApiKeyProvider] Request for API key timed out after ${this.MAX_WAIT_TIME/1000}s`);
         if (this.pendingRequests.has(requestId)) {
           this.pendingRequests.delete(requestId);
           resolve(null); // Resolve with null after timeout
         }
-      }, this.MAX_WAIT_TIME) as any;
+      }, this.MAX_WAIT_TIME);
       
       this.requestTimeouts.set(requestId, timeout);
       this.pendingRequests.set(requestId, resolve);
@@ -103,7 +100,6 @@ class ApiKeyProvider {
       parentPort.on('message', responseHandler);
       
       // Set a timeout to avoid hanging indefinitely
-      // FIX: Use `global.setTimeout` to resolve type conflict between Node.js (returns NodeJS.Timeout) and browser (returns number) environments.
       global.setTimeout(() => {
         parentPort?.removeListener('message', responseHandler);
         console.log(`[ApiKeyProvider] Timeout waiting for cooldown check response. Assuming not all keys are on cooldown.`);

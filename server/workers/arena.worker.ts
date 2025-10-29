@@ -91,5 +91,4 @@ async function main() {
 
 main().catch(err => {
   console.error('[ArenaWorker] Failed to start:', err);
-  // FIX: The global `process` object is not available in a worker context in this way. Let the thread exit on its own.
 });

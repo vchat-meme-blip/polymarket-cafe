@@ -178,50 +178,43 @@ export function VrmModel({ modelUrl, animationUrl, idleUrl, triggerAnimationUrl,
   // Effect for robust auto-scaling and grounding.
   useEffect(() => {
     if (vrm?.scene) {
-      // Use a short timeout to ensure the model is fully ready for measurement
       const timeoutId = setTimeout(() => {
         if (!vrm.scene) return;
 
-        // --- Sizing and Grounding Pass ---
-        // To get a reliable height, we need to calculate the bounding box
-        // of the un-transformed model.
-        
-        // Store original transforms
+        // --- Sizing Pass ---
+        // To calculate bounds correctly, temporarily reset transforms
         const originalPosition = vrm.scene.position.clone();
         const originalRotation = vrm.scene.rotation.clone();
         const originalScale = vrm.scene.scale.clone();
 
-        // Reset transforms for accurate measurement
         vrm.scene.position.set(0, 0, 0);
         vrm.scene.rotation.set(0, 0, 0);
         vrm.scene.scale.set(1, 1, 1);
-        vrm.scene.updateMatrixWorld(true); // Force update of world matrix
+        vrm.scene.updateMatrixWorld(true);
 
         const box = new THREE.Box3().setFromObject(vrm.scene);
         const size = box.getSize(new THREE.Vector3());
 
-        // Restore original transforms before we apply the new calculated ones
+        // Restore original transforms before applying new ones
         vrm.scene.position.copy(originalPosition);
         vrm.scene.rotation.copy(originalRotation);
         vrm.scene.scale.copy(originalScale);
 
-        // Calculate new scale based on height
-        const TARGET_HEIGHT = 1.75; // All agents will be scaled to this height
+        const TARGET_HEIGHT = 1.75;
         const scale = size.y > 0.1 ? TARGET_HEIGHT / size.y : 1;
         vrm.scene.scale.setScalar(scale);
 
-        // Ground the model based on its new scale and original geometry
+        // --- Grounding Pass ---
         if (!disableAutoGrounding) {
             // The local box's lowest point is box.min.y. After scaling, it's box.min.y * scale.
             // To move the feet to y=0 (the parent group's floor), we must shift the model up by this amount.
             const groundOffset = -box.min.y * scale;
             vrm.scene.position.y = groundOffset + verticalOffset;
         } else if (verticalOffset) {
-            // If grounding is disabled, just apply the manual offset
             vrm.scene.position.y += verticalOffset;
         }
 
-      }, 0); // A 0ms timeout defers execution until after the current stack clears
+      }, 0);
       return () => clearTimeout(timeoutId);
     }
   }, [vrm, modelUrl, disableAutoGrounding, verticalOffset]);
@@ -308,7 +301,7 @@ export function VrmAvatarCanvas({ modelUrl, isSpeaking, scale = 1, verticalOffse
       >
         <ambientLight intensity={1.5} />
         <directionalLight position={[3, 5, 2]} intensity={2} castShadow />
-        <group position={[0, -0.8, 0]} rotation={[0, modelUrl.includes('war_boudica') ? 0 : Math.PI, 0]} scale={scale}>
+        <group position={[0, -0.875, 0]} rotation={[0, modelUrl.includes('war_boudica') ? 0 : Math.PI, 0]} scale={scale}>
             <VrmModel modelUrl={modelUrl} isSpeaking={isSpeaking} verticalOffset={verticalOffset} />
         </group>
         <OrbitControls

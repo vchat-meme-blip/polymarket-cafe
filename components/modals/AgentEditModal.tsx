@@ -82,7 +82,7 @@ export default function AgentEditModal() {
     try {
       const prompt = `Brainstorm a detailed, first-person personality for an AI agent in a SocialFi simulation called "Quants Café". The agent's personality should be based on these keywords: "${personalityKeywords}". The description should be under 80 words.`;
       const response = await ai.models.generateContent({
-        // FIX: Corrected model name from deprecated 'gemini-2.5-flash' to 'gemini-2.5-flash'.
+        // FIX: Corrected model name from deprecated 'gemini-pro' to 'gemini-2.5-flash'.
         model: 'gemini-2.5-flash',
         contents: prompt,
       });

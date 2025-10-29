@@ -66,7 +66,7 @@ export type Agent = {
 
 // Arena types
 export type Room = {
-  id?: string;
+  id: string;
   _id?: any;
   name?: string; // Optional custom name for owned rooms
   agentIds: string[];
@@ -255,4 +255,8 @@ export type Intel = {
   marketData: MarketData;
   securityAnalysis: SecurityAnalysis;
   socialSentiment: SocialSentiment;
+  summary?: string;
+  bountyId?: string;
+  timestamp: number;
+  source: string;
 };
