@@ -7,7 +7,7 @@ const envPath = path.resolve(process.cwd(), '.env.local');
 config({ path: envPath });
 console.log(`Loading environment from: ${envPath}`);
 
-import connectDB from '../db.js';
+import connectDB, { seedDatabase, db } from '../db.js';
 import mongoose, { Connection } from 'mongoose';
 
 async function resetDatabase() {

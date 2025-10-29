@@ -1,11 +1,12 @@
 
 import { agentsCollection, bettingIntelCollection, usersCollection } from '../db.js';
-import mongoose from 'mongoose';
-import { Agent, BettingIntel } from '../../lib/types/index.js';
+import { ObjectId } from 'mongodb';
+import type { Agent } from '../../lib/types/shared.js';
+import type { BettingIntelDocument } from '../../lib/types/mongodb.js';
+import type { BettingIntel } from '../../lib/types/shared.js';
 import { alphaService } from '../services/alpha.service.js';
 import { notificationService } from '../services/notification.service.js';
 import { aiService } from '../services/ai.service.js';
-import { ObjectId } from 'mongodb';
 
 type EmitToMainThread = (message: { type: string; event?: string; payload?: any; room?: string; worker?: string; message?: any; }) => void;
 
@@ -43,8 +44,8 @@ export class AutonomyDirector {
                     }
                     
                     // Add ObjectId condition if valid
-                    if (user.currentAgentId && mongoose.Types.ObjectId.isValid(user.currentAgentId)) {
-                        filter.$or.push({ _id: new mongoose.Types.ObjectId(user.currentAgentId) });
+                    if (user.currentAgentId && ObjectId.isValid(user.currentAgentId)) {
+                        filter.$or.push({ _id: new ObjectId(user.currentAgentId) });
                     }
                     
                     // Only run the query if we have valid conditions
@@ -170,8 +171,45 @@ export class AutonomyDirector {
 
     private async saveIntel(intel: BettingIntel): Promise<BettingIntel | null> {
         const newId = new ObjectId();
-        const intelWithId: BettingIntel = { ...intel, id: newId.toHexString() };
-        await bettingIntelCollection.insertOne({ ...intelWithId, _id: newId });
-        return intelWithId;
+        const now = new Date();
+        
+        // Create the document with all required fields for BettingIntelDocument
+        const document: Omit<BettingIntelDocument, 'toShared'> & { toShared(): BettingIntel } = {
+            ...intel,
+            _id: newId,
+            ownerAgentId: new ObjectId(intel.ownerAgentId),
+            sourceAgentId: intel.sourceAgentId ? new ObjectId(intel.sourceAgentId) : undefined,
+            bountyId: intel.bountyId ? new ObjectId(intel.bountyId) : undefined,
+            createdAt: new Date(intel.createdAt || now.getTime()),
+            sourceUrls: intel.sourceUrls || [],
+            rawResearchData: intel.rawResearchData || [],
+            pnlGenerated: intel.pnlGenerated || { amount: 0, currency: 'USD' },
+            toShared(): BettingIntel {
+                return {
+                    id: this._id.toHexString(),
+                    ownerAgentId: this.ownerAgentId.toHexString(),
+                    market: this.market,
+                    content: this.content,
+                    sourceDescription: this.sourceDescription,
+                    isTradable: this.isTradable,
+                    createdAt: this.createdAt.getTime(),
+                    pnlGenerated: this.pnlGenerated,
+                    sourceAgentId: this.sourceAgentId?.toHexString(),
+                    pricePaid: this.pricePaid,
+                    bountyId: this.bountyId?.toHexString(),
+                    ownerHandle: this.ownerHandle,
+                    sourceUrls: this.sourceUrls,
+                    rawResearchData: this.rawResearchData
+                };
+            }
+        };
+        
+        try {
+            await bettingIntelCollection.insertOne(document as BettingIntelDocument);
+            return document.toShared();
+        } catch (error) {
+            console.error('Error saving intel:', error);
+            return null;
+        }
     }
 }
