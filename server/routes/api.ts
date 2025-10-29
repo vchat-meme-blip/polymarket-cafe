@@ -82,11 +82,21 @@ router.get('/bootstrap/:handle', async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const agents = await agentsCollection.find({ ownerHandle: handle }).toArray();
+    const presets = await agentsCollection.find({ ownerHandle: { $exists: false } }).toArray();
     
     const autonomy = { bounties: await bountiesCollection.find({ ownerHandle: handle }).toArray(), intel: await bettingIntelCollection.find({ ownerHandle: handle }).toArray() };
     const wallet = { transactions: await transactionsCollection.find({ ownerHandle: handle }).toArray() };
 
-    res.json({ user, agents, autonomy, wallet });
+    // Important: The client needs the string version of the _id as the canonical 'id'
+    const sanitize = (doc: any) => ({ ...doc, id: doc._id.toString(), _id: doc._id.toString() });
+
+    res.json({ 
+        user: sanitize(user), 
+        agents: agents.map(sanitize),
+        presets: presets.map(sanitize), 
+        autonomy, 
+        wallet 
+    });
   } catch (error) {
     console.error('[API] Error during bootstrap:', error);
     res.status(500).json({ message: 'Server error during bootstrap' });

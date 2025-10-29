@@ -48,7 +48,8 @@ class ApiService {
       useUser.setState(data.user);
       useAgent.setState({
           availablePersonal: data.agents,
-          current: data.agents.find((a: Agent) => a.id === data.user.currentAgentId) || data.agents[0] || useAgent.getState().current,
+          availablePresets: data.presets,
+          current: data.agents.find((a: Agent) => a.id === data.user.currentAgentId) || data.presets.find((a: Agent) => a.id === data.user.currentAgentId) || data.agents[0] || data.presets[0] || useAgent.getState().current,
       });
       useAutonomyStore.getState().hydrate(data.autonomy);
       useWalletStore.getState().hydrate(data.wallet);

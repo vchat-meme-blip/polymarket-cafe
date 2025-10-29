@@ -154,22 +154,17 @@ export async function seedMcpAgents() {
   }
   
   console.log('[DB Seeder] Seeding MCP agents...');
-  const mcpAgents = PRESET_AGENTS.map(agentTemplate => {
-    const newId = new mongoose.Types.ObjectId();
-    return {
-      ...agentTemplate,
-      _id: newId,
-      id: newId.toHexString(), // Ensure string ID is consistent
-    };
-  });
+  const mcpDocuments = PRESET_AGENTS.map(agentTemplate => ({
+    ...agentTemplate, // This preserves the original string ID like 'tony-pump'
+    _id: new mongoose.Types.ObjectId(), // Let MongoDB generate its own internal ID
+  }));
   
-  if (mcpAgents.length > 0) {
-    await agentsCollection.insertMany(mcpAgents as any[]);
-    console.log(`[DB Seeder] Inserted ${mcpAgents.length} MCP agents.`);
+  if (mcpDocuments.length > 0) {
+    await agentsCollection.insertMany(mcpDocuments as any[]);
+    console.log(`[DB Seeder] Inserted ${mcpDocuments.length} MCP agents.`);
   }
 }
 
-// FIX: Added missing seedPublicRooms function to create initial public rooms.
 export async function seedPublicRooms() {
   if (!roomsCollection) {
     console.warn('[DB Seeder] roomsCollection is not initialized, skipping public room seed.');
@@ -207,6 +202,5 @@ export async function seedPublicRooms() {
 
 export async function seedDatabase() {
     await seedMcpAgents();
-    // FIX: Added call to seedPublicRooms to ensure initial rooms are created.
     await seedPublicRooms();
 }
