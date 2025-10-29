@@ -188,11 +188,11 @@ export default function IntelExchangeView() {
       </div>
 
       {focusedRoom?.id && (
-          <RoomCardActions
-            onListenIn={() => openListenInModal(focusedRoom.id)}
-            onShowDetails={() => setShowRoomDetailModal(focusedRoom.id)}
-            isConversationActive={isFocusedRoomActive}
-          />
+        <RoomCardActions
+          onListenIn={() => focusedRoom.id && openListenInModal(focusedRoom.id)}
+          onShowDetails={() => setShowRoomDetailModal(focusedRoom.id || null)}
+          isConversationActive={isFocusedRoomActive}
+        />
       )}
 
       <div className={`${styles.arenaUiOverlay} ${styles.bottom}`}>
