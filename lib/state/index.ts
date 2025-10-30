@@ -42,6 +42,8 @@ export const useUser = create(
     setName: (name: string) => void;
     setInfo: (info: string) => void;
     updateNotificationSettings: (settings: { phone?: string; notificationSettings?: NotificationSettings }) => Promise<void>;
+    // FIX: Added missing updateUserSettings function to fix type error in SecurityTab.tsx.
+    updateUserSettings: (settings: Partial<User>) => Promise<void>;
     completeOnboarding: () => void;
     setLastSeen: (timestamp: Date | null) => void;
     _setHandle: (handle: string) => void;
@@ -171,6 +173,19 @@ export const useUser = create(
     } catch (error) {
       console.error("Failed to update notification settings:", error);
       throw error;
+    }
+  },
+  // FIX: Added missing updateUserSettings function to fix type error in SecurityTab.tsx.
+  updateUserSettings: async (settings) => {
+    try {
+        await apiService.request('/api/users/settings', {
+            method: 'PUT',
+            body: JSON.stringify(settings),
+        });
+        set(settings);
+    } catch (error) {
+        console.error("Failed to update user settings:", error);
+        throw error;
     }
   },
   

@@ -45,7 +45,6 @@ type VrmModelProps = {
   verticalOffset?: number; // optional vertical offset to apply after auto-grounding
 };
 
-// FIX: Removed explicit JSX.Element return type to fix JSX namespace issue.
 export function VrmModel({ modelUrl, animationUrl, idleUrl, triggerAnimationUrl, talkAnimationUrl, triggerKey, isSpeaking, lookAtTarget, darkenFace, disableAutoGrounding, verticalOffset = 0 }: VrmModelProps) {
   const { vrm, loading, error } = useVrm(modelUrl);
   const idleAnimation = useVrmAnimation(idleUrl || animationUrl || '/animations/idle2.vrma', vrm);
@@ -182,7 +181,6 @@ export function VrmModel({ modelUrl, animationUrl, idleUrl, triggerAnimationUrl,
         if (!vrm.scene) return;
 
         // --- Sizing Pass ---
-        // To calculate bounds correctly, temporarily reset transforms
         const originalPosition = vrm.scene.position.clone();
         const originalRotation = vrm.scene.rotation.clone();
         const originalScale = vrm.scene.scale.clone();
@@ -195,7 +193,6 @@ export function VrmModel({ modelUrl, animationUrl, idleUrl, triggerAnimationUrl,
         const box = new THREE.Box3().setFromObject(vrm.scene);
         const size = box.getSize(new THREE.Vector3());
 
-        // Restore original transforms before applying new ones
         vrm.scene.position.copy(originalPosition);
         vrm.scene.rotation.copy(originalRotation);
         vrm.scene.scale.copy(originalScale);
@@ -206,10 +203,18 @@ export function VrmModel({ modelUrl, animationUrl, idleUrl, triggerAnimationUrl,
 
         // --- Grounding Pass ---
         if (!disableAutoGrounding) {
-            // The local box's lowest point is box.min.y. After scaling, it's box.min.y * scale.
-            // To move the feet to y=0 (the parent group's floor), we must shift the model up by this amount.
-            const groundOffset = -box.min.y * scale;
-            vrm.scene.position.y = groundOffset + verticalOffset;
+            // We MUST update the world matrix after scaling to get the new bounding box
+            vrm.scene.updateMatrixWorld(true);
+            const postScaleBox = new THREE.Box3().setFromObject(vrm.scene);
+            
+            if (!postScaleBox.isEmpty()) {
+                // Apply standard grounding plus any additional vertical offset
+                const groundOffset = -postScaleBox.min.y;
+                vrm.scene.position.y = groundOffset + verticalOffset;
+            } else {
+                // Fallback if box is empty
+                vrm.scene.position.y = verticalOffset;
+            }
         } else if (verticalOffset) {
             vrm.scene.position.y += verticalOffset;
         }

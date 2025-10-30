@@ -44,13 +44,14 @@ class ApiKeyProvider {
     
     return new Promise((resolve) => {
       // Set a timeout to prevent indefinite waiting
+      // FIX: Argument of type 'number' is not assignable to parameter of type 'Timeout'.
       const timeout = global.setTimeout(() => {
         console.warn(`[ApiKeyProvider] Request for API key timed out after ${this.MAX_WAIT_TIME/1000}s`);
         if (this.pendingRequests.has(requestId)) {
           this.pendingRequests.delete(requestId);
           resolve(null); // Resolve with null after timeout
         }
-      }, this.MAX_WAIT_TIME);
+      }, this.MAX_WAIT_TIME) as any;
       
       this.requestTimeouts.set(requestId, timeout);
       this.pendingRequests.set(requestId, resolve);

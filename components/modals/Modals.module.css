@@ -713,6 +713,29 @@
 .helpModal strong { color: var(--Neutral-90); font-weight: 500; }
 .helpModal li { list-style: disc; margin-left: 20px; margin-bottom: 8px; color: var(--Neutral-80); }
 
+/* NEW: Styles for Markdown Tables in Help Modal */
+.helpModal .helpTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+}
+.helpModal .helpTable th,
+.helpModal .helpTable td {
+    border: 1px solid var(--Neutral-30);
+    padding: 8px 12px;
+    text-align: left;
+}
+.helpModal .helpTable th {
+    background-color: var(--Neutral-20);
+    color: var(--brand-cyan);
+    font-weight: 500;
+}
+.helpModal .helpTable tr:nth-child(even) {
+    background-color: var(--Neutral-10);
+}
+
+
 /* --- NEW: Share Room Modal --- */
 .shareRoomModal .modalHeader h2 { color: var(--brand-cyan); }
 .shareRoomModal .modalContentPane { text-align: center; }

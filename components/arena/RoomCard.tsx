@@ -100,7 +100,6 @@ type RoomSceneProps = { room: RoomType; };
 function RoomScene({ room }: RoomSceneProps) {
     const { availablePresets, availablePersonal } = useAgent();
     const allAgents = useMemo(() => [...availablePresets, ...availablePersonal], [availablePresets, availablePersonal]);
-    // FIX: Add `systemPaused` to the store selector to resolve property not found error.
     const { thinkingAgents, agentConversations, lastSyncTimestamp, systemPaused } = useArenaStore();
     const roomAgents = room.agentIds.map(id => getAgentById(id, allAgents)).filter((a): a is Agent => !!a);
     const vibeColor = useMemo(() => new THREE.Color(VIBE_COLORS[room.vibe || 'General Chat ☕️'] || '#9b59b6'), [room.vibe]);

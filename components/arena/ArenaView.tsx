@@ -59,13 +59,13 @@ const WanderingAgentsPanel = () => {
   );
 };
 
-const RoomCardActions = ({ onListenIn, onShowDetails, isConversationActive }: { onListenIn: () => void; onShowDetails: () => void; isConversationActive: boolean; }) => {
+const RoomCardActions = ({ onListenIn, onShowDetails, isConversationActive, disabled }: { onListenIn: () => void; onShowDetails: () => void; isConversationActive: boolean; disabled: boolean; }) => {
     return (
         <div className={styles.roomCardActionsOverlay}>
-            <button className="button secondary" onClick={onShowDetails}>
+            <button className="button secondary" onClick={onShowDetails} disabled={disabled}>
                 <span className="icon">info</span> Details
             </button>
-            <button className="button primary" onClick={onListenIn}>
+            <button className="button primary" onClick={onListenIn} disabled={disabled}>
                 <span className={`icon ${isConversationActive ? 'pulse' : ''}`}>hearing</span> Listen In
             </button>
         </div>
@@ -187,13 +187,12 @@ export default function IntelExchangeView() {
         )}
       </div>
 
-      {focusedRoom?.id && (
-        <RoomCardActions
-          onListenIn={() => focusedRoom.id && openListenInModal(focusedRoom.id)}
-          onShowDetails={() => setShowRoomDetailModal(focusedRoom?.id || null)}
-          isConversationActive={isFocusedRoomActive}
-        />
-      )}
+      <RoomCardActions
+        onListenIn={() => focusedRoom?.id && openListenInModal(focusedRoom.id)}
+        onShowDetails={() => setShowRoomDetailModal(focusedRoom?.id || null)}
+        isConversationActive={isFocusedRoomActive}
+        disabled={!focusedRoom}
+      />
 
       <div className={`${styles.arenaUiOverlay} ${styles.bottom}`}>
          <WanderingAgentsPanel />

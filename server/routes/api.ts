@@ -26,6 +26,7 @@ import OpenAI from 'openai';
 import { Readable } from 'stream';
 import { startOfToday, formatISO } from 'date-fns';
 import { seedDatabase } from '../db.js';
+import { UserDocument } from '../../lib/types/mongodb.js';
 
 const router = Router();
 
@@ -195,6 +196,39 @@ router.put('/users/settings/notifications', async (req, res) => {
         res.status(200).json({ message: 'Notification settings updated.' });
     } catch (error) {
         console.error('[API] Error updating notification settings:', error);
+        res.status(500).json({ message: 'Failed to update settings.' });
+    }
+});
+
+// FIX: Added a generic settings update endpoint for SecurityTab.tsx.
+router.put('/users/settings', async (req, res) => {
+    const { userHandle } = res.locals;
+    const settings = req.body;
+    if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
+
+    // Sanitize updates to prevent unwanted changes
+    // FIX: In the user settings update endpoint, the `finalUpdates` object was typed as `Partial<User>`, which includes properties like `_id` as a `string`. This conflicts with the `UserDocument` type used by the collection, which expects `_id` to be an `ObjectId`, causing a TypeScript error. The type of `finalUpdates` is now narrowed to only include the specific, non-conflicting keys being updated, resolving the type mismatch.
+    const allowedUpdates = ['receivingWalletAddress', 'userApiKey'] as const;
+    const finalUpdates: Partial<Pick<User, typeof allowedUpdates[number]>> = {};
+    for (const key of allowedUpdates) {
+        if (settings[key] !== undefined) {
+            (finalUpdates as any)[key] = settings[key];
+        }
+    }
+
+    if (Object.keys(finalUpdates).length === 0) {
+        return res.status(400).json({ message: "No valid settings to update." });
+    }
+
+    try {
+        const updateDoc = { $set: { ...finalUpdates, updatedAt: Date.now() } };
+        const result = await usersCollection.updateOne({ handle: userHandle }, updateDoc);
+        if (result.modifiedCount === 0) {
+            return res.status(404).json({ message: "User not found or no changes made." });
+        }
+        res.status(200).json({ message: 'User settings updated.' });
+    } catch (error) {
+        console.error('[API] Error updating user settings:', error);
         res.status(500).json({ message: 'Failed to update settings.' });
     }
 });

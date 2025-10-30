@@ -1,6 +1,6 @@
 .aboutPage {
     background-color: var(--Neutral-05);
-    background: linear-gradient(160deg, #4a1e82 0%, #1b9d99 100%);
+    background: linear-gradient(160deg, #6a32b2 0%, #21c2bd 100%);
     color: var(--text);
     min-height: 100vh;
     animation: fadeIn 0.5s ease-in-out;
@@ -87,7 +87,8 @@
     transition: all 0.3s ease-in-out;
 }
 .infoCard:hover {
-    box-shadow: 0 0 30px rgba(52, 152, 219, 0.2);
+    transform: translateY(-4px);
+    box-shadow: 0 0 40px rgba(52, 152, 219, 0.25);
     border-color: rgba(52, 152, 219, 0.3);
 }
 
@@ -109,7 +110,6 @@
     border: 1px solid rgba(255,255,255,0.1);
 }
 .infoItem h3 {
-    color: var(--brand-cyan);
     font-size: 18px;
     font-weight: 500;
     margin-bottom: 12px;
@@ -117,7 +117,7 @@
     align-items: center;
     gap: 10px;
 }
-.infoIcon {
+.infoItem h3 .icon {
     font-size: 24px !important;
 }
 
@@ -125,6 +125,17 @@
     color: var(--Neutral-80);
     line-height: 1.6;
 }
+
+/* Livelier Icons */
+.howItWorksGrid .infoItem:nth-child(4n+1) h3 { color: var(--brand-cyan); }
+.howItWorksGrid .infoItem:nth-child(4n+2) h3 { color: var(--brand-yellow); }
+.howItWorksGrid .infoItem:nth-child(4n+3) h3 { color: var(--brand-pink); }
+.howItWorksGrid .infoItem:nth-child(4n+4) h3 { color: var(--brand-blue); }
+
+.keyFeaturesGrid .infoItem:nth-child(4n+1) h3 { color: var(--brand-blue); }
+.keyFeaturesGrid .infoItem:nth-child(4n+2) h3 { color: var(--brand-pink); }
+.keyFeaturesGrid .infoItem:nth-child(4n+3) h3 { color: var(--brand-yellow); }
+.keyFeaturesGrid .infoItem:nth-child(4n+4) h3 { color: var(--brand-cyan); }
 
 .faqList {
     display: flex;

@@ -5,18 +5,20 @@ Welcome to the Polymarket Cafe, a virtual AI-powered copilot for prediction mark
 
 ## Features
 
--   **Virtual Companion Framework:** Your AI agent lives a dual life. On your dashboard, it's your personal **Copilot**, taking your direct commands. In the 3D **Intel Exchange**, it's an **Autonomous Citizen**, making its own decisions to chat, trade, and navigate a persistent social economy, 24/7.
--   **Own Your Intel Storefront:** Purchase a persistent 3D room in the Intel Exchange. This becomes your personal storefront where your agent can operate and autonomously sell valuable betting intel to other agents, even while you're offline.
--   **Advanced Agent Configuration:** Take control of your agent's autonomous strategy. Set its **Operating Hours** to define when it's active in your storefront, and for your roaming agents, assign a **Trusted Rooms List** to direct their intel-gathering efforts.
+-   **Persistent 24/7 World:** The application runs on a full-stack architecture with a persistent Node.js backend and MongoDB database. Your agents continue to operate, research, and trade in the virtual "Intel Exchange" even when you're offline.
+-   **Virtual Companion Framework:** Your AI agent lives a dual life. On your dashboard, it's your personal **Copilot**, taking your direct commands. In the 3D **Intel Exchange**, it's an **Autonomous Citizen**, making its own decisions in a live, multi-agent simulation.
+-   **Own Your Intel Storefront:** Purchase a persistent 3D room in the Intel Exchange. This becomes your personal storefront where your agent can operate and autonomously sell valuable betting intel to other agents.
+-   **Advanced Agent Configuration:** Take control of your agent's autonomous strategy. Set its **Operating Hours** for your storefront, and for your roaming agents, assign a **Trusted Rooms List** to direct their intel-gathering efforts.
 -   **Autonomous Web Research:** Your agent can proactively research prediction markets using Firecrawl to search the web, scrape content, and use AI to synthesize its findings into unique, actionable alpha.
--   **Live Bet Resolution & Leaderboards:** A persistent backend simulation means your agent is always working. A dedicated worker automatically resolves bets against real-world market outcomes and updates the P&L and Intel Score leaderboards in real-time.
+-   **Live Bet Resolution & Leaderboards:** A dedicated backend worker automatically resolves bets against real-world market outcomes and updates the P&L and Intel Score leaderboards in real-time based on persisted data.
 
 ## Tech Stack
 
 -   **Frontend:** React, TypeScript, Vite, Zustand, Three.js, React Three Fiber
--   **Backend:** Node.js, Express, TypeScript, Socket.IO, MongoDB
+-   **Backend:** Node.js, Express, TypeScript, Socket.IO, MongoDB, Mongoose
+-   **Architecture:** Multi-threaded backend using Node.js `worker_threads` to isolate heavy simulation logic (Arena, Autonomy) from the main API server thread.
 -   **AI:** OpenAI API for all agent intelligence.
--   **Data Sources:** Polymarket API, Kalshi API, Firecrawl API
+-   **Data Sources & Services:** Polymarket API, Kalshi API, Firecrawl API (for web scraping), ElevenLabs API (for voice synthesis), Twilio API (for WhatsApp notifications).
 
 ## Getting Started
 
@@ -51,7 +53,7 @@ Welcome to the Polymarket Cafe, a virtual AI-powered copilot for prediction mark
     MONGODB_URI="mongodb+srv://<user>:<password>@<cluster-url>/...&appName=..."
 
     # Your OpenAI API Key(s) for agent intelligence
-    # You can provide a single key or a comma-separated list of keys
+    # You can provide a single key or a comma-separated list for load balancing
     OPENAI_API_KEYS="your_openai_api_key_1,your_openai_api_key_2"
 
     # Your ElevenLabs API Key for voice synthesis and music generation
