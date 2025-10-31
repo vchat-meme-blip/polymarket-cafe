@@ -97,13 +97,7 @@ export default function AboutPage() {
                 <footer className={styles.footer}>
                     <div className={styles.footerContent}>
                         <p className={styles.footerText}>Built for the future of on-chain AI. See you in the Cafe.</p>
-                        <div className={styles.developerCredit}>
-                            <span>Developed by </span>
-                            <a href="https://bytezero.dev" target="_blank" rel="noopener noreferrer" className={styles.devLink}>
-                                ByteZero
-                                <span className={styles.linkIcon}>↗</span>
-                            </a>
-                        </div>
+                        
                     </div>
                 </footer>
             </main>
