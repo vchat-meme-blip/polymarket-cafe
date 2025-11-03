@@ -6,7 +6,6 @@ import axios from 'axios';
 import { MarketIntel } from '../../lib/types/index.js';
 
 const GAMMA_API = 'https://gamma-api.polymarket.com';
-const CLOB_API = 'https://clob.polymarket.com';
 const DATA_API = 'https://data-api.polymarket.com';
 
 /**
@@ -33,13 +32,19 @@ function mapMarket(market: any, event: any): MarketIntel | null {
     }
     
     // Fallback for older binary structure if parsing fails but prices are available
-    if (parsedOutcomes.length === 0) {
-        const yesPrice = parseFloat(market.outcomePrices?.[0] ?? '0.5');
-        const noPrice = 1 - yesPrice;
-        parsedOutcomes = [
-            { name: 'Yes', price: isNaN(yesPrice) ? 0.5 : yesPrice },
-            { name: 'No', price: isNaN(noPrice) ? 0.5 : noPrice },
-        ];
+    if (parsedOutcomes.length === 0 && market.outcomePrices) {
+        try {
+            const outcomePrices = JSON.parse(market.outcomePrices);
+            const yesPrice = parseFloat(outcomePrices?.[0] ?? '0.5');
+            const noPrice = 1 - yesPrice;
+            parsedOutcomes = [
+                { name: 'Yes', price: isNaN(yesPrice) ? 0.5 : yesPrice },
+                { name: 'No', price: isNaN(noPrice) ? 0.5 : noPrice },
+            ];
+        } catch (e) {
+             // Fallback if prices are not parsable
+             parsedOutcomes = [ { name: 'Yes', price: 0.5 }, { name: 'No', price: 0.5 }];
+        }
     }
 
     const yesOutcome = parsedOutcomes.find(o => o.name === 'Yes');
@@ -54,7 +59,6 @@ function mapMarket(market: any, event: any): MarketIntel | null {
         eventSlug: event.slug,
         marketSlug: market.slug,
         outcomes: parsedOutcomes,
-        // Derived odds for simple binary display
         odds: {
             yes: yesOutcome ? yesOutcome.price : 0,
             no: noOutcome ? noOutcome.price : 0,
@@ -92,52 +96,43 @@ class PolymarketService {
   }
   
   async searchMarkets(query: string, category?: string, page: number = 1, limit: number = 40): Promise<{ markets: MarketIntel[], hasMore: boolean }> {
-    if (category === 'Breaking') {
-        const data = await this.fetchFromApi(GAMMA_API, 'events', {
-            order: 'id',
-            ascending: false,
-            closed: false,
-            limit: limit,
-            offset: (page - 1) * limit
-        });
-        if (!data || !Array.isArray(data)) {
-            console.warn('[PolymarketService] Received invalid data from /events for Breaking category.');
-            return { markets: [], hasMore: false };
-        }
-        const markets: MarketIntel[] = [];
-        for (const event of data) {
-            if (event.markets && Array.isArray(event.markets)) {
-                for (const market of event.markets) {
-                    const mapped = mapMarket(market, event);
-                    if (mapped) {
-                        markets.push(mapped);
-                    }
-                }
-            }
-        }
-        const hasMore = data.length === limit;
-        return { markets, hasMore };
-    }
-
+    const useSearchEndpoint = !!query;
+    let endpoint = useSearchEndpoint ? 'public-search' : 'events';
+    
     const params: any = {
-        limit_per_type: limit,
-        page: page,
-        types: 'market',
-        order: 'desc'
+        limit: useSearchEndpoint ? undefined : limit,
+        limit_per_type: useSearchEndpoint ? limit : undefined,
+        offset: useSearchEndpoint ? undefined : (page - 1) * limit,
+        page: useSearchEndpoint ? page : undefined,
+        closed: false,
     };
 
-    params.q = query || (category && category !== 'All' ? category : '*');
-    if (params.q === '*') {
-        params.sort = 'liquidity';
+    if (useSearchEndpoint) {
+        params.q = query;
+        params.sort = 'volume'; // Sort by volume for relevance on search
+        params.ascending = false;
+    } else {
+        if (category && category !== 'All') {
+            params.events_tag = category;
+        }
+        params.sort = 'creation_date'; // Sort by newest for browsing
+        params.ascending = false;
+    }
+    
+    // The 'Breaking' category is a special case that sorts by newest event ID
+    if (category === 'Breaking' && !useSearchEndpoint) {
+        params.sort = 'id';
     }
 
+    const data = await this.fetchFromApi(GAMMA_API, endpoint, params);
 
-    const data = await this.fetchFromApi(GAMMA_API, 'public-search', params);
-
-    if (!data?.events) return { markets: [], hasMore: false };
+    const events = (useSearchEndpoint ? data?.events : data) || [];
+    if (!Array.isArray(events)) {
+        return { markets: [], hasMore: false };
+    }
 
     const markets: MarketIntel[] = [];
-    for (const event of data.events) {
+    for (const event of events) {
       if (event.markets && Array.isArray(event.markets)) {
         for (const market of event.markets) {
           const mapped = mapMarket(market, event);
@@ -147,8 +142,10 @@ class PolymarketService {
         }
       }
     }
-    return { markets, hasMore: data.has_more ?? false };
-}
+
+    const hasMore = useSearchEndpoint ? (data?.pagination?.hasMore ?? false) : (events.length === limit);
+    return { markets, hasMore };
+  }
 
   async getLiveMarkets(limit = 50, category?: string, page: number = 1): Promise<{ markets: MarketIntel[], hasMore: boolean }> {
     return this.searchMarkets('', category, page, limit);

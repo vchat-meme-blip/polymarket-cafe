@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -170,7 +171,7 @@ class ElevenLabsTextToSpeechService {
         throw new Error('Empty audio response received');
       }
 
-      // FIX: Changed `arrayBuffer.slice(0)` to `arrayBuffer` to resolve incorrect argument count error.
+      // FIX: Changed arrayBuffer.slice(0) to arrayBuffer to resolve incorrect argument count error.
       const audioBuffer = await context.decodeAudioData(arrayBuffer);
       this.audioCache.set(cacheKey, audioBuffer);
       return audioBuffer;
