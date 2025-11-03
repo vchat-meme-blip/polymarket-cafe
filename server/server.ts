@@ -47,7 +47,7 @@ export { server };
 
 // --- Configuration ---
 const isProduction = process.env.NODE_ENV === 'production';
-const productionDomains = ['polymarket-cafe.sliplane.app', 'polymarketcafe.sliplane.app'];
+const productionDomains = ['polycafe.life', 'polymarket-cafe.sliplane.app'];
 const devOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
