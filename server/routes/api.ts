@@ -919,12 +919,19 @@ router.get('/music/cafe/:roomId', async (req, res) => {
     try {
         const { roomId } = req.params;
         const forceRefresh = req.query.refresh === '1';
-        const track = await cafeMusicService.getTrack(roomId, { forceRefresh });
+        const { buffer, prompt, trackId } = await cafeMusicService.getTrack(roomId, { forceRefresh });
+        
         res.setHeader('Content-Type', 'audio/mpeg');
-        res.setHeader('X-Music-Prompt', track.prompt);
-        res.send(track.buffer);
+        res.setHeader('X-Music-Prompt', prompt);
+        res.setHeader('X-Track-Id', trackId);
+        res.setHeader('Cache-Control', 'no-cache'); // Prevent browser caching
+        res.send(buffer);
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        console.error('Error in /music/cafe/:roomId:', error);
+        res.status(500).json({ 
+            error: error.message || 'Failed to load cafe music',
+            code: error.code
+        });
     }
 });
 

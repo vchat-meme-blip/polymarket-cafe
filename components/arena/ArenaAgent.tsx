@@ -42,7 +42,7 @@ export default function ArenaAgent({ agent, isSpeaking }: ArenaAgentProps) {
             triggerAnimationUrl="/animations/gesture_talk.vrma"
             triggerKey={animationTriggerKey}
             disableAutoGrounding={true}
-            verticalOffset={-1.0}
+            verticalOffset={-0.4}
         />
     );
 };

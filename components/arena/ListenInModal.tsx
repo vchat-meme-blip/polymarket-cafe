@@ -7,7 +7,7 @@ import { useAgent, useUI } from '../../lib/state/index.js';
 import { useArenaStore } from '../../lib/state/arena';
 import Modal from '../Modal';
 import { Agent } from '../../lib/types/index.js';
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useLiveConversationSynthesis } from '../../hooks/arena/useLiveRoomSynthesis';
 import LiveAudioToggle from './LiveAudioToggle';
 import { usePlaybackSynthesis } from '../../hooks/arena/usePlaybackSynthesis';
@@ -25,6 +25,8 @@ export default function ListenInModal() {
   ];
 
   const { rooms, agentConversations } = useArenaStore();
+  const { isMuted, setIsMuted } = useLiveConversationSynthesis(listeningOnRoomId);
+  const { play, cancel, isPlaying } = usePlaybackSynthesis([], allAgents);
 
   const conversation = useMemo(() => {
     if (!listeningOnRoomId) return [];
@@ -35,29 +37,33 @@ export default function ListenInModal() {
     return agentConversations[agent1Id]?.[agent2Id] || [];
   }, [listeningOnRoomId, rooms, agentConversations]);
 
-  const { isMuted, setIsMuted } = useLiveConversationSynthesis(listeningOnRoomId);
-  const { play, cancel, isPlaying } = usePlaybackSynthesis(conversation, allAgents);
+  // Handle modal close with cleanup
+  const handleClose = useCallback(() => {
+    cancel(); // Stop any ongoing playback
+    setIsMuted(true); // Mute live audio
+    closeListenInModal();
+  }, [cancel, closeListenInModal, setIsMuted]);
 
-  const handlePlayHistory = () => {
+  const handlePlayHistory = useCallback(() => {
     // Ensure live audio is muted before playing history to prevent overlap
     if (!isMuted) {
       setIsMuted(true);
     }
     play();
-  };
+  }, [isMuted, play, setIsMuted]);
 
-  const handleToggleLiveAudio = () => {
+  const handleToggleLiveAudio = useCallback(() => {
     // If history is playing, stop it before unmuting live audio
     if (isPlaying) {
       cancel();
     }
     setIsMuted(!isMuted);
-  };
+  }, [isPlaying, isMuted, cancel, setIsMuted]);
 
   if (!listeningOnRoomId) return null;
 
   return (
-    <Modal onClose={closeListenInModal}>
+    <Modal onClose={handleClose}>
       <div className={`${styles.listenInModal} ${styles.modalContentPane}`}>
         <div className={styles.listenInModalHeader}>
             <h2>Room {listeningOnRoomId.split('-')[1]}</h2>
@@ -65,7 +71,7 @@ export default function ListenInModal() {
                 <button className="button" onClick={handlePlayHistory} disabled={isPlaying}>
                     <span className="icon">play_circle</span> {isPlaying ? 'Playing...' : 'Play History'}
                 </button>
-                 <button className="button" onClick={cancel} disabled={!isPlaying}>
+                 <button className="button" onClick={cancel}>
                     <span className="icon">stop_circle</span> Stop
                 </button>
                 <LiveAudioToggle isMuted={isMuted} onToggle={handleToggleLiveAudio} />
