@@ -2,6 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 
 class WebSocketService {
+  private static instance: WebSocketService;
   private io: SocketIOServer | null = null;
   private connections: Map<string, Socket> = new Map();
   private connectionCounts: Map<string, number> = new Map();
@@ -9,8 +10,27 @@ class WebSocketService {
   private readonly RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
   private readonly MAX_EVENTS_PER_WINDOW = 30;
   private eventCounts: Map<string, { count: number; resetAt: number }> = new Map();
+  private isInitialized = false;
+
+  // Singleton pattern to prevent multiple instances
+  public static getInstance(): WebSocketService {
+    if (!WebSocketService.instance) {
+      WebSocketService.instance = new WebSocketService();
+    }
+    return WebSocketService.instance;
+  }
+
+  private constructor() {}
 
   init(server: HttpServer) {
+    // Prevent multiple initializations
+    if (this.isInitialized) {
+      console.log('[WebSocket] WebSocket server already initialized');
+      return;
+    }
+
+    console.log('[WebSocket] Initializing WebSocket server...');
+    this.isInitialized = true;
     this.io = new SocketIOServer(server, {
       cors: {
         origin: (origin, callback) => {
@@ -121,4 +141,5 @@ class WebSocketService {
   }
 }
 
-export const webSocketService = new WebSocketService();
+// Export a singleton instance
+export const webSocketService = WebSocketService.getInstance();

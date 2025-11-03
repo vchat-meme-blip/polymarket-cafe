@@ -46,9 +46,13 @@ const server = http.createServer(app);
 
 // Initialize WebSocket service
 import { webSocketService } from './services/websocket.service.js';
-webSocketService.init(server);
 
-export { server };
+// Initialize WebSocket service only if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  webSocketService.init(server);
+}
+
+export { server, webSocketService };
 
 // --- Configuration ---
 const isProduction = process.env.NODE_ENV === 'production';
@@ -392,38 +396,80 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
+// Handle server shutdown
+const cleanup = () => {
+  console.log('Shutting down server...');
+  
+  // Close WebSocket server if it exists
+  if (io) {
+    console.log('Closing WebSocket server...');
+    io.close();
+  }
+  
+  // Close HTTP server
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+
+  // Force close after 5 seconds
+  setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 5000);
+};
+
+// Handle various shutdown signals
+process.on('SIGTERM', cleanup);
+process.on('SIGINT', cleanup);
+
 // --- Server Start Logic ---
 export async function startServer() {
   const PORT = process.env.PORT || 3001;
   const HOST = process.env.HOST || '0.0.0.0';
   
-  if (!server.listening) {
-    server.listen(Number(PORT), HOST, async () => {
-      console.log(`[Server] Server listening on http://${HOST}:${PORT}`);
-      console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`[Server] Database: ${process.env.MONGODB_URI ? 'Configured' : 'Not Configured'}`);
-      console.log(`[Server] WebSocket path: ${socketConfig.path}`);
-      console.log(`[Server] Allowed transports: ${socketConfig.transports.join(', ')}`);
+  return new Promise<void>((resolve, reject) => {
+    if (!server.listening) {
+      server.listen(Number(PORT), HOST, async () => {
+        try {
+          console.log(`[Server] Server listening on http://${HOST}:${PORT}`);
+          console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
+          console.log(`[Server] Database: ${process.env.MONGODB_URI ? 'Configured' : 'Not Configured'}`);
+          console.log(`[Server] WebSocket path: ${socketConfig.path}`);
+          console.log(`[Server] Allowed transports: ${socketConfig.transports.join(', ')}`);
 
-      // Centralized Seeding Logic
-      try {
-        const agentCount = await agentsCollection.countDocuments();
-        if(agentCount === 0) {
-            await seedMcpAgents();
-            console.log('[Server] Seeded MCPs into the database.');
+          // Centralized Seeding Logic
+          try {
+            const agentCount = await agentsCollection.countDocuments();
+            if (agentCount === 0) {
+              await seedMcpAgents();
+              console.log('[Server] Seeded MCPs into the database.');
+            }
+          } catch (e) {
+            console.error('[Server] Failed to seed database:', e);
+          }
+          
+          // Setup worker intervals
+          setInterval(() => arenaWorker.postMessage({ type: 'tick' }), 10000); // 10s
+          setInterval(() => resolutionWorker.postMessage({ type: 'tick' }), 5 * 60 * 1000); // 5min
+          setInterval(() => dashboardWorker.postMessage({ type: 'tick' }), 30 * 1000); // 30s
+          setInterval(() => autonomyWorker.postMessage({ type: 'tick' }), 3 * 60 * 1000); // 3min
+          setInterval(() => marketWatcherWorker.postMessage({ type: 'tick' }), 60 * 1000); // 1min
+          
+          resolve();
+        } catch (error) {
+          reject(error);
         }
-      } catch (e) {
-        console.error('[Server] Failed to seed database:', e);
-      }
-      
-      // Setup worker intervals
-      setInterval(() => arenaWorker.postMessage({ type: 'tick' }), 10000); // Arena is slower paced now (10s)
-      setInterval(() => resolutionWorker.postMessage({ type: 'tick' }), 5 * 60 * 1000); // 5min for resolution
-      setInterval(() => dashboardWorker.postMessage({ type: 'tick' }), 30 * 1000); // 30s for dashboard agent
-      setInterval(() => autonomyWorker.postMessage({ type: 'tick' }), 3 * 60 * 1000); // 3 minutes for autonomy
-      setInterval(() => marketWatcherWorker.postMessage({ type: 'tick' }), 60 * 1000); // 1 minute for new market checks
-    });
-  } else {
-    console.log('[Server] Server is already running');
-  }
+      }).on('error', reject);
+    } else {
+      console.log('[Server] Server is already running');
+      resolve();
+    }
+  });
 }
+
+// Start the server
+startServer().catch(error => {
+  console.error('Fatal error during server startup:', error);
+  process.exit(1);
+});
