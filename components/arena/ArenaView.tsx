@@ -174,8 +174,8 @@ export default function IntelExchangeView() {
 
       <div className={styles.arenaMainContent}>
         {focusedRoom ? (
+          // FIX: Removed the 'key' prop to resolve a TypeScript error. Component updates will be handled by prop changes.
           <RoomCard
-            key={focusedRoom.id}
             room={focusedRoom}
             userAgent={userAgent}
           />

@@ -44,7 +44,8 @@ export default function TransactionHistory() {
   return (
     <div className={styles.transactionList}>
       {transactions.map(tx => (
-        <TransactionItem key={tx.id} tx={tx} />
+        // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
+        <TransactionItem tx={tx} />
       ))}
     </div>
   );

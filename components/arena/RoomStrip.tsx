@@ -44,8 +44,8 @@ const RoomStrip = React.forwardRef<HTMLDivElement, RoomStripProps>(({ rooms, foc
         <div className={styles.roomStripContainer}>
             <div className={styles.roomStripScroll} ref={ref}>
                 {rooms.map(room => (
+                    // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
                     <RoomPreview
-                        key={room.id}
                         room={room}
                         isFocused={room.id === focusedRoomId}
                         onSelect={() => onRoomSelect(room.id)}

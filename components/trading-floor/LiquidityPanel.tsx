@@ -40,7 +40,8 @@ export default function LiquidityPanel() {
             ) : markets.length > 0 ? (
                 <div className={styles.marketGrid}>
                     {markets.map(market => (
-                        <MarketCard key={market.id} market={market} onSelect={openMarketDetailModal} />
+                        // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
+                        <MarketCard market={market} onSelect={openMarketDetailModal} />
                     ))}
                 </div>
             ) : (

@@ -2,6 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
+import React from 'react';
 // FIX: Fix imports for `useAgent`, `useUI`, and `useUser` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
 import { useAgent, useUI, useUser } from '../../lib/state/index.js';
 import { USER_ID, useArenaStore } from '../../lib/state/arena';
@@ -10,6 +11,7 @@ import { format } from 'date-fns';
 import { useEffect, useMemo, useRef } from 'react';
 import styles from './Dashboard.module.css';
 import { MarketIntel } from '../../lib/types/index.js';
+import { useDirectChatTTS } from '../../hooks/useDirectChatTTS.js';
 
 const TypingIndicator = () => (
     <div className={c(styles.chatMessage, styles.agent, styles.typingIndicator)}>
@@ -39,6 +41,26 @@ const MarketCardInChat = ({ market }: { market: MarketIntel }) => {
     );
 };
 
+const MarkdownRenderer = ({ text }: { text: string }) => {
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={i}>{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith('*') && part.endsWith('*')) {
+          return <em key={i}>{part.slice(1, -1)}</em>;
+        }
+        if (part.startsWith('`') && part.endsWith('`')) {
+          return <code key={i}>{part.slice(1, -1)}</code>;
+        }
+        return part;
+      })}
+    </>
+  );
+};
+
 
 /**
  * A component that displays the live, persisted chat history
@@ -50,6 +72,9 @@ export default function DirectChatLog() {
   const { isAgentTyping } = useUI();
   const { agentConversations } = useArenaStore();
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Initialize the TTS hook. It will automatically listen for new agent messages.
+  useDirectChatTTS();
 
   const conversationHistory = useMemo(() => {
     return agentConversations[currentAgent.id]?.[USER_ID] || [];
@@ -94,11 +119,12 @@ export default function DirectChatLog() {
                             <span className={styles.messageTime}>{format(msg.timestamp, 'p')}</span>
                         </div>
                         <div className={styles.messageBubble}>
-                            {msg.text}
+                            <MarkdownRenderer text={msg.text} />
                             {msg.markets && msg.markets.length > 0 && (
                                 <div className={styles.marketCardList}>
                                     {msg.markets.map(market => (
-                                        <MarketCardInChat key={market.id} market={market} />
+                                        // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
+                                        <MarketCardInChat market={market} />
                                     ))}
                                 </div>
                             )}

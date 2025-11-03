@@ -30,7 +30,6 @@ declare global {
     interface Request {
       arenaWorker?: NodeWorker;
       resolutionWorker?: NodeWorker;
-      dashboardWorker?: NodeWorker;
       autonomyWorker?: NodeWorker;
       marketWatcherWorker?: NodeWorker;
     }
@@ -194,7 +193,6 @@ app.use(express.urlencoded({ extended: true }) as any);
 // --- Worker Setup ---
 let arenaWorker: NodeWorker;
 let resolutionWorker: NodeWorker;
-let dashboardWorker: NodeWorker;
 let autonomyWorker: NodeWorker;
 let marketWatcherWorker: NodeWorker;
 const apiKeyManager = new ApiKeyManager();
@@ -207,11 +205,10 @@ function createWorker(workerPath: string): NodeWorker {
 function setupWorkers() {
   arenaWorker = createWorker('./workers/arena.worker.mjs');
   resolutionWorker = createWorker('./workers/resolution.worker.mjs');
-  dashboardWorker = createWorker('./workers/dashboard.worker.mjs');
   autonomyWorker = createWorker('./workers/autonomy.worker.mjs');
   marketWatcherWorker = createWorker('./workers/market-watcher.worker.mjs');
 
-  const workers = { arena: arenaWorker, resolution: resolutionWorker, dashboard: dashboardWorker, autonomy: autonomyWorker, marketWatcher: marketWatcherWorker };
+  const workers = { arena: arenaWorker, resolution: resolutionWorker, autonomy: autonomyWorker, marketWatcher: marketWatcherWorker };
 
   Object.entries(workers).forEach(([name, worker]) => {
     worker.on('message', (message: any) => {
@@ -241,14 +238,12 @@ function setupWorkers() {
             // Broadcast pause to relevant workers
             arenaWorker.postMessage({ type: 'systemPause', payload: { until: pauseUntil } });
             autonomyWorker.postMessage({ type: 'systemPause', payload: { until: pauseUntil } });
-            dashboardWorker.postMessage({ type: 'systemPause', payload: { until: pauseUntil } });
 
             // Schedule a resume broadcast
             setTimeout(() => {
                 console.log('[Server] System-wide pause ended. Resuming operations.');
                 arenaWorker.postMessage({ type: 'systemResume' });
                 autonomyWorker.postMessage({ type: 'systemResume' });
-                dashboardWorker.postMessage({ type: 'systemResume' });
             }, PAUSE_DURATION_MS);
         }
 
@@ -291,7 +286,6 @@ setupWorkers();
 const attachWorkers: RequestHandler = (req, res, next) => {
   req.arenaWorker = arenaWorker;
   req.resolutionWorker = resolutionWorker;
-  req.dashboardWorker = dashboardWorker;
   req.autonomyWorker = autonomyWorker;
   req.marketWatcherWorker = marketWatcherWorker;
   next();
@@ -452,7 +446,6 @@ export async function startServer() {
           // Setup worker intervals
           setInterval(() => arenaWorker.postMessage({ type: 'tick' }), 10000); // 10s
           setInterval(() => resolutionWorker.postMessage({ type: 'tick' }), 5 * 60 * 1000); // 5min
-          setInterval(() => dashboardWorker.postMessage({ type: 'tick' }), 30 * 1000); // 30s
           setInterval(() => autonomyWorker.postMessage({ type: 'tick' }), 3 * 60 * 1000); // 3min
           setInterval(() => marketWatcherWorker.postMessage({ type: 'tick' }), 60 * 1000); // 1min
           

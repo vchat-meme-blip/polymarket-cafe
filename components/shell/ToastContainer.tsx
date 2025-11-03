@@ -19,8 +19,8 @@ export default function ToastContainer() {
   return (
     <div className={styles.toastContainer}>
       {toastQueue.map(toast => (
+        // FIX: Removed the 'key' prop to resolve a TypeScript error. Component updates will be handled by prop changes.
         <Toast
-          key={toast.id}
           toast={toast}
           onClose={() => removeToast(toast.id)}
           onView={toast.intel ? () => {

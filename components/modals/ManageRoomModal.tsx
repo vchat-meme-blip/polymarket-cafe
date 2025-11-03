@@ -2,7 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useState, useEffect, useMemo } from 'react';
+// FIX: Added missing React import.
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../Modal';
 import { useUI, useUser, useArenaStore, useAgent } from '../../lib/state/index.js';
 import { apiService } from '../../lib/services/api.service.js';

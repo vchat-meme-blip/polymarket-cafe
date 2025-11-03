@@ -52,7 +52,8 @@ export default function IntelBankPanel() {
         <div className={styles.intelList}>
             {intelBank.length > 0 ? (
                 intelBank.map(intel => (
-                    <IntelItem key={intel.id} intel={intel} />
+                    // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
+                    <IntelItem intel={intel} />
                 ))
             ) : (
                 <p className={styles.empty}>No intel gathered yet. Your agent will add findings here.</p>

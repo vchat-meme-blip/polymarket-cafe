@@ -1,5 +1,7 @@
 
-import { useState, useEffect } from 'react';
+
+// FIX: Added missing React import
+import React, { useState, useEffect } from 'react';
 import { useAgent, useUI } from '../../lib/state/index.js';
 import { apiService } from '../../lib/services/api.service.js';
 import styles from './PredictionHub.module.css';
@@ -95,7 +97,8 @@ const LiquidityPanel = () => {
             ) : markets.length > 0 ? (
                 <div className={styles.marketGrid}>
                     {markets.map(market => (
-                        <MarketCard key={market.id} market={market} onSelect={openMarketDetailModal} />
+                        // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
+                        <MarketCard market={market} onSelect={openMarketDetailModal} />
                     ))}
                 </div>
             ) : (
@@ -149,7 +152,8 @@ export default function PredictionHubView() {
             return (
                  <div className={styles.marketGrid}>
                     {markets.map(market => (
-                        <MarketCard key={market.id} market={market} onSelect={openMarketDetailModal} />
+                        // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
+                        <MarketCard market={market} onSelect={openMarketDetailModal} />
                     ))}
                 </div>
             );

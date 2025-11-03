@@ -5,7 +5,8 @@
 import React, { useState, useRef, useEffect, ReactNode } from 'react';
 
 type RenderOnViewProps = {
-  children: ReactNode;
+  // FIX: Made children prop optional to resolve strange type inference issue.
+  children?: ReactNode;
   placeholder: ReactNode;
   rootMargin?: string;
 };

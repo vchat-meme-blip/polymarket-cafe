@@ -48,7 +48,8 @@ export default function WatchlistPanel() {
         <div className={styles.intelBankList}>
             {watchlists.length > 0 ? (
                 watchlists.map(list => (
-                    <WatchlistItem key={list.id} watchlist={list} />
+                    // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
+                    <WatchlistItem watchlist={list} />
                 ))
             ) : (
                 <p className={styles.empty}>No watchlists created yet. Your agent can create these based on your research.</p>

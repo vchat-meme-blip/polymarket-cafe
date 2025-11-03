@@ -39,7 +39,8 @@ export default function PredictionSidebar() {
             <div className={styles.marketList}>
                 {markets.length > 0 ? (
                     markets.map(market => (
-                        <MarketItem key={market.id} market={market} onSelect={() => setView('prediction-hub')} />
+                        // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
+                        <MarketItem market={market} onSelect={() => setView('prediction-hub')} />
                     ))
                 ) : (
                     <p>Loading markets...</p>

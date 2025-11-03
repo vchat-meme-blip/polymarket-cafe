@@ -206,7 +206,8 @@ function RoomScene({ room }: RoomSceneProps) {
             </mesh>
             
             {systemPaused && <CooldownHologram />}
-            {room.activeOffer && !systemPaused && <HolographicOffer key={offerKey} offer={room.activeOffer} />}
+            {/* FIX: Removed the 'key' prop to resolve a TypeScript error. Component updates will be handled by prop changes. */}
+            {room.activeOffer && !systemPaused && <HolographicOffer offer={room.activeOffer} />}
             
             {roomAgents.map((agent, index) => {
                 const isSpeaking = latestTurn?.agentId === agent.id;

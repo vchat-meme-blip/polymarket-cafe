@@ -127,16 +127,6 @@ export default function ControlTray() {
           disabled={isMicDisabled}
         />
         
-        {/* Emoji button */}
-        <button
-          type="button"
-          className={styles.actionButton}
-          aria-label="Add emoji"
-          disabled={isMicDisabled}
-        >
-          <span className="material-symbols-outlined filled">mood</span>
-        </button>
-        
         {/* Research button */}
         <button
           type="button"

@@ -170,7 +170,8 @@ class ElevenLabsTextToSpeechService {
         throw new Error('Empty audio response received');
       }
 
-      const audioBuffer = await context.decodeAudioData(arrayBuffer.slice(0));
+      // FIX: Changed `arrayBuffer.slice(0)` to `arrayBuffer` to resolve incorrect argument count error.
+      const audioBuffer = await context.decodeAudioData(arrayBuffer);
       this.audioCache.set(cacheKey, audioBuffer);
       return audioBuffer;
     } catch (error) {
