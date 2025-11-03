@@ -3,6 +3,7 @@
 import { parentPort } from 'worker_threads';
 import connectDB from '../db.js';
 import { AutonomyDirector } from '../directors/autonomy.director.js';
+import { apiKeyProvider } from '../services/apiKey.provider.js';
 
 if (!parentPort) {
   throw new Error('This file must be run as a worker thread.');
@@ -24,6 +25,10 @@ async function main() {
   // Add null check before using parentPort
   if (parentPort) {
     parentPort.on('message', (message: { type: string; payload: any; }) => {
+      if (message.type === 'apiKeyResponse') {
+        apiKeyProvider.handleMessage(message);
+        return;
+      }
       if (message.type === 'systemPause') {
         systemPaused = true;
         pauseUntil = message.payload.until;

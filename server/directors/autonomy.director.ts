@@ -8,6 +8,7 @@ import { alphaService } from '../services/alpha.service.js';
 import { notificationService } from '../services/notification.service.js';
 import { aiService } from '../services/ai.service.js';
 import { polymarketService } from '../services/polymarket.service.js';
+import { apiKeyProvider } from '../services/apiKey.provider.js';
 import OpenAI from 'openai';
 
 type EmitToMainThread = (message: { type: string; event?: string; payload?: any; room?: string; worker?: string; message?: any; }) => void;
@@ -58,7 +59,7 @@ export class AutonomyDirector {
         this.isTicking = true;
         
         try {
-            const activeUserQuery = { currentAgentId: { $exists: true, $ne: null } };
+            const activeUserQuery = { currentAgentId: { $exists: true, $ne: null as any } };
             const totalUsers = await usersCollection.countDocuments(activeUserQuery);
 
             if (this.currentUserOffset >= totalUsers) {
@@ -212,7 +213,7 @@ export class AutonomyDirector {
         const interestingMarket = markets[Math.floor(Math.random() * markets.length)];
         const prompt = `As ${agent.name}, your personality is "${agent.personality}". You just noticed a trending prediction market: "${interestingMarket.title}" with Yes odds at ${Math.round(interestingMarket.odds.yes * 100)}¢. Briefly, in one or two sentences, give a proactive, interesting, or insightful comment about it to your user, ${user.name}. Be conversational and engaging.`;
         
-        const message = await this.generateProactiveMessage(agent, prompt, user.userApiKey);
+        const message = await this.generateProactiveMessage(agent, prompt);
         if (message) {
             this.sendProactiveMessage(user.handle!, agent, message);
         }
@@ -228,7 +229,7 @@ export class AutonomyDirector {
         const intel = recentIntel[0];
         const prompt = `As ${agent.name}, your personality is "${agent.personality}". You are reviewing some intel you recently found about the market "${intel.market}": "${intel.content}". Briefly, in one or two sentences, bring this up to your user, ${user.name}, in a natural and interesting way. What's a good follow-up question you could ask them about it?`;
 
-        const message = await this.generateProactiveMessage(agent, prompt, user.userApiKey);
+        const message = await this.generateProactiveMessage(agent, prompt);
         if (message) {
             this.sendProactiveMessage(user.handle!, agent, message);
         }
@@ -241,15 +242,18 @@ export class AutonomyDirector {
         const betToReview = pendingBets[Math.floor(Math.random() * pendingBets.length)];
         const prompt = `As ${agent.name}, your personality is "${agent.personality}". You are reviewing an active bet for your user, ${user.name}: A ${betToReview.amount} USD bet on "${betToReview.outcome}" for a market with ID ${betToReview.marketId}. Briefly, in one or two sentences, give them a fresh thought or ask an insightful question about this position.`;
         
-        const message = await this.generateProactiveMessage(agent, prompt, user.userApiKey);
+        const message = await this.generateProactiveMessage(agent, prompt);
         if (message) {
             this.sendProactiveMessage(user.handle!, agent, message);
         }
     }
 
-    private async generateProactiveMessage(agent: Agent, prompt: string, userApiKey: string | null): Promise<string | null> {
-        const apiKey = userApiKey || (process.env.OPENAI_API_KEYS || '').split(',')[0];
-        if (!apiKey) return null;
+    private async generateProactiveMessage(agent: Agent, prompt: string): Promise<string | null> {
+        const apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
+        if (!apiKey) {
+            console.warn(`[AutonomyDirector] No API key available for proactive message from agent ${agent.name}.`);
+            return null;
+        }
         
         const openai = new OpenAI({ apiKey });
         const createCompletion = () => openai.chat.completions.create({
@@ -262,6 +266,9 @@ export class AutonomyDirector {
             return completion.choices[0].message.content?.trim() ?? null;
         } catch (error) {
             console.error(`[AutonomyDirector] Failed to generate proactive message for ${agent.name} after retries:`, error);
+            if (error instanceof OpenAI.APIError && error.status === 429) {
+                apiKeyProvider.reportRateLimit(apiKey, 60);
+            }
             return null;
         }
     }
