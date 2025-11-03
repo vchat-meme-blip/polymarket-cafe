@@ -43,6 +43,11 @@ const __dirname = path.dirname(__filename);
 // --- App & Server Initialization ---
 const app: Express = express();
 const server = http.createServer(app);
+
+// Initialize WebSocket service
+import { webSocketService } from './services/websocket.service.js';
+webSocketService.init(server);
+
 export { server };
 
 // --- Configuration ---
@@ -68,16 +73,73 @@ if (!isProduction) {
 app.use(
   helmet({
     contentSecurityPolicy: {
+      useDefaults: true,
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        'connect-src': ["'self'", 'https://*.sliplane.app', 'wss://*.sliplane.app', 'blob:'],
-        'script-src-elem': ["'self'", "https://aistudiocdn.com", "'sha256-jc7G1mO6iumy5+mUBzbiKkcDtWD3pvyxBCrV8DgQQe0='", "'sha256-f7e2FzTlLBcKV18x7AY/5TeX5EoQtT0BZxrV1/f1odI='"],
-        'style-src': ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.bunny.net"],
-        'font-src': ["'self'", "https://fonts.gstatic.com", "https://fonts.bunny.net"],
-        'img-src': ["'self'", "data:", "https://polymarket-upload.s3.us-east-2.amazonaws.com", "https://assets.coingecko.com"],
-        'worker-src': ["'self'", "blob:"],
+        'default-src': ["'self'", 'https:'],
+        'connect-src': [
+          "'self'",
+          'https://*.sliplane.app',
+          'wss://*.sliplane.app',
+          'wss://*.polycafe.life',
+          'blob:',
+          'data:',
+          'https://api.elevenlabs.io'
+        ],
+        'media-src': [
+          "'self'",
+          'blob:',
+          'data:',
+          'https://*.sliplane.app',
+          'https://*.polycafe.life'
+        ],
+        'script-src': [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'"
+        ],
+        'script-src-elem': [
+          "'self'",
+          "https://aistudiocdn.com",
+          "'sha256-jc7G1mO6iumy5+mUBzbiKkcDtWD3pvyxBCrV8DgQQe0='",
+          "'sha256-f7e2FzTlLBcKV18x7AY/5TeX5EoQtT0BZxrV1/f1odI='"
+        ],
+        'style-src': [
+          "'self'",
+          "'unsafe-inline'",
+          "https://fonts.googleapis.com",
+          "https://fonts.bunny.net"
+        ],
+        'font-src': [
+          "'self'",
+          'data:',
+          'https://fonts.gstatic.com',
+          'https://fonts.bunny.net'
+        ],
+        'img-src': [
+          "'self'",
+          'data:',
+          'blob:',
+          'https://polymarket-upload.s3.us-east-2.amazonaws.com',
+          'https://assets.coingecko.com',
+          'https://*.sliplane.app',
+          'https://*.polycafe.life'
+        ],
+        'worker-src': [
+          "'self'",
+          'blob:'
+        ],
         'object-src': ["'none'"],
         'frame-ancestors': ["'none'"],
+        'frame-src': [
+          "'self'",
+          'blob:',
+          'data:'
+        ],
+        'child-src': [
+          "'self'",
+          'blob:'
+        ]
       },
     },
   }) as any
@@ -87,11 +149,23 @@ app.disable('x-powered-by');
 // 2. CORS configuration
 const corsOptions: cors.CorsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, success?: boolean) => void) => {
-    if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+    if (!origin) {
+      // Allow requests with no origin (like mobile apps or curl requests)
       return callback(null, true);
     }
-    // In production, also allow any sliplane.app subdomain for flexibility
-    if (isProduction && origin.endsWith('.sliplane.app')) {
+    
+    // Check against allowed origins
+    if (allowedOrigins.some(o => origin.startsWith(o))) {
+      return callback(null, true);
+    }
+    
+    // Allow subdomains in production
+    if (isProduction && (
+      origin.endsWith('.sliplane.app') || 
+      origin.endsWith('.polycafe.life') ||
+      origin === 'https://polycafe.life' ||
+      origin === 'https://www.polycafe.life'
+    )) {
       return callback(null, true);
     }
     

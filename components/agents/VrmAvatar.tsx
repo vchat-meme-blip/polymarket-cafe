@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import '@react-three/fiber';
-import React, { useEffect, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import React, { useEffect, useRef, Suspense } from 'react';
+import { Canvas as ThreeCanvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, useProgress, Html } from '@react-three/drei';
-import './VrmAvatar.css'; // Import the CSS file with maximized canvas styles
+import './VrmAvatar.css';
 import * as THREE from 'three';
 import useVrm from '../../hooks/useVrm';
 import useVrmAnimation from '../../hooks/useVrmAnimation';
+// WebGL context manager will be defined inline since we can't access the file system
 
 type VrmPlaceholderProps = {
   status: 'loading' | 'error';
@@ -291,23 +292,139 @@ type VrmAvatarCanvasProps = {
   verticalOffset?: number; // Optional vertical offset for the model
 };
 
+// Simple WebGL context handler component
+const WebGLContextHandler = () => {
+  const { gl } = useThree();
+  const contextLostRef = useRef(false);
+  
+  useEffect(() => {
+    const canvas = gl.domElement;
+    
+    const handleContextLost = (event: Event) => {
+      console.warn('WebGL context lost, attempting to recover...');
+      event.preventDefault();
+      contextLostRef.current = true;
+    };
+    
+    const handleContextRestored = () => {
+      console.log('WebGL context restored');
+      contextLostRef.current = false;
+      // Force a re-render to recover the scene
+      gl.forceContextRestore();
+    };
+    
+    canvas.addEventListener('webglcontextlost', handleContextLost, false);
+    canvas.addEventListener('webglcontextrestored', handleContextRestored, false);
+    
+    // Check for context loss periodically
+    const checkContext = () => {
+      if (contextLostRef.current) {
+        console.log('Attempting to restore WebGL context...');
+        const extension = gl.getContextAttributes()?.loseContext;
+        if (extension) {
+          extension.restoreContext();
+        }
+      }
+    };
+    
+    const interval = setInterval(checkContext, 1000);
+    
+    return () => {
+      clearInterval(interval);
+      canvas.removeEventListener('webglcontextlost', handleContextLost);
+      canvas.removeEventListener('webglcontextrestored', handleContextRestored);
+    };
+  }, [gl]);
+  
+  return null;
+};
+
+// Enhanced Canvas component with WebGL context management
 export function VrmAvatarCanvas({ modelUrl, isSpeaking, scale = 1, verticalOffset = 0 }: VrmAvatarCanvasProps) {
-  // Adjust camera position based on scale to ensure model is fully visible
-  const cameraZ = scale > 1 ? 3.5 : 2.5; // Increased camera distance for scaled models
-  const cameraY = scale > 1 ? 1.2 : 0.8; // Adjust camera height based on scale
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const cameraZ = scale > 1 ? 3.5 : 2.5;
+  const cameraY = scale > 1 ? 1.2 : 0.8;
+  
+  // Handle component unmount
+  useEffect(() => {
+    return () => {
+      // Clean up WebGL resources when component unmounts
+      if (canvasRef.current) {
+        const canvas = canvasRef.current.querySelector('canvas');
+        if (canvas) {
+          // Get WebGL context with proper type assertion
+          const gl = (
+            canvas.getContext('webgl') || 
+            canvas.getContext('experimental-webgl')
+          ) as WebGLRenderingContext | null;
+          
+          if (gl) {
+            try {
+              // Force context loss to release resources
+              const extension = gl.getExtension('WEBGL_lose_context');
+              if (extension) {
+                extension.loseContext();
+              }
+            } catch (error) {
+              console.warn('Error while trying to lose WebGL context:', error);
+            }
+          }
+        }
+      }
+    };
+  }, []);
   
   return (
-    <div className="vrm-avatar-canvas" style={{ width: '100%', height: '100%', minHeight: '600px' }}>
-      <Canvas
-        style={{ width: '100%', height: '100%' }}
-        camera={{ position: [0, cameraY, cameraZ], fov: 30 }}
-        gl={{ antialias: true, alpha: true }}
-        shadows
+    <div 
+      ref={canvasRef}
+      className="vrm-avatar-canvas" 
+      style={{ 
+        width: '100%', 
+        height: '100%', 
+        minHeight: '600px',
+        position: 'relative',
+        overflow: 'hidden'
+      }}
+    >
+      <ThreeCanvas
+        camera={{ position: [0, cameraY, cameraZ], fov: 45, near: 0.1, far: 1000 }}
+        gl={{
+          alpha: true,
+          powerPreference: 'high-performance',
+          stencil: false,
+          depth: true,
+          premultipliedAlpha: false,
+          failIfMajorPerformanceCaveat: false,
+          preserveDrawingBuffer: false,
+          antialias: false, // Disable antialiasing for better performance
+        }}
+        dpr={Math.min(window.devicePixelRatio, 2)} // Limit DPR for performance
+        onCreated={({ gl }) => {
+          // Optimize WebGL context
+          gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          // @ts-ignore - shadowMap might not exist on all renderers
+          if (gl.shadowMap) gl.shadowMap.enabled = false;
+          // @ts-ignore - These properties might not exist on all renderers
+          if (gl.autoClear !== undefined) gl.autoClear = true;
+          // @ts-ignore
+          if (gl.autoClearColor !== undefined) gl.autoClearColor = true;
+          // @ts-ignore
+          if (gl.autoClearDepth !== undefined) gl.autoClearDepth = true;
+          // @ts-ignore
+          if (gl.autoClearStencil !== undefined) gl.autoClearStencil = true;
+        }}
       >
+<WebGLContextHandler />
         <ambientLight intensity={1.5} />
         <directionalLight position={[3, 5, 2]} intensity={2} castShadow />
         <group position={[0, -0.875, 0]} rotation={[0, modelUrl.includes('war_boudica') ? 0 : Math.PI, 0]} scale={scale}>
-            <VrmModel modelUrl={modelUrl} isSpeaking={isSpeaking} verticalOffset={verticalOffset} />
+          <Suspense fallback={<VrmPlaceholder status="loading" />}>
+            <VrmModel 
+              modelUrl={modelUrl} 
+              isSpeaking={isSpeaking} 
+              verticalOffset={verticalOffset} 
+            />
+          </Suspense>
         </group>
         <OrbitControls
           enableZoom={true}
@@ -316,7 +433,7 @@ export function VrmAvatarCanvas({ modelUrl, isSpeaking, scale = 1, verticalOffse
           minDistance={1.5}
           maxDistance={5.0}
         />
-      </Canvas>
+      </ThreeCanvas>
     </div>
   );
 }

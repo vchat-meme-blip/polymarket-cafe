@@ -4,6 +4,7 @@
 */
 import { audioContext as getAudioContext } from '../utils.js';
 import { API_BASE_URL } from '../config.js';
+import { ttsQueue } from '../../src/utils/ttsQueue';
 
 export type ElevenLabsVoice = {
   id: string;
@@ -93,16 +94,25 @@ class ElevenLabsTextToSpeechService {
     if (!context) return null;
 
     const cacheKey = `${voiceId || DEFAULT_VOICE_ID}:${modelId || 'default'}:${text}`;
+    
+    // Check cache first
     if (this.audioCache.has(cacheKey)) {
       return this.audioCache.get(cacheKey) ?? null;
     }
 
+    // Check if already in flight
     if (this.inflightSyntheses.has(cacheKey)) {
       return this.inflightSyntheses.get(cacheKey)!;
     }
 
-    const synthesisPromise = this.fetchAndDecodeAudio(cacheKey, context, options).finally(() => {
+    // Use the queue for new requests
+    const synthesisPromise = ttsQueue.add<AudioBuffer | null>(() => 
+      this.fetchAndDecodeAudio(cacheKey, context, options)
+    ).finally(() => {
       this.inflightSyntheses.delete(cacheKey);
+    }).catch(error => {
+      console.error('[TTS Queue] Error in synthesis:', error);
+      return null;
     });
 
     this.inflightSyntheses.set(cacheKey, synthesisPromise);
@@ -112,8 +122,11 @@ class ElevenLabsTextToSpeechService {
   private async fetchAndDecodeAudio(
     cacheKey: string,
     context: AudioContext,
-    options: SynthesisOptions
+    options: SynthesisOptions,
+    retryCount = 0
   ): Promise<AudioBuffer | null> {
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY = 1000; // 1 second
     try {
       const normalizedVoiceId = this.normalizeVoiceId(options.voiceId);
 
@@ -132,15 +145,24 @@ class ElevenLabsTextToSpeechService {
 
       if (!response.ok) {
         let errorDetails = `status ${response.status}`;
+        let errorJson;
         try {
-          const errorJson = await response.json();
+          errorJson = await response.json();
           if (errorJson?.error) {
             errorDetails += `: ${errorJson.error}`;
           }
         } catch {
           // ignore JSON parse errors, we already have status
         }
-        throw new Error(`TTS request failed with ${errorDetails}`);
+        
+        // Handle rate limiting with retry
+        if (response.status === 429 && retryCount < MAX_RETRIES) {
+          console.log(`[TTS] Rate limited, retrying (${retryCount + 1}/${MAX_RETRIES})...`);
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
+          return this.fetchAndDecodeAudio(cacheKey, context, options, retryCount + 1);
+        }
+        
+        throw new Error(`TTS request failed with ${errorDetails}`, { cause: errorJson });
       }
 
       const arrayBuffer = await response.arrayBuffer();
