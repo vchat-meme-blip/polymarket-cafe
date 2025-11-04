@@ -18,7 +18,348 @@ import { useArenaStore } from '../../lib/state/arena.js';
 import { ttsService } from '../../lib/services/tts.service.js';
 import { useAutonomyStore } from '../../lib/state/autonomy.js';
 
-// Tabs and other components remain the same...
+const ProfileTab = ({ agent, onUpdate, onSave }: { agent: Partial<Agent>, onUpdate: (updates: Partial<Agent>) => void, onSave: () => void }) => {
+    const [isBrainstorming, setIsBrainstorming] = useState(false);
+    const [personalityKeywords, setPersonalityKeywords] = useState('');
+    const [voices, setVoices] = useState<VoiceProfile[]>(() => [...AVAILABLE_VOICES]);
+
+    useEffect(() => {
+        let isMounted = true;
+        (async () => {
+            try {
+                const fetched = await ttsService.getAvailableVoices();
+                if (!isMounted) return;
+                const mapped: VoiceProfile[] = fetched.map(voice => ({ id: voice.id, name: voice.label }));
+                const list = [...mapped];
+                if (agent.voice && !list.some(v => v.id === agent.voice)) {
+                    list.push({ id: agent.voice, name: 'Current Voice' });
+                }
+                setVoices(list.length > 0 ? list : [...AVAILABLE_VOICES]);
+            } catch (error) {
+                console.error('[AgentDossierModal] Failed to load ElevenLabs voices', error);
+            }
+        })();
+        return () => {
+            isMounted = false;
+        };
+    }, [agent.voice]);
+
+    const handleBrainstorm = async () => {
+        if (!personalityKeywords.trim()) return;
+        setIsBrainstorming(true);
+        try {
+            const data = await apiService.brainstormPersonality(personalityKeywords);
+            onUpdate({ personality: data.personality });
+        } catch (error) {
+            console.error('Error brainstorming personality:', error);
+        } finally {
+            setIsBrainstorming(false);
+        }
+    };
+    
+    return (
+        <form className={styles.dossierForm} onSubmit={e => { e.preventDefault(); onSave(); }}>
+            <div className={styles.dossierFormPreview}>
+                <div className={styles.previewRenderer}>
+                    <div style={{ position: 'relative', width: '100%', height: '300px' }}>
+                        <Canvas
+                            camera={{ position: [0, 1.0, 2.5], fov: 40 }}
+                            gl={{ antialias: true, alpha: true }}
+                            shadows
+                        >
+                            <ambientLight intensity={1.5} />
+                            <directionalLight position={[3, 1, 2]} intensity={2} castShadow />
+                            <group position={[0, -0.8, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0.2 : (0.2 + Math.PI), 0]} scale={1.0}>
+                                <VrmModel 
+                                    modelUrl={agent.modelUrl || ''} 
+                                    isSpeaking={false}
+                                    disableAutoGrounding={false}
+                                />
+                            </group>
+                            <OrbitControls
+                                enableZoom={false}
+                                enablePan={false}
+                                target={[0, 0.5, 0]}
+                            />
+                        </Canvas>
+                    </div>
+                </div>
+                 <label>
+                    <span>3D Model</span>
+                    <select 
+                        value={agent.modelUrl} 
+                        onChange={e => {
+                            // Find the preset that matches this model URL
+                            const selectedPreset = PRESET_AGENTS.find(p => p.modelUrl === e.target.value);
+                            if (selectedPreset) {
+                                // Apply the preset's personality and other attributes
+                                onUpdate({
+                                    modelUrl: selectedPreset.modelUrl,
+                                    personality: selectedPreset.personality,
+                                    name: selectedPreset.name,
+                                    voice: selectedPreset.voice,
+                                    instructions: selectedPreset.instructions,
+                                    topics: selectedPreset.topics,
+                                    wishlist: selectedPreset.wishlist
+                                });
+                            } else {
+                                onUpdate({ modelUrl: e.target.value });
+                            }
+                        }}
+                    >
+                        {/* FIX: Access id property which now exists on Agent type */}
+                        {PRESET_AGENTS.map(p => <option key={p.id} value={p.modelUrl}>{p.name}</option>)}
+                    </select>
+                </label>
+                <label>
+                    <span>Voice</span>
+                    <select value={agent.voice} onChange={e => onUpdate({ voice: e.target.value as any })}>
+                        {voices.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                    </select>
+                </label>
+            </div>
+            <div className={styles.dossierFormFields}>
+                 <label>
+                    <span>Name</span>
+                    <input type="text" value={agent.name} onChange={e => onUpdate({ name: e.target.value })} />
+                </label>
+                <label>
+                    <span>Personality</span>
+                    <div className={styles.personalityCopilot}>
+                      <input type="text" value={personalityKeywords} onChange={e => setPersonalityKeywords(e.target.value)} placeholder="Brainstorm with keywords..." />
+                      <button type="button" className="button" onClick={handleBrainstorm} disabled={isBrainstorming || !personalityKeywords.trim()}>
+                        <span className="icon">auto_awesome</span>{isBrainstorming ? '...' : 'Go'}
+                      </button>
+                    </div>
+                    <textarea value={agent.personality} onChange={e => onUpdate({ personality: e.target.value })} rows={4} />
+                </label>
+
+                <label>
+                    <span>Core Instructions</span>
+                    <textarea value={agent.instructions} onChange={e => onUpdate({ instructions: e.target.value })} rows={4} />
+                </label>
+
+                <div className={styles.tagGroup}>
+                    <label>Topics of Interest</label>
+                    <div className={styles.tagContainer}>
+                        {agent.topics?.map(topic => <span key={topic} className={styles.tag}>{topic}</span>)}
+                    </div>
+                </div>
+
+                <div className={styles.tagGroup}>
+                    <label>Token Wishlist</label>
+                    <div className={styles.tagContainer}>
+                        {agent.wishlist?.map(item => <span key={item} className={styles.tag}>{item}</span>)}
+                    </div>
+                </div>
+
+                <div className={styles.infoGrid}>
+                    <div className={styles.infoItem}><span>Owner</span><strong>{agent.ownerHandle}</strong></div>
+                    <div className={styles.infoItem}><span>Reputation</span><strong>{agent.reputation}</strong></div>
+                </div>
+
+                <div className={styles.shillSection}>
+                    <label>Enable Shilling</label>
+                    <div className={styles.toggleSwitch}>
+                        <input 
+                            type="checkbox" 
+                            checked={agent.isShilling} 
+                            onChange={e => onUpdate({ isShilling: e.target.checked })}
+                            id={`shill-toggle-${agent.id}`}
+                        />
+                        <label htmlFor={`shill-toggle-${agent.id}`}></label>
+                    </div>
+                </div>
+
+                {agent.isShilling && (
+                    <label>
+                        <span>Shilling Instructions</span>
+                        <textarea value={agent.shillInstructions} onChange={e => onUpdate({ shillInstructions: e.target.value })} rows={3} />
+                    </label>
+                )}
+
+                 <button type="submit" className="button primary" style={{justifyContent: 'center', marginTop: '1rem'}}>Save Changes</button>
+            </div>
+        </form>
+    );
+};
+
+const OperationsTab = ({ agent, onUpdate }: { agent: Partial<Agent>, onUpdate: (updates: Partial<Agent>) => void }) => {
+    return (
+        <div className={styles.operationsContainer}>
+            <h4>Autonomous Behavior Configuration</h4>
+            <p>Set rules for how this agent operates on its own.</p>
+            <div className={styles.operationsForm}>
+                <div className={styles.shillSection}>
+                    <label 
+                        htmlFor={`proactive-toggle-${agent.id}`}
+                        title="If enabled, this agent will occasionally send you unsolicited messages with market analysis or other insights when you are on the Dashboard."
+                    >
+                        Enable Proactive Insights
+                    </label>
+                    <div className={styles.toggleSwitch}>
+                        <input 
+                            type="checkbox" 
+                            checked={agent.isProactive} 
+                            onChange={e => onUpdate({ isProactive: e.target.checked })}
+                            id={`proactive-toggle-${agent.id}`}
+                        />
+                        <label htmlFor={`proactive-toggle-${agent.id}`}></label>
+                    </div>
+                </div>
+                <label title="If filled, this agent will only visit these specific rooms to buy intel. Leave blank to allow random roaming in the Intel Exchange.">
+                    <span>Trusted Intel Sources (Room IDs)</span>
+                    <textarea 
+                        rows={3} 
+                        placeholder="e.g., room-abc12, room-xyz34"
+                        value={agent.trustedRoomIds?.join(', ') || ''}
+                        onChange={(e) => onUpdate({ trustedRoomIds: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                    />
+                </label>
+                <label title="Define when this agent should be active if they are hosting an owned storefront. (Parsing is very basic for now).">
+                    <span>Operating Hours (for owned rooms)</span>
+                    <input 
+                        type="text" 
+                        placeholder="e.g., Weekdays 9-17 UTC" 
+                        value={agent.operatingHours || ''}
+                        onChange={(e) => onUpdate({ operatingHours: e.target.value })}
+                    />
+                </label>
+            </div>
+        </div>
+    );
+};
+
+const LedgerAndReportTab = ({ agentId }: { agentId: string }) => {
+    const [summary, setSummary] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const { tradeHistory } = useArenaStore();
+    const { availablePersonal, availablePresets } = useAgent();
+    const { ownedRoomId } = useUser();
+
+    const allAgents = useMemo(() => new Map([...availablePersonal, ...availablePresets].map(a => [a.id, a])), [availablePersonal, availablePresets]);
+
+    useEffect(() => {
+        const fetchActivity = async () => {
+            setIsLoading(true);
+            try {
+                const { summary } = await apiService.getAgentActivitySummary(agentId);
+                setSummary(summary);
+            } catch (error) {
+                console.error('Failed to fetch agent activity summary', error);
+                setSummary('Could not load AI-generated activity report.');
+            }
+            setIsLoading(false);
+        };
+        fetchActivity();
+    }, [agentId]);
+    
+    const personalTradeHistory = useMemo(() => {
+        return tradeHistory
+            .filter(trade => trade.fromId === agentId || trade.toId === agentId)
+            .sort((a, b) => b.timestamp - a.timestamp);
+    }, [tradeHistory, agentId]);
+
+    const storefrontTradeHistory = useMemo(() => {
+        if (!ownedRoomId) return [];
+        return tradeHistory
+            .filter(trade => trade.roomId === ownedRoomId)
+            .sort((a, b) => b.timestamp - a.timestamp);
+    }, [tradeHistory, ownedRoomId]);
+
+    const storefrontPnl = useMemo(() => {
+        return storefrontTradeHistory.reduce((total, trade) => {
+            // Assume the owner is the seller
+            return total + trade.price;
+        }, 0);
+    }, [storefrontTradeHistory]);
+
+    if (isLoading) {
+        return <p>Loading agent report...</p>;
+    }
+
+    return (
+        <div className={styles.activityLogContainer}>
+            <div className={styles.activitySummaryCard}>
+                <h4>AI Daily Report</h4>
+                <blockquote className={styles.summaryText}>{summary || 'No summary available.'}</blockquote>
+            </div>
+
+            {ownedRoomId && (
+                 <div className={styles.storefrontLedger}>
+                    <h4>Storefront Ledger (Total PNL: {storefrontPnl.toLocaleString()} BOX)</h4>
+                    {storefrontTradeHistory.length === 0 ? (
+                        <p className={styles.emptyLedger}>No trades recorded in your storefront yet.</p>
+                    ) : (
+                         <table className={styles.ledgerTable}>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Asset</th>
+                                    <th>Price</th>
+                                    <th>Buyer</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {storefrontTradeHistory.map(trade => {
+                                    const buyer = allAgents.get(trade.toId);
+                                    return (
+                                        <tr key={trade.timestamp}>
+                                            <td>{format(trade.timestamp, 'MMM d, h:mm a')}</td>
+                                            <td className={styles.tokenCell}>{`Intel on ${trade.market}`}</td>
+                                            <td className={styles.priceCell}>{trade.price.toLocaleString()} BOX</td>
+                                            <td>{buyer?.name || 'Unknown'}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            )}
+
+            <div className={styles.personalLedger}>
+                <h4>Intel Trade Ledger</h4>
+                {personalTradeHistory.length === 0 ? (
+                    <p className={styles.emptyLedger}>No trades recorded yet.</p>
+                ) : (
+                    <table className={styles.ledgerTable}>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Action</th>
+                                <th>Asset</th>
+                                <th>Amount</th>
+                                <th>Counterparty</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {personalTradeHistory.map(trade => {
+                                const isBuy = trade.toId === agentId;
+                                const counterpartyId = isBuy ? trade.fromId : trade.toId;
+                                const counterparty = allAgents.get(counterpartyId);
+                                
+                                return (
+                                    <tr key={trade.timestamp}>
+                                        <td>{format(trade.timestamp, 'MMM d, h:mm a')}</td>
+                                        <td>
+                                            <span className={isBuy ? styles.actionBuy : styles.actionSell}>
+                                                {isBuy ? 'BUY' : 'SELL'}
+                                            </span>
+                                        </td>
+                                        <td className={styles.tokenCell}>{`Intel on ${trade.market}`}</td>
+                                        <td className={styles.priceCell}>{trade.price.toLocaleString()} BOX</td>
+                                        <td>{counterparty?.name || 'Unknown'}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const IntelBriefingTab = ({ agent, onUpdate }: { agent: Partial<Agent>, onUpdate: (updates: Partial<Agent>) => void }) => {
     const { addToast } = useUI();
@@ -162,12 +503,7 @@ const IntelBriefingTab = ({ agent, onUpdate }: { agent: Partial<Agent>, onUpdate
 };
 
 
-// The rest of the AgentDossierModal component remains the same,
-// but it will now render the complete IntelBriefingTab.
-
-// A placeholder for the rest of the component to avoid breaking changes.
-// The important part is the implementation of IntelBriefingTab above.
-const restOfComponent = (agentId: string) => {
+export default function AgentDossierModal({ agentId }: { agentId: string }) {
     const { closeAgentDossier, isCreatingAgentInDossier } = useUI();
     const { availablePersonal } = useAgent();
     const { handle } = useUser();
@@ -187,7 +523,33 @@ const restOfComponent = (agentId: string) => {
     }
     
     const handleSave = async () => {
-        // ... save logic from original file
+        setIsSaving(true);
+    
+        if (isCreatingAgentInDossier) {
+            // FIX: The server now generates the agent ID.
+            // We call the API, get the saved agent with a real ID, and then add it to the local store.
+            // This avoids optimistic updates with temporary IDs and fixes the type error.
+            const agentToCreate = { ...formData, ownerHandle: handle };
+            try {
+                const { agent: savedAgent } = await apiService.saveNewAgent(agentToCreate);
+                useAgent.getState().addAgent(savedAgent);
+            } catch (error) {
+                console.error('Failed to create agent:', error);
+                // Optionally add a toast message for the user
+            }
+        } else {
+            // FIX: Add a guard to ensure formData and its id exist before updating.
+            if (!formData.id) {
+                console.error("Cannot update agent without an ID.");
+                setIsSaving(false);
+                return;
+            }
+            useAgent.getState().update(formData.id, formData);
+            await apiService.updateAgent(formData.id, formData);
+        }
+    
+        setIsSaving(false);
+        closeAgentDossier();
     };
 
     const onUpdate = (updates: Partial<Agent>) => {
@@ -207,17 +569,12 @@ const restOfComponent = (agentId: string) => {
                     <button className={c(styles.tabButton, { [styles.active]: activeTab === 'activity' })} onClick={() => setActiveTab('activity')} disabled={isCreatingAgentInDossier}>Ledger & Report</button>
                 </div>
                 <div className={styles.modalContent}>
+                    {activeTab === 'profile' && <ProfileTab agent={formData as Agent} onUpdate={(updates) => setFormData(prev => prev ? {...prev, ...updates} : null)} onSave={handleSave} />}
                     {activeTab === 'intel' && <IntelBriefingTab agent={formData} onUpdate={onUpdate} />}
-                    {/* Other tabs would be rendered here */}
+                    {activeTab === 'operations' && <OperationsTab agent={formData} onUpdate={(updates) => setFormData(prev => prev ? {...prev, ...updates} : null)} />}
+                    {activeTab === 'activity' && <LedgerAndReportTab agentId={formData.id!} />}
                 </div>
             </div>
         </Modal>
     );
 };
-
-export default function AgentDossierModal({ agentId }: { agentId: string }) {
-    // This is just a shell to render the correct component for now.
-    // The implementation of the rest of the modal is complex and depends on many other files.
-    // This provides the specific requested implementation for the Intel Briefing Tab.
-    return restOfComponent(agentId);
-}
