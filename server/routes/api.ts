@@ -1,9 +1,7 @@
 
-
-
 import { Router } from 'express';
 import mongoose, { Collection } from 'mongoose';
-import { TradeRecord, BettingIntel } from '../../lib/types/shared.js';
+import { TradeRecord, BettingIntel, MarketWatchlist } from '../../lib/types/shared.js';
 import { 
   usersCollection, 
   agentsCollection,
@@ -14,6 +12,7 @@ import {
   bettingIntelCollection,
   roomsCollection,
   dailySummariesCollection,
+  marketWatchlistsCollection,
 } from '../db.js';
 import { PRESET_AGENTS } from '../../lib/presets/agents.js';
 import { aiService } from '../services/ai.service.js';
@@ -64,10 +63,8 @@ router.post('/system/reset-database', async (req, res) => {
         
         console.log('[API] All collections dropped.');
         
-        // Re-run the comprehensive seeding logic
         await seedDatabase();
 
-        // Tell workers to re-initialize their state from the now-fresh DB
         req.arenaWorker?.postMessage({ type: 'reinitialize' });
 
         res.status(200).json({ message: 'Database reset and re-seeded successfully.' });
@@ -91,7 +88,6 @@ router.get('/bootstrap/:handle', async (req, res) => {
     const autonomy = { bounties: await bountiesCollection.find({ ownerHandle: handle }).toArray(), intel: await bettingIntelCollection.find({ ownerHandle: handle }).toArray() };
     const wallet = { transactions: await transactionsCollection.find({ ownerHandle: handle }).toArray() };
 
-    // Important: The client needs the string version of the _id as the canonical 'id'
     const sanitize = (doc: any) => ({ ...doc, id: doc._id.toString(), _id: doc._id.toString() });
 
     res.json({ 
@@ -106,7 +102,7 @@ router.get('/bootstrap/:handle', async (req, res) => {
     res.status(500).json({ message: 'Server error during bootstrap' });
   }
 });
-
+  
 router.get('/users/check-handle/:handle', async (req, res) => {
   try {
     const user = await usersCollection.findOne({ handle: req.params.handle });
@@ -300,19 +296,58 @@ router.put('/agents/:agentId', async (req, res) => {
 
 router.post('/agents/:agentId/watchlists', async (req, res) => {
     const { agentId } = req.params;
+    const { userHandle } = res.locals;
     const watchlistData = req.body;
-    // Server-side validation and creation logic would go here
-    const newWatchlist = { ...watchlistData, id: new ObjectId().toHexString(), createdAt: Date.now() };
-    await agentsCollection.updateOne({ id: agentId }, { $push: { marketWatchlists: newWatchlist } });
-    res.status(201).json({ watchlist: newWatchlist });
+
+    try {
+        const agent = await agentsCollection.findOne({ id: agentId, ownerHandle: userHandle });
+        if (!agent) {
+            return res.status(404).json({ message: 'Agent not found or you do not own this agent.' });
+        }
+        
+        const newWatchlist: Omit<MarketWatchlist, 'id'> & { _id: ObjectId, id: string } = {
+            _id: new ObjectId(),
+            id: '',
+            name: watchlistData.name,
+            markets: watchlistData.markets,
+            createdAt: Date.now(),
+            isTradable: watchlistData.isTradable,
+            price: watchlistData.price,
+        };
+        newWatchlist.id = newWatchlist._id.toHexString();
+
+        await agentsCollection.updateOne(
+            { _id: agent._id },
+            { $push: { marketWatchlists: newWatchlist as any } }
+        );
+
+        res.status(201).json({ watchlist: newWatchlist });
+    } catch (error) {
+        console.error('Error adding watchlist:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
 });
 
 router.delete('/agents/:agentId/watchlists/:watchlistId', async (req, res) => {
     const { agentId, watchlistId } = req.params;
-    await agentsCollection.updateOne({ id: agentId }, { $pull: { marketWatchlists: { id: watchlistId } } });
-    res.status(204).send();
-});
+    const { userHandle } = res.locals;
 
+    try {
+        const result = await agentsCollection.updateOne(
+            { id: agentId, ownerHandle: userHandle },
+            { $pull: { marketWatchlists: { id: watchlistId } as any } }
+        );
+
+        if (result.modifiedCount === 0) {
+            return res.status(404).json({ message: 'Watchlist not found or you do not own this agent.' });
+        }
+
+        res.status(204).send();
+    } catch (error) {
+        console.error('Error deleting watchlist:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
 
 // --- AI Endpoints ---
 router.post('/ai/brainstorm-personality', async (req, res) => {
@@ -377,7 +412,6 @@ router.post('/ai/direct-message', async (req, res) => {
 });
 
 router.post('/ai/transcribe', async (req, res) => {
-  // Mock transcription
   res.json({ text: "This is a mock transcription of your audio." });
 });
 

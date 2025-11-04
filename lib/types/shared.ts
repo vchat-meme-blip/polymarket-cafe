@@ -93,6 +93,8 @@ export type Interaction = {
 export type Offer = {
   fromId: string;
   toId: string;
+  // FIX: Add roomId to the Offer type, as it's a required piece of information for trade execution.
+  roomId: string;
   type: 'intel' | 'watchlist';
   intelId?: string;
   market?: string;
@@ -211,6 +213,8 @@ export type MarketWatchlist = {
     createdAt: number;
     price?: number;
     isTradable?: boolean;
+    sourceAgentId?: string;
+    pricePaid?: number;
 }
 
 export type Notification = {

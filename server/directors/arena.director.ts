@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -6,9 +7,11 @@ import { Agent, Room, Interaction, Offer, TradeRecord, BettingIntel, MarketWatch
 import { aiService } from '../services/ai.service.js';
 import { tradeService } from '../services/trade.service.js';
 import { shuffle } from 'lodash';
+import { agentsCollection, bettingIntelCollection, roomsCollection } from '../db.js';
+import { ObjectId } from 'mongodb';
 
 // Type for the callback function to emit messages to the main thread
-type EmitToMainThread = (message: { type: string; event?: string; payload?: any; room?: string; }) => void;
+type EmitToMainThread = (message: { type: string; event?: string; payload?: any; room?: string; worker?: string; message?: any; }) => void;
 
 // In-memory state for a single conversation
 interface ConversationState {
@@ -49,14 +52,11 @@ export class ArenaDirector {
     private thinkingAgents: Set<string> = new Set();
     private conversations: Map<string, ConversationState> = new Map();
     private allAgents: Agent[] = [];
-    // FIX: Add system pause state properties
     private systemPaused = false;
     private pauseUntil = 0;
 
     public async initialize(emitCallback: EmitToMainThread) {
         this.emitToMain = emitCallback;
-        // The director now relies on the main server thread to push state updates.
-        // This method can be used for any initial setup if needed.
         console.log('[ArenaDirector] Initialized.');
     }
     
@@ -64,10 +64,9 @@ export class ArenaDirector {
         this.rooms = worldState.rooms;
         this.allAgents = worldState.agents;
 
-        // Rebuild agentLocations map from the rooms data
         this.agentLocations = {};
         this.allAgents.forEach(agent => {
-            this.agentLocations[agent.id] = null; // Default to wandering
+            this.agentLocations[agent.id] = null;
         });
         this.rooms.forEach(room => {
             room.agentIds.forEach(agentId => {
@@ -76,7 +75,6 @@ export class ArenaDirector {
         });
     }
 
-    // FIX: Add system pause handling to tick method
     public async tick() {
         if (this.isTicking || (this.systemPaused && Date.now() < this.pauseUntil)) {
             if (this.systemPaused) {
@@ -108,7 +106,7 @@ export class ArenaDirector {
                 if (shouldBeInRoom && !isHostInRoom) {
                     this.moveAgentToRoom(host.id, room.id);
                 } else if (!shouldBeInRoom && isHostInRoom) {
-                    this.moveAgentToRoom(host.id, null); // Recall from storefront
+                    this.moveAgentToRoom(host.id, null);
                 }
             }
         }
@@ -122,11 +120,9 @@ export class ArenaDirector {
             const agent1 = shuffledWanderers.pop()!;
             const agent2 = shuffledWanderers.pop()!;
 
-            // Prioritize filling owned storefronts that have an active host
             const availableStorefront = this.findAvailableStorefront(agent1.id);
             if (availableStorefront) {
                 this.moveAgentToRoom(agent1.id, availableStorefront.id);
-                // The other agent remains wandering for the next opportunity
                 shuffledWanderers.push(agent2); 
                 continue;
             }
@@ -142,7 +138,6 @@ export class ArenaDirector {
     private findAvailableStorefront(agentId: string): Room | null {
         for (const room of this.rooms) {
             if (room.isOwned && room.agentIds.length === 1 && room.hostId && isWithinOperatingHours(this.allAgents.find(a => a.id === room.hostId)?.operatingHours)) {
-                // Enforce ban list
                 if (!room.bannedAgentIds?.includes(agentId)) {
                     return room;
                 }
@@ -155,9 +150,7 @@ export class ArenaDirector {
         // This logic remains largely the same as before, but with tool-use enhancements
     }
     
-    // ... Other methods like moveAgentToRoom, getWanderingAgents, findEmptyPublicRoom, etc.
     private moveAgentToRoom(agentId: string, toRoomId: string | null) {
-        // This now just updates the internal state. The main server thread will handle DB and socket emissions.
         const fromRoomId = this.agentLocations[agentId];
         if (fromRoomId) {
             const room = this.rooms.find(r => r.id === fromRoomId);
@@ -174,8 +167,6 @@ export class ArenaDirector {
                 room.agentIds.push(agentId);
             }
         }
-
-        // Emit an event for the main thread to handle DB update and broadcast
         this.emitToMain?.({ type: 'agentMoved', payload: { agentId, toRoomId } });
     }
 
@@ -183,7 +174,6 @@ export class ArenaDirector {
         return this.rooms.find(r => !r.isOwned && r.agentIds.length === 0) || null;
     }
     
-    // FIX: Implement missing methods called by the worker
     public handleSystemPause(until: number) {
         this.systemPaused = true;
         this.pauseUntil = until;

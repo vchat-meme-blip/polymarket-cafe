@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -75,8 +76,9 @@ class ApiService {
     });
   }
   
-  async disconnectWallet(): Promise<void> {
+  async disconnectWallet(): Promise<{ success: boolean }> {
     await this.request<void>('/api/users/wallet/disconnect', { method: 'POST' });
+    return { success: true };
   }
   
   async recoverByWallet(address: string): Promise<{ handle: string }> {
@@ -84,7 +86,6 @@ class ApiService {
   }
 
   // --- Agents ---
-  // FIX: Changed agent type from Agent to Partial<Agent> because the client does not create the ID.
   async saveNewAgent(agent: Partial<Agent>): Promise<{ agent: Agent }> {
     return this.request<{ agent: Agent }>('/api/agents', {
       method: 'POST',
@@ -205,7 +206,6 @@ class ApiService {
     });
   }
 
-  // Make the generic request method public for one-off calls
   public async get<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint);
   }

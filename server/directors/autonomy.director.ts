@@ -63,12 +63,9 @@ export class AutonomyDirector {
             const totalUsers = await usersCollection.countDocuments(activeUserQuery);
 
             if (this.currentUserOffset >= totalUsers) {
-                console.log(`[AutonomyDirector] Reached end of user list (processed ${this.currentUserOffset}/${totalUsers}). Resetting for next cycle.`);
                 this.currentUserOffset = 0;
             }
             
-            console.log(`[AutonomyDirector] Starting autonomy tick (processing users from offset ${this.currentUserOffset}/${totalUsers})...`);
-
             const usersWithActiveAgents = await usersCollection
                 .find(activeUserQuery)
                 .skip(this.currentUserOffset)
@@ -76,7 +73,6 @@ export class AutonomyDirector {
                 .toArray();
 
             if (usersWithActiveAgents.length === 0 && totalUsers > 0) {
-                // This can happen if users are deleted during a cycle. Reset to be safe.
                 this.currentUserOffset = 0;
             } else {
                 this.currentUserOffset += usersWithActiveAgents.length;
@@ -104,12 +100,10 @@ export class AutonomyDirector {
             console.error('[AutonomyDirector] Error during tick:', error);
         } finally {
             this.isTicking = false;
-            console.log('[AutonomyDirector] Finished autonomy tick.');
         }
     }
 
     public async startResearch(agentId: string) {
-        // This is a manual trigger, the main logic is in the tick
         const agentDoc = await agentsCollection.findOne({ id: agentId });
         if (agentDoc) {
             const agent: Agent = {
@@ -153,24 +147,24 @@ export class AutonomyDirector {
             return;
         }
 
-        console.log(`[AutonomyDirector] Processing autonomy for agent: ${agent.name} (Owner: ${user.handle})`);
         this.setAgentBusy(agent.id, true);
 
         try {
             const actionRoll = Math.random();
 
             if (actionRoll < 0.7) { // 70% chance: Go to Café
-                console.log(`[AutonomyDirector] Action for ${agent.name}: Go to Café`);
                 this.emitToMain?.({
                     type: 'forwardToWorker',
                     worker: 'arena',
                     message: { type: 'moveAgentToCafe', payload: { agentId: agent.id } }
                 });
-            } else if (actionRoll < 0.9) { // 20% chance: Proactive Engagement
-                console.log(`[AutonomyDirector] Action for ${agent.name}: Proactive Engagement`);
+            } else if (actionRoll < 0.9) { // 20% chance: Proactive User Engagement
+                this.emitToMain?.({
+                    type: 'systemLog',
+                    payload: { type: 'system', message: `AutonomyDirector: Agent ${agent.name} is performing a "Proactive Engagement" for user ${user.handle}.` }
+                });
                 await this.proactiveEngagement(user, agent);
             } else { // 10% chance: Deep Research
-                console.log(`[AutonomyDirector] Action for ${agent.name}: Deep Research`);
                 const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
                 if (newIntel && agent.ownerHandle) {
                     const savedIntel = await this.saveIntel(newIntel as BettingIntel);

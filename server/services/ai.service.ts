@@ -24,12 +24,16 @@ class AiService {
     const openai = new OpenAI({ apiKey });
     const systemPrompt = createSystemInstructions(agent, user, false);
 
+    // FIX: Explicitly type the role to satisfy OpenAI's ChatCompletionMessageParam type.
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemPrompt },
-      ...history.map((turn) => ({
-        role: turn.agentId === agent.id ? 'assistant' : 'user',
-        content: turn.text,
-      })),
+      ...history.map((turn) => {
+        const role: 'assistant' | 'user' = turn.agentId === agent.id ? 'assistant' : 'user';
+        return {
+          role,
+          content: turn.text,
+        };
+      }),
       { role: 'user', content: message },
     ];
 
