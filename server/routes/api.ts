@@ -1,5 +1,6 @@
 
 
+
 import { Router } from 'express';
 import mongoose, { Collection } from 'mongoose';
 import { TradeRecord, BettingIntel } from '../../lib/types/shared.js';
@@ -202,14 +203,11 @@ router.put('/users/settings/notifications', async (req, res) => {
     }
 });
 
-// FIX: Added a generic settings update endpoint for SecurityTab.tsx.
 router.put('/users/settings', async (req, res) => {
     const { userHandle } = res.locals;
     const settings = req.body;
     if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
 
-    // Sanitize updates to prevent unwanted changes
-    // FIX: In the user settings update endpoint, the `finalUpdates` object was typed as `Partial<User>`, which includes properties like `_id` as a `string`. This conflicts with the `UserDocument` type used by the collection, which expects `_id` to be an `ObjectId`, causing a TypeScript error. The type of `finalUpdates` is now narrowed to only include the specific, non-conflicting keys being updated, resolving the type mismatch.
     const allowedUpdates = ['receivingWalletAddress', 'userApiKey'] as const;
     const finalUpdates: Partial<Pick<User, typeof allowedUpdates[number]>> = {};
     for (const key of allowedUpdates) {
@@ -262,13 +260,12 @@ router.post('/agents', async (req, res) => {
     try {
         const agentData = req.body as Omit<Agent, 'id' | '_id'>;
         
-        // Server is the authority for IDs.
         const newId = new ObjectId();
         
         const newAgent: Agent = {
             ...agentData,
-            id: newId.toHexString(), // The string representation for client-side use
-            _id: newId, // The ObjectId for database use
+            id: newId.toHexString(), 
+            _id: newId, 
             ownerHandle: res.locals.userHandle,
         } as Agent;
         
@@ -301,6 +298,22 @@ router.put('/agents/:agentId', async (req, res) => {
   res.json({ agent: result });
 });
 
+router.post('/agents/:agentId/watchlists', async (req, res) => {
+    const { agentId } = req.params;
+    const watchlistData = req.body;
+    // Server-side validation and creation logic would go here
+    const newWatchlist = { ...watchlistData, id: new ObjectId().toHexString(), createdAt: Date.now() };
+    await agentsCollection.updateOne({ id: agentId }, { $push: { marketWatchlists: newWatchlist } });
+    res.status(201).json({ watchlist: newWatchlist });
+});
+
+router.delete('/agents/:agentId/watchlists/:watchlistId', async (req, res) => {
+    const { agentId, watchlistId } = req.params;
+    await agentsCollection.updateOne({ id: agentId }, { $pull: { marketWatchlists: { id: watchlistId } } });
+    res.status(204).send();
+});
+
+
 // --- AI Endpoints ---
 router.post('/ai/brainstorm-personality', async (req, res) => {
   try {
@@ -324,115 +337,17 @@ router.post('/ai/brainstorm-personality', async (req, res) => {
 
 router.post('/ai/analyze-market', async (req, res) => {
     const { agentId, market, comments } = req.body;
-    const agentDoc = await agentsCollection.findOne({ id: agentId });
-    if (!agentDoc) return res.status(404).json({ message: 'Agent not found' });
-    
-    // Fetch and map the bet documents to match the Bet type with all required fields
-    const bettingHistory: Bet[] = [];
-    
-    if (agentDoc.bettingHistory?.length) {
-        const betDocs = await betsCollection.find({ 
-            _id: { $in: agentDoc.bettingHistory } 
-        }).toArray();
-        
-        for (const betDoc of betDocs) {
-            // Ensure all required Bet fields are present
-            const bet: Bet = {
-                id: betDoc._id.toString(),
-                agentId: betDoc.agentId?.toString() || '',
-                marketId: betDoc.marketId?.toString() || '',
-                outcome: betDoc.outcome || 'yes', // Default to 'yes' if not specified
-                amount: betDoc.amount || 0,
-                price: betDoc.price || 0,
-                timestamp: betDoc.timestamp instanceof Date ? betDoc.timestamp.getTime() : Date.now(),
-                status: betDoc.status || 'pending',
-                pnl: betDoc.pnl,
-                sourceIntelId: betDoc.sourceIntelId?.toString()
-            };
-            bettingHistory.push(bet);
-        }
-    }
-    
-    // Create a new agent object with all required properties from the Agent type
-    const agent: Agent = {
-        id: agentDoc.id,
-        name: agentDoc.name,
-        personality: agentDoc.personality || '',
-        instructions: agentDoc.instructions || '',
-        voice: agentDoc.voice || '',
-        topics: Array.isArray(agentDoc.topics) ? [...agentDoc.topics] : [],
-        wishlist: Array.isArray(agentDoc.wishlist) ? [...agentDoc.wishlist] : [],
-        reputation: agentDoc.reputation || 0,
-        isShilling: Boolean(agentDoc.isShilling),
-        shillInstructions: agentDoc.shillInstructions || '',
-        modelUrl: agentDoc.modelUrl || '',
-        bettingHistory,
-        currentPnl: agentDoc.currentPnl || 0,
-        // FIX: Add missing intelPnl property
-        intelPnl: (agentDoc as any).intelPnl || 0,
-        ownerHandle: agentDoc.ownerHandle,
-        // Initialize missing required properties with default values
-        bettingIntel: (agentDoc as any).bettingIntel || [],
-        marketWatchlists: (agentDoc as any).marketWatchlists || [],
-        boxBalance: (agentDoc as any).boxBalance || 0,
-        portfolio: (agentDoc as any).portfolio || {},
-        // Include any other properties from the document that we haven't explicitly set
-        ...Object.fromEntries(
-            Object.entries(agentDoc as any).filter(([key]) => 
-                ![
-                    'id', 'name', 'personality', 'instructions', 'voice', 'topics', 
-                    'wishlist', 'reputation', 'isShilling', 'shillInstructions', 
-                    'modelUrl', 'bettingHistory', 'currentPnl', 'ownerHandle',
-                    'bettingIntel', 'marketWatchlists', 'boxBalance', 'portfolio', 'intelPnl'
-                ].includes(key)
-            )
-        )
-    };
+    const agent = await agentsCollection.findOne({ id: agentId });
+    if (!agent) return res.status(404).json({ message: 'Agent not found' });
     
     try {
-        const analysis = await aiService.analyzeMarket(agent, market, comments);
+        const analysis = await aiService.analyzeMarket(agent as any, market, comments);
         res.json({ analysis });
     } catch (error: any) {
         console.error('Error in analyze-market:', error);
         res.status(500).json({ message: error.message });
     }
 });
-
-const searchMarketsTool: OpenAI.Chat.Completions.ChatCompletionTool = {
-    type: 'function',
-    function: {
-        name: 'search_markets',
-        description: 'Search for prediction markets on Polymarket based on a query.',
-        parameters: {
-            type: 'object',
-            properties: {
-                query: {
-                    type: 'string',
-                    description: 'The search query for markets, e.g., "Trump election".',
-                },
-            },
-            required: ['query'],
-        },
-    },
-};
-
-const getWalletPositionsTool: OpenAI.Chat.Completions.ChatCompletionTool = {
-    type: 'function',
-    function: {
-        name: 'get_wallet_positions',
-        description: "Get the current prediction market positions for a given wallet address from Polymarket's data API.",
-        parameters: {
-            type: 'object',
-            properties: {
-                wallet_address: {
-                    type: 'string',
-                    description: 'The wallet address to look up.',
-                },
-            },
-            required: ['wallet_address'],
-        },
-    },
-};
 
 router.post('/ai/direct-message', async (req, res) => {
     const { agentId, message, history } = req.body;
@@ -450,147 +365,9 @@ router.post('/ai/direct-message', async (req, res) => {
         if (!apiKey) {
             return res.status(403).json({ message: 'No API key available. Please configure your user API key in Settings.' });
         }
+
+        const agentMessage = await aiService.getDirectMessageResponse(agent as any, user as any, message, history, apiKey);
         
-        const openai = new OpenAI({ apiKey });
-        // Map the agent document to the Agent type
-        // Create a new agent object with required fields
-        const agentWithBets: Agent = {
-            id: agent._id.toString(),
-            name: agent.name,
-            personality: agent.personality || '',
-            instructions: agent.instructions || '',
-            voice: agent.voice || '',
-            topics: Array.isArray(agent.topics) ? [...agent.topics] : [],
-            wishlist: Array.isArray(agent.wishlist) ? [...agent.wishlist] : [],
-            reputation: agent.reputation || 0,
-            isShilling: Boolean(agent.isShilling),
-            shillInstructions: agent.shillInstructions || '',
-            modelUrl: agent.modelUrl || '',
-            bettingHistory: [], // Will be populated below
-            currentPnl: agent.currentPnl || 0,
-            // FIX: Add missing intelPnl property
-            intelPnl: (agent as any).intelPnl || 0,
-            ownerHandle: agent.ownerHandle,
-            // Add any other required Agent properties with defaults
-            bettingIntel: [],
-            marketWatchlists: [],
-            boxBalance: 0,
-            portfolio: {}
-        };
-
-        // If there are bets, fetch and map them
-        if (agent.bettingHistory?.length) {
-            const betDocs = await betsCollection.find({ 
-                _id: { $in: agent.bettingHistory } 
-            }).toArray();
-
-            agentWithBets.bettingHistory = betDocs.map(betDoc => ({
-                id: betDoc._id.toString(),
-                agentId: betDoc.agentId?.toString() || '',
-                marketId: betDoc.marketId?.toString() || '',
-                outcome: betDoc.outcome || 'yes',
-                amount: betDoc.amount || 0,
-                price: betDoc.price || 0,
-                timestamp: betDoc.timestamp instanceof Date ? betDoc.timestamp.getTime() : Date.now(),
-                status: betDoc.status || 'pending',
-                pnl: betDoc.pnl,
-                sourceIntelId: betDoc.sourceIntelId?.toString()
-            }));
-        }
-
-        // Map the user document to the User type
-        const mappedUser: User = {
-            _id: user._id.toString(),
-            name: user.name || '',
-            info: user.info || '',
-            handle: user.handle,
-            hasCompletedOnboarding: Boolean(user.hasCompletedOnboarding),
-            lastSeen: user.lastSeen || null,
-            userApiKey: user.userApiKey || null,
-            solanaWalletAddress: user.solanaWalletAddress || null,
-            createdAt: user.createdAt || Date.now(),
-            updatedAt: user.updatedAt || Date.now(),
-            currentAgentId: user.currentAgentId?.toString(),
-            ownedRoomId: user.ownedRoomId?.toString(),
-            phone: user.phone,
-            notificationSettings: user.notificationSettings || {
-                agentResearch: true,
-                agentTrades: true,
-                newMarkets: true,
-                agentEngagements: true
-            }
-        };
-
-        const systemInstruction = createSystemInstructions(agentWithBets, mappedUser, false);
-
-        const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-            { role: 'system', content: systemInstruction },
-            ...(history || []).map((msg: Interaction) => ({
-                role: msg.agentId === 'user' ? 'user' : 'assistant',
-                content: msg.text,
-            })),
-            { role: 'user', content: message }
-        ];
-        
-        let foundMarkets: MarketIntel[] = [];
-
-        let response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages,
-            tools: [searchMarketsTool, getWalletPositionsTool],
-            tool_choice: 'auto',
-        });
-
-        let responseMessage = response.choices[0].message;
-        
-        while (responseMessage.tool_calls) {
-            messages.push(responseMessage);
-            const toolCalls = responseMessage.tool_calls;
-            
-            for (const toolCall of toolCalls) {
-                if (toolCall.type !== 'function') continue;
-                const functionName = toolCall.function.name;
-                const functionArgs = JSON.parse(toolCall.function.arguments);
-                let toolContent = '';
-
-                if (functionName === 'search_markets') {
-                    const polyResults = await polymarketService.searchMarkets(functionArgs.query);
-                    foundMarkets = polyResults.markets;
-                    toolContent = JSON.stringify({
-                        markets: foundMarkets.map(m => ({ title: m.title, outcomes: m.outcomes, platform: m.platform })).slice(0, 5)
-                    });
-                } else if (functionName === 'get_wallet_positions') {
-                    const positions = await polymarketService.getWalletPositions(functionArgs.wallet_address);
-                    toolContent = positions.length > 0 ? JSON.stringify(positions) : `No positions found for wallet ${functionArgs.wallet_address}.`;
-                }
-                
-                messages.push({
-                    tool_call_id: toolCall.id,
-                    role: 'tool',
-                    content: toolContent,
-                });
-            }
-
-            response = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
-                messages,
-                tools: [searchMarketsTool, getWalletPositionsTool],
-                tool_choice: 'auto',
-            });
-            responseMessage = response.choices[0].message;
-        }
-        
-        const agentMessage: Interaction = {
-            agentId: agent.id,
-            agentName: agent.name,
-            text: responseMessage.content ?? "I'm not sure what to say.",
-            timestamp: Date.now(),
-        };
-
-        if (foundMarkets.length > 0) {
-            agentMessage.markets = foundMarkets.slice(0, 5);
-        }
-
         res.json({ agentMessage });
 
     } catch (error) {
@@ -598,7 +375,6 @@ router.post('/ai/direct-message', async (req, res) => {
         res.status(500).json({ message: 'Error communicating with AI model' });
     }
 });
-
 
 router.post('/ai/transcribe', async (req, res) => {
   // Mock transcription
@@ -616,217 +392,6 @@ router.post('/ai/suggest-bet', async (req, res) => {
 });
 
 
-// --- Autonomy ---
-router.post('/autonomy/start-research', (req, res) => {
-    if (req.autonomyWorker) {
-        req.autonomyWorker.postMessage({ type: 'startResearch', payload: req.body });
-        res.status(202).json({ message: 'Research task initiated.' });
-    } else {
-        res.status(500).json({ message: 'Autonomy worker not available.' });
-    }
-});
-
-
-// --- Arena ---
-router.post('/arena/send-to-cafe', (req, res) => {
-  req.arenaWorker?.postMessage({ type: 'moveAgentToCafe', payload: req.body });
-  res.status(202).send();
-});
-
-router.post('/arena/recall-agent', (req, res) => {
-    req.arenaWorker?.postMessage({ type: 'recallAgent', payload: req.body });
-    res.status(202).send();
-});
-
-router.post('/arena/create-room', (req, res) => {
-  req.arenaWorker?.postMessage({ type: 'createAndHostRoom', payload: req.body });
-  res.status(202).send();
-});
-
-router.post('/arena/kick', async (req, res) => {
-    const { userHandle } = res.locals;
-    const { roomId, agentId, ban } = req.body;
-
-    // Basic validation: In a real app, you'd have more robust ownership checks here
-    // or inside the director.
-    if (!userHandle || !roomId || !agentId) {
-        return res.status(400).json({ message: "Missing required fields." });
-    }
-
-    req.arenaWorker?.postMessage({ type: 'kickAgent', payload: { agentId, roomId, ban } });
-    res.status(202).send();
-});
-
-router.post('/rooms/purchase', async (req, res) => {
-    const { userHandle } = res.locals;
-    const { name } = req.body;
-    if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
-
-    const user = await usersCollection.findOne({ handle: userHandle });
-    if (!user || user.ownedRoomId) return res.status(400).json({ message: "User already owns a room or does not exist." });
-
-    const newRoom: Room = {
-        id: `room-${new ObjectId().toHexString()}`,
-        name: name || `${userHandle}'s Storefront`,
-        agentIds: [],
-        hostId: null,
-        topics: [],
-        warnFlags: 0,
-        rules: [],
-        activeOffer: null,
-        vibe: 'General Chat ☕️',
-        isOwned: true,
-        ownerHandle: userHandle,
-        roomBio: `Welcome to my intel storefront!`,
-        twitterUrl: '',
-        isRevenuePublic: false,
-    };
-
-    await roomsCollection.insertOne(newRoom as any);
-    await usersCollection.updateOne(
-      { handle: userHandle },
-      { $set: { ownedRoomId: new mongoose.Types.ObjectId(newRoom.id) } }
-    );
-    
-    req.arenaWorker?.postMessage({ type: 'roomUpdated', payload: { room: newRoom } });
-    
-    const updatedUser = await usersCollection.findOne({ handle: userHandle });
-    res.status(201).json({ room: newRoom, user: updatedUser });
-});
-
-router.put('/rooms/:roomId', async (req, res) => {
-    const { userHandle } = res.locals;
-    const { roomId } = req.params;
-    const updates = req.body;
-    if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
-
-    const room = await roomsCollection.findOne({ id: roomId });
-    if (!room || room.ownerHandle !== userHandle) {
-        return res.status(403).json({ message: "You do not own this room." });
-    }
-
-    const updatedRoom = await roomsCollection.findOneAndUpdate(
-        { id: roomId },
-        { $set: { ...updates, updatedAt: Date.now() } },
-        { returnDocument: 'after' }
-    );
-    
-    if (updatedRoom) {
-        req.arenaWorker?.postMessage({ type: 'roomUpdated', payload: { room: updatedRoom } });
-    }
-    
-    res.json({ room: updatedRoom });
-});
-
-router.delete('/rooms/:roomId', async (req, res) => {
-    const { userHandle } = res.locals;
-    const { roomId } = req.params;
-    if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
-
-    const room = await roomsCollection.findOne({ id: roomId });
-    if (!room || room.ownerHandle !== userHandle) {
-        return res.status(403).json({ message: "You do not own this room." });
-    }
-
-    await roomsCollection.deleteOne({ id: roomId });
-    await usersCollection.updateOne({ handle: userHandle }, { $unset: { ownedRoomId: "" } });
-
-    req.arenaWorker?.postMessage({ type: 'roomDeleted', payload: { roomId } });
-
-    res.status(204).send();
-});
-
-
-router.get('/agents/:agentId/activity', async (req, res) => {
-  const { agentId } = req.params;
-  const todayStr = formatISO(startOfToday(), { representation: 'date' });
-
-  try {
-    let dailySummary = await dailySummariesCollection.findOne({
-      agentId: new mongoose.Types.ObjectId(agentId),
-      date: { $eq: todayStr }
-    } as any);
-    
-    if (dailySummary) {
-      return res.json({ summary: dailySummary.summary });
-    }
-
-    // If no summary exists, generate one
-    const recentTrades = await tradeHistoryCollection.find({
-      $or: [
-        { fromId: new mongoose.Types.ObjectId(agentId) },
-        { toId: new mongoose.Types.ObjectId(agentId) }
-      ]
-    }).sort({ timestamp: -1 }).limit(10).toArray();
-    const recentIntel = await bettingIntelCollection.find({
-      ownerAgentId: new mongoose.Types.ObjectId(agentId)
-    }).sort({ createdAt: -1 }).limit(5).toArray();
-    
-    // Map MongoDB documents to the expected types
-    const mappedTrades: TradeRecord[] = recentTrades.map(trade => ({
-      fromId: trade.fromId.toString(),
-      toId: trade.toId.toString(),
-      type: trade.type,
-      market: trade.market,
-      intelId: trade.intelId?.toString(),
-      price: trade.price,
-      // FIX: The `quantity` property does not exist on the `TradeRecord` or `TradeRecordDocument` type. It has been removed.
-      timestamp: trade.timestamp instanceof Date ? trade.timestamp.getTime() : Date.now(),
-      roomId: trade.roomId.toString()
-    }));
-
-    const mappedIntel: BettingIntel[] = recentIntel.map(intel => ({
-      id: intel._id.toString(),
-      ownerAgentId: intel.ownerAgentId.toString(),
-      market: intel.market,
-      content: intel.content,
-      sourceDescription: intel.sourceDescription,
-      isTradable: intel.isTradable,
-      createdAt: intel.createdAt instanceof Date ? intel.createdAt.getTime() : Date.now(),
-      pnlGenerated: intel.pnlGenerated,
-      sourceAgentId: intel.sourceAgentId?.toString(),
-      pricePaid: intel.pricePaid,
-      bountyId: intel.bountyId?.toString(),
-      ownerHandle: intel.ownerHandle,
-      sourceUrls: intel.sourceUrls,
-      rawResearchData: intel.rawResearchData
-    }));
-
-    const activities = { trades: mappedTrades, intel: mappedIntel };
-    const newSummaryText = await aiService.generateDailySummary(activities);
-
-    if (newSummaryText) {
-      const newSummary = {
-        agentId,
-        date: todayStr,
-        summary: newSummaryText,
-      };
-      await dailySummariesCollection.insertOne(newSummary as any);
-      return res.json({ summary: newSummaryText });
-    } else {
-        return res.json({ summary: "No significant activity to report for today." });
-    }
-    
-  } catch (error) {
-      console.error(`[API] Error getting activity for agent ${agentId}:`, error);
-      res.status(500).json({ message: "Failed to generate activity summary." });
-  }
-});
-
-router.post('/agents/:agentId/intel', async (req, res) => {
-  const { agentId } = req.params;
-  const intelData = req.body;
-  const newIntel = {
-    ...intelData,
-    id: `bettingintel-${new ObjectId().toHexString()}`,
-    ownerAgentId: agentId,
-    createdAt: Date.now(),
-    pnlGenerated: { amount: 0, currency: 'USD' }
-  };
-  await bettingIntelCollection.insertOne(newIntel);
-  res.status(201).send();
-});
-
 // --- Markets & Betting ---
 router.get('/markets/live', async (req, res) => {
   try {
@@ -834,10 +399,9 @@ router.get('/markets/live', async (req, res) => {
     const pageNum = parseInt(page as string) || 1;
     const limitNum = parseInt(limit as string) || 20;
 
-    console.log(`[API] Fetching live markets (Polymarket only) for category: ${category}, page: ${pageNum}, limit: ${limitNum}`);
+    console.log(`[API] Fetching live markets for category: ${category}, page: ${pageNum}, limit: ${limitNum}`);
     
     const { markets, hasMore } = await polymarketService.searchMarkets('', category as string | undefined, pageNum, limitNum);
-    console.log(`[API] Fetched ${markets.length} live markets from Polymarket.`);
 
     res.json({
         markets,
@@ -859,26 +423,6 @@ router.get('/markets/comments/:eventId', async (req, res) => {
     }
 });
 
-router.get('/markets/:marketId/comments', async (req, res) => {
-    try {
-        const { marketId } = req.params;
-        const comments = await polymarketService.getMarketComments(marketId, 'Market');
-        res.json(comments);
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch market comments' });
-    }
-});
-
-router.get('/markets/liquidity', async (req, res) => {
-    try {
-        const markets = await polymarketService.getLiquidityOpportunities();
-        res.json(markets);
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch liquidity opportunities' });
-    }
-});
-
-
 router.post('/bets', async (req, res) => {
   const betData = req.body;
   const newBet = {
@@ -892,10 +436,12 @@ router.post('/bets', async (req, res) => {
   res.status(201).send();
 });
 
+
 // --- Other Services ---
 router.get('/stats', async (req, res) => {
   res.json({
     directors: {
+      autonomy: { status: 'Running', lastTick: new Date().toISOString() },
       arena: { status: 'Running', lastTick: new Date().toISOString() }
     },
     simulation: {
@@ -919,26 +465,6 @@ router.post('/tts', async (req, res) => {
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
-});
-
-router.get('/music/cafe/:roomId', async (req, res) => {
-    try {
-        const { roomId } = req.params;
-        const forceRefresh = req.query.refresh === '1';
-        const { buffer, prompt, trackId } = await cafeMusicService.getTrack(roomId, { forceRefresh });
-        
-        res.setHeader('Content-Type', 'audio/mpeg');
-        res.setHeader('X-Music-Prompt', prompt);
-        res.setHeader('X-Track-Id', trackId);
-        res.setHeader('Cache-Control', 'no-cache'); // Prevent browser caching
-        res.send(buffer);
-    } catch (error: any) {
-        console.error('Error in /music/cafe/:roomId:', error);
-        res.status(500).json({ 
-            error: error.message || 'Failed to load cafe music',
-            code: error.code
-        });
-    }
 });
 
 router.get('/leaderboard/pnl', async (req, res) => {

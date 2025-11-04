@@ -2,7 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { agentsCollection, betsCollection, bettingIntelCollection } from '../db.js';
+import { agentsCollection, betsCollection, tradeHistoryCollection } from '../db.js';
+import { ObjectId } from 'mongodb';
 
 export type PnlLeaderboardEntry = {
     agentId: string;
@@ -46,24 +47,26 @@ class LeaderboardService {
     const intelPnlAggregation = await agentsCollection.aggregate([
         {
             $project: {
+                _id: 1,
                 id: 1,
                 name: 1,
                 modelUrl: 1,
-                intelPnl: 1,
+                intelPnl: { $ifNull: ['$intelPnl', 0] } // BUG FIX: Ensure intelPnl defaults to 0
             }
         },
         { $sort: { intelPnl: -1 } },
         { $limit: 50 },
         {
             $lookup: {
-                from: 'tradehistory',
-                localField: 'id',
+                from: 'trade_history', // Correct collection name
+                localField: '_id', // Use ObjectId for lookup
                 foreignField: 'fromId',
                 as: 'sales'
             }
         },
         {
             $project: {
+                _id: 0,
                 agentId: '$id',
                 agentName: '$name',
                 agentModelUrl: '$modelUrl',

@@ -2,14 +2,72 @@ import OpenAI from 'openai';
 import mongoose from 'mongoose';
 const { Types } = mongoose;
 
-import { Agent, Interaction, MarketIntel, Room, TradeRecord, BettingIntel } from '../../lib/types/index.js';
+// FIX: Add User type import
+import { Agent, Interaction, MarketIntel, Room, TradeRecord, BettingIntel, User } from '../../lib/types/index.js';
 import { apiKeyProvider } from './apiKey.provider.js';
 import { agentsCollection, bettingIntelCollection, notificationsCollection } from '../db.js';
 import { polymarketService } from './polymarket.service.js';
 import { kalshiService } from './kalshi.service.js';
 import { firecrawlService } from './firecrawl.service.js';
+// FIX: Add createSystemInstructions import
+import { createSystemInstructions } from '../../lib/prompts.js';
 
 class AiService {
+  // FIX: Add missing 'getDirectMessageResponse' method
+  async getDirectMessageResponse(
+    agent: Agent,
+    user: User,
+    message: string,
+    history: Interaction[],
+    apiKey: string
+  ): Promise<Interaction> {
+    const openai = new OpenAI({ apiKey });
+    const systemPrompt = createSystemInstructions(agent, user, false);
+
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
+      ...history.map((turn) => ({
+        role: turn.agentId === agent.id ? 'assistant' : 'user',
+        content: turn.text,
+      })),
+      { role: 'user', content: message },
+    ];
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        messages: messages,
+      });
+
+      const responseText =
+        completion.choices[0].message.content?.trim() ?? '...';
+
+      const agentMessage: Interaction = {
+        agentId: agent.id,
+        agentName: agent.name,
+        text: responseText,
+        timestamp: Date.now(),
+      };
+
+      return agentMessage;
+    } catch (error) {
+      console.error(
+        `[AiService] OpenAI completion failed for direct message with ${agent.name}:`,
+        error
+      );
+      if (error instanceof OpenAI.APIError && error.status === 429) {
+        apiKeyProvider.reportRateLimit(apiKey, 60);
+      }
+      // Return a generic error message
+      return {
+        agentId: agent.id,
+        agentName: agent.name,
+        text: "I'm having some trouble connecting right now. Let's talk later.",
+        timestamp: Date.now(),
+      };
+    }
+  }
+    
   async getConversationTurn(
     currentAgent: Agent,
     otherAgent: Agent,
