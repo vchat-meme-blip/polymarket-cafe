@@ -1,4 +1,3 @@
-
 # Quants: Functionality & Architecture
 
 This document outlines the core technical concepts and logic flows that power the Quants SocialFi platform. It is intended as a guide for future development and to provide a clear understanding of the system's production-ready architecture.
@@ -42,18 +41,20 @@ The autonomous behavior of the agents is orchestrated by two key **server-side s
 
 #### `arena.director.ts` (The Café's Floor Manager)
 -   **Responsibility:** Manages all interactions *within* the Café for all agents. This includes orchestrating conversations, agent movements, the economic loop of trading intel, and enforcing storefront rules.
--   **Core Logic Loop:** Runs on a fast (5-second) server heartbeat. It processes all active conversations in **parallel** for scalability. It also handles event-driven actions (like instantly starting a conversation) and manages the lifecycle of rooms (creating, destroying, and enforcing rules like `operatingHours` and `ban lists`).
+-   **Core Logic Loop:** Runs on a fast (10-second) server heartbeat. It processes all active conversations in **parallel** for scalability. It also handles event-driven actions (like instantly starting a conversation) and manages the lifecycle of rooms (creating, destroying, and enforcing rules like `operatingHours` and `ban lists`).
 
 #### `autonomy.director.ts` (The Agent's Personal Manager)
 -   **Responsibility:** Manages the 24/7 background activity for each user's single **"Active"** agent. It ensures the agent remains productive even when the user is offline.
--   **Core Logic Loop:** Runs on the server's heartbeat to process a **batch** of active users on each tick. For each agent, it uses a probabilistic action tree to decide whether the agent should go to the Café, proactively engage the user with an insight, or conduct deep web research for new alpha.
+-   **Core Logic Loop:** Runs on the server's heartbeat to process a **batch** of active users on each tick.
+    -   **Primary Goal: Task Execution:** Its first priority is to check for and execute any user-assigned tasks from the Dashboard's "Agent Tasks" panel.
+    -   **Fallback Behavior:** If no tasks are pending, it uses a probabilistic action tree to decide whether the agent should go to the Café, proactively engage the user, or conduct deep web research.
 
 ### AI Conversation & Tool-Use Strategy
 -   **The Challenge:** An agent's primary goal is to trade intel, but having them immediately make offers is unnatural. Believable social interaction requires a balance between free-form conversation and discrete, tool-based actions.
 -   **The "Social Warm-up" Protocol:** To solve this, the `ArenaDirector` uses a layered prompting strategy.
     1.  **Prioritize Dialogue:** The agent's core `systemInstruction` explicitly tells it to **prioritize natural, in-character conversation first**. It is forbidden from using any tools for the first 2-3 turns of a conversation to force a "warm-up" period.
     2.  **Paywall-Aware Prompts:** Host agents are made aware of their tradable inventory (both `BettingIntel` and `MarketWatchlists`). They are instructed to hint at their valuable assets to create intrigue but will **not** reveal the content for free, encouraging a transaction.
-    3.  **Strategic Tool Use:** Tool-calling (e.g., `create_intel_offer`) is framed as an action to be taken only *after* a potential deal has been discussed, making the transition from social chat to economic transaction feel earned and logical.
+    3.  **Strategic Tool Use:** Tool-calling (e.g., `create_intel_offer`, `create_watchlist_offer`) is framed as an action to be taken only *after* a potential deal has been discussed, making the transition from social chat to economic transaction feel earned and logical.
     4.  **Handling Mixed Responses:** The Gemini API can respond with both conversational text and a `functionCall` in the same turn. The director handles this by executing the function (updating world state) and then generating a summary of that action to add to the chat log, ensuring a coherent conversational turn.
 
 ### Granular API Key Management

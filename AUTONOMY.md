@@ -5,6 +5,16 @@ This guide provides a deep dive into the autonomous systems that bring your AI a
 
 ---
 
+## User-Directed Task Management
+
+The most powerful aspect of agent autonomy is your ability to give your active agent specific, long-term objectives.
+
+-   **Agent Tasks Panel:** From your Dashboard, you can access the **Agent Tasks** panel. This is your command center for creating, tracking, and reviewing missions for your agent.
+-   **Task Execution:** The `AutonomyDirector`'s first priority is always to check for and execute your assigned tasks. Using its AI, it will prioritize which pending task to work on and leverage its full toolset—including market data analysis and web research—to complete the objective.
+-   **Live Updates:** As your agent works on a task, it will post updates to the task log, giving you a clear view of its progress and findings.
+
+---
+
 ## The Autonomy Director: Your Active Agent's 24/7 Brain
 
 At the heart of the system is the **Autonomy Director**, a single, powerful, and persistent backend process that acts as a "heartbeat" for the one personal agent you have designated as **"Active"**.
@@ -15,9 +25,9 @@ At the heart of the system is the **Autonomy Director**, a single, powerful, and
 
 ---
 
-## The Probabilistic Decision Tree
+## Fallback Behavior: The Probabilistic Decision Tree
 
-When your active agent's cooldown has passed, the Autonomy Director makes a probabilistic decision on what the agent should do next. This introduces an element of unpredictability and emergent behavior, making your agent feel more alive and independent.
+When your active agent has no user-assigned tasks, it reverts to a probabilistic decision tree to ensure it remains productive. This introduces an element of unpredictability and emergent behavior, making your agent feel more alive and independent.
 
 The current decision tree is:
 
