@@ -135,13 +135,13 @@ export default function LeaderboardView() {
                     className={`${styles.tabButton} ${activeTab === 'pnl' ? styles.active : ''}`}
                     onClick={() => setActiveTab('pnl')}
                 >
-                    P&L Score
+                    Betting PNL
                 </button>
                 <button 
                     className={`${styles.tabButton} ${activeTab === 'intel' ? styles.active : ''}`}
                     onClick={() => setActiveTab('intel')}
                 >
-                    Intel Score
+                    Intel PNL
                 </button>
             </div>
 

@@ -86,12 +86,10 @@ export default function AgentsView() {
       >
         <View.Port />
         {availablePersonal.map((agent, index) => (
-          // FIX: The `track` prop expects a RefObject ({ current: ... }), not a direct HTMLElement.
-          // This wraps the querySelector result in the expected object structure to resolve the type error.
-          <View index={index + 1} track={{ current: (mainCanvasRef.current?.querySelector(`[data-vrm-index="${index}"]`) as HTMLElement) ?? null }}>
+          <View key={agent.id} index={index + 1} track={{ current: (mainCanvasRef.current?.querySelector(`[data-vrm-index="${index}"]`) as HTMLElement) ?? null }}>
             <ambientLight intensity={1.5} />
             <directionalLight position={[3, 5, 2]} intensity={2} castShadow />
-            <group position={[0, -1, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI, 0]}>
+            <group position={[0, -1.2, 0]} scale={1.2} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI, 0]}>
               <VrmModel modelUrl={agent.modelUrl || ''} isSpeaking={false} />
             </group>
             <OrbitControls makeDefault enableZoom={false} enablePan={false} target={[0, 1.2, 0]} />

@@ -1,3 +1,4 @@
+
 import { usersCollection, agentsCollection, betsCollection, bettingIntelCollection } from '../db.js';
 import mongoose from 'mongoose';
 import { User, Agent } from '../../lib/types/index.js';
@@ -98,6 +99,8 @@ export class DashboardAgentDirector {
             modelUrl: agentDoc.modelUrl || '',
             bettingHistory: [], // Initialize as empty array since we don't need the actual bets here
             currentPnl: typeof agentDoc.currentPnl === 'number' ? agentDoc.currentPnl : 0,
+            // FIX: Add missing intelPnl property
+            intelPnl: typeof (agentDoc as any).intelPnl === 'number' ? (agentDoc as any).intelPnl : 0,
             ownerHandle: agentDoc.ownerHandle,
             // Add any other required Agent properties with defaults
             bettingIntel: [],

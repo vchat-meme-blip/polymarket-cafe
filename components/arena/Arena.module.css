@@ -349,30 +349,30 @@
     backdrop-filter: blur(8px);
     border: 1px solid var(--Neutral-30);
     border-radius: 12px;
-    padding: 12px 24px;
+    padding: 6px 12px; /* COMPACT */
     display: flex;
-    gap: 24px;
+    gap: 12px; /* COMPACT */
     flex-wrap: wrap;
 }
 
 .statPanel {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 6px; /* COMPACT */
     color: var(--Neutral-80);
 }
 .statPanel .statIcon .icon {
-    font-size: 28px;
+    font-size: 20px; /* COMPACT */
     color: var(--brand-cyan);
 }
 .statPanel .statValue {
-    font-size: 24px;
+    font-size: 16px; /* COMPACT */
     font-weight: bold;
     color: white;
-    min-width: 60px; /* To prevent layout shift during animation */
+    min-width: 30px; /* COMPACT */
 }
 .statPanel .statLabel {
-    font-size: 14px;
+    font-size: 11px; /* COMPACT */
 }
 
 /* --- NEW: THOUGHT BUBBLE --- */
@@ -445,13 +445,14 @@
         padding: 12px;
     }
     .arenaStatsDisplay {
-        padding: 8px 12px;
-        gap: 12px;
-        display: none; /* Hide stats on very small screens to save space */
+        padding: 6px 10px;
+        gap: 10px;
+        display: flex; /* Make it visible on mobile */
+        justify-content: center;
     }
-    .statPanel .statValue { font-size: 18px; min-width: 40px; }
-    .statPanel .statLabel { font-size: 12px; }
-    .statPanel .statIcon .icon { font-size: 24px; }
+    .statPanel .statValue { font-size: 16px; min-width: 30px; }
+    .statPanel .statLabel { display: none; } /* Hide label on mobile to save space */
+    .statPanel .statIcon .icon { font-size: 20px; }
     
     .arenaMainContent {
         padding: 60px 0 180px 0; /* Less padding for mobile */

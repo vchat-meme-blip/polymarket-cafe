@@ -46,7 +46,7 @@ const StatPanel = ({ icon, label, value }: { icon: string; label: string; value:
 
 export default function ArenaStatsDisplay() {
     const { availablePresets, availablePersonal } = useAgent();
-    const { rooms, activeConversations } = useArenaStore();
+    const { rooms, activeConversations, tradeHistory } = useArenaStore();
     
     const totalAgents = availablePresets.length + availablePersonal.length;
     const activeRooms = rooms.filter(r => r?.agentIds?.length > 0).length;
@@ -59,14 +59,14 @@ export default function ArenaStatsDisplay() {
         // Consider a conversation "live" if there was activity in the last 30 seconds
         return Date.now() - Number(timestamp) < 30000;
     }).length;
-    const totalBets = 0; // Placeholder until bet history is implemented
+    const totalTrades = tradeHistory.length;
 
     return (
         <div className={styles.arenaStatsDisplay}>
             <StatPanel icon="groups" label="Total Quants" value={totalAgents} />
             <StatPanel icon="meeting_room" label="Active Rooms" value={activeRooms} />
             <StatPanel icon="forum" label="Live Conversations" value={liveConversations} />
-            <StatPanel icon="paid" label="Bets Placed" value={totalBets} />
+            <StatPanel icon="swap_horiz" label="Intel Trades" value={totalTrades} />
         </div>
     );
 }

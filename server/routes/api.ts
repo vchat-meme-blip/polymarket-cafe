@@ -1,3 +1,5 @@
+
+
 import { Router } from 'express';
 import mongoose, { Collection } from 'mongoose';
 import { TradeRecord, BettingIntel } from '../../lib/types/shared.js';
@@ -366,12 +368,14 @@ router.post('/ai/analyze-market', async (req, res) => {
         modelUrl: agentDoc.modelUrl || '',
         bettingHistory,
         currentPnl: agentDoc.currentPnl || 0,
+        // FIX: Add missing intelPnl property
+        intelPnl: (agentDoc as any).intelPnl || 0,
         ownerHandle: agentDoc.ownerHandle,
         // Initialize missing required properties with default values
-        bettingIntel: agentDoc.bettingIntel || [],
-        marketWatchlists: agentDoc.marketWatchlists || [],
-        boxBalance: agentDoc.boxBalance || 0,
-        portfolio: agentDoc.portfolio || {},
+        bettingIntel: (agentDoc as any).bettingIntel || [],
+        marketWatchlists: (agentDoc as any).marketWatchlists || [],
+        boxBalance: (agentDoc as any).boxBalance || 0,
+        portfolio: (agentDoc as any).portfolio || {},
         // Include any other properties from the document that we haven't explicitly set
         ...Object.fromEntries(
             Object.entries(agentDoc as any).filter(([key]) => 
@@ -379,7 +383,7 @@ router.post('/ai/analyze-market', async (req, res) => {
                     'id', 'name', 'personality', 'instructions', 'voice', 'topics', 
                     'wishlist', 'reputation', 'isShilling', 'shillInstructions', 
                     'modelUrl', 'bettingHistory', 'currentPnl', 'ownerHandle',
-                    'bettingIntel', 'marketWatchlists', 'boxBalance', 'portfolio'
+                    'bettingIntel', 'marketWatchlists', 'boxBalance', 'portfolio', 'intelPnl'
                 ].includes(key)
             )
         )
@@ -464,6 +468,8 @@ router.post('/ai/direct-message', async (req, res) => {
             modelUrl: agent.modelUrl || '',
             bettingHistory: [], // Will be populated below
             currentPnl: agent.currentPnl || 0,
+            // FIX: Add missing intelPnl property
+            intelPnl: (agent as any).intelPnl || 0,
             ownerHandle: agent.ownerHandle,
             // Add any other required Agent properties with defaults
             bettingIntel: [],
@@ -764,7 +770,7 @@ router.get('/agents/:agentId/activity', async (req, res) => {
       market: trade.market,
       intelId: trade.intelId?.toString(),
       price: trade.price,
-      quantity: trade.quantity,
+      // FIX: The `quantity` property does not exist on the `TradeRecord` or `TradeRecordDocument` type. It has been removed.
       timestamp: trade.timestamp instanceof Date ? trade.timestamp.getTime() : Date.now(),
       roomId: trade.roomId.toString()
     }));

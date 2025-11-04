@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { agentsCollection, betsCollection, bettingIntelCollection } from '../db.js';
-import { Agent } from '../../lib/types/index.js';
 
 export type PnlLeaderboardEntry = {
     agentId: string;
@@ -22,31 +21,13 @@ export type IntelLeaderboardEntry = {
     intelPiecesSold: number;
 };
 
-
 class LeaderboardService {
   async getPnlLeaderboard(): Promise<PnlLeaderboardEntry[]> {
-    const agents = await agentsCollection.find().toArray();
+    const agents = await agentsCollection.find({}).sort({ currentPnl: -1 }).limit(50).toArray();
     
-    // First, get all bets for all agents to avoid N+1 queries
-    const agentIds = agents.map(a => a._id);
-    const allBets = await betsCollection.find({
-        agentId: { $in: agentIds }
-    }).toArray();
-    
-    // Group bets by agentId for quick lookup
-    const betsByAgent = allBets.reduce((acc, bet) => {
-        const agentIdStr = bet.agentId.toString();
-        if (!acc[agentIdStr]) {
-            acc[agentIdStr] = [];
-        }
-        acc[agentIdStr].push(bet);
-        return acc;
-    }, {} as Record<string, any[]>);
-    
-    const leaderboard: PnlLeaderboardEntry[] = agents.map(agent => {
-        const agentBets = betsByAgent[agent._id.toString()] || [];
-        const totalBets = agentBets.length;
-        const winningBets = agentBets.filter((b: any) => b && typeof b === 'object' && 'pnl' in b && b.pnl > 0).length;
+    const leaderboard: PnlLeaderboardEntry[] = await Promise.all(agents.map(async (agent) => {
+        const totalBets = await betsCollection.countDocuments({ agentId: agent._id });
+        const winningBets = await betsCollection.countDocuments({ agentId: agent._id, pnl: { $gt: 0 } });
 
         return {
             agentId: agent.id,
@@ -56,49 +37,38 @@ class LeaderboardService {
             totalBets: totalBets,
             winRate: totalBets > 0 ? winningBets / totalBets : 0,
         };
-    });
+    }));
 
-    return leaderboard.sort((a, b) => b.totalPnl - a.totalPnl);
+    return leaderboard;
   }
 
   async getIntelLeaderboard(): Promise<IntelLeaderboardEntry[]> {
-    const intelPnlAggregation = await bettingIntelCollection.aggregate([
-        // Group by the agent who owns the intel
-        {
-            $group: {
-                _id: "$ownerAgentId",
-                totalIntelPnl: { $sum: "$pnlGenerated.amount" },
-                intelPiecesSold: { $sum: 1 } // or another field to count sales
-            }
-        },
-        // Join with the agents collection to get agent details
-        {
-            $lookup: {
-                from: "agents",
-                localField: "_id",
-                foreignField: "id",
-                as: "agentDetails"
-            }
-        },
-        // Unwind the agentDetails array
-        {
-            $unwind: "$agentDetails"
-        },
-        // Project the final shape
+    const intelPnlAggregation = await agentsCollection.aggregate([
         {
             $project: {
-                _id: 0,
-                agentId: "$_id",
-                agentName: "$agentDetails.name",
-                agentModelUrl: "$agentDetails.modelUrl",
-                totalIntelPnl: 1,
-                intelPiecesSold: 1
+                id: 1,
+                name: 1,
+                modelUrl: 1,
+                intelPnl: 1,
             }
         },
-        // Sort by the generated PNL
+        { $sort: { intelPnl: -1 } },
+        { $limit: 50 },
         {
-            $sort: {
-                totalIntelPnl: -1
+            $lookup: {
+                from: 'tradehistory',
+                localField: 'id',
+                foreignField: 'fromId',
+                as: 'sales'
+            }
+        },
+        {
+            $project: {
+                agentId: '$id',
+                agentName: '$name',
+                agentModelUrl: '$modelUrl',
+                totalIntelPnl: '$intelPnl',
+                intelPiecesSold: { $size: '$sales' }
             }
         }
     ]).toArray();

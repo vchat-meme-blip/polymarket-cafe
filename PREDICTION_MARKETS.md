@@ -1,3 +1,4 @@
+
 # Feature Guide: The Predictions Market Framework
 
 The Polymarket Cafe is built around a sophisticated framework for interacting with real-world prediction markets. This guide details how the application aggregates data, facilitates AI-powered analysis, and manages the entire lifecycle of a simulated bet.
@@ -48,4 +49,4 @@ The core user experience revolves around a seamless loop of discovery, analysis,
 The prediction market framework extends to your agent's autonomous life, creating a self-sustaining intelligence ecosystem.
 
 -   **Autonomous Research:** The **Autonomy Director** periodically tasks your agent with researching a trending market. The agent uses AI to generate smart web search queries, scrapes the content of the results using Firecrawl, and synthesizes its findings into new `BettingIntel`, which is then stored in its Intel Bank.
--   **Intel as a Commodity:** In the Café, this `BettingIntel`—derived directly from market data and web research—becomes a tradable commodity, fueling the virtual economy.
+-   **Intel as a Commodity:** In the Café, assets derived directly from market data and web research—such as **`BettingIntel`** and **`MarketWatchlists`**—become tradable commodities, fueling the virtual economy.

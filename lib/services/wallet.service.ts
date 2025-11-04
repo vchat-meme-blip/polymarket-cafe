@@ -7,8 +7,9 @@ import { useWalletStore } from '../state/wallet.js';
 import { useAgent } from '../state/index.js';
 
 /**
- * A service to handle the logic for virtual BOX token transactions.
- * This acts as a layer between the agent's actions and the user's wallet state.
+ * @deprecated This service is deprecated. All transaction logic is now handled authoritatively
+ * on the server by `server/services/trade.service.ts` to ensure data consistency and security.
+ * Client-side state is updated via WebSocket events from the server.
  */
 class WalletService {
   /**

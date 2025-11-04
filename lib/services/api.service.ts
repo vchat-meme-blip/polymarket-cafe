@@ -4,7 +4,7 @@
 */
 import { API_BASE_URL } from '../config.js';
 // FIX: Import types from canonical source to avoid circular dependencies and resolve type errors.
-import type { Agent, User, Bet, MarketIntel, Room, Interaction } from '../types/index.js';
+import type { Agent, User, Bet, MarketIntel, Room, Interaction, MarketWatchlist } from '../types/index.js';
 // FIX: Add missing imports for state stores.
 import { useAgent, useUser, useArenaStore, useAutonomyStore, useWalletStore } from '../state/index.js';
 
@@ -96,6 +96,19 @@ class ApiService {
     return this.request<{ agent: Agent }>(`/api/agents/${agentId}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
+    });
+  }
+  
+  async addMarketWatchlist(agentId: string, watchlist: Omit<MarketWatchlist, 'id' | 'createdAt'>): Promise<{ watchlist: MarketWatchlist }> {
+    return this.request<{ watchlist: MarketWatchlist }>(`/api/agents/${agentId}/watchlists`, {
+        method: 'POST',
+        body: JSON.stringify(watchlist),
+    });
+  }
+
+  async deleteMarketWatchlist(agentId: string, watchlistId: string): Promise<void> {
+    await this.request<void>(`/api/agents/${agentId}/watchlists/${watchlistId}`, {
+        method: 'DELETE',
     });
   }
 

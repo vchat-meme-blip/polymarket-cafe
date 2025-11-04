@@ -36,6 +36,7 @@ import CreateRoomModal from './components/modals/CreateRoomModal';
 import ManageRoomModal from './components/modals/ManageRoomModal';
 import ShareRoomModal from './components/modals/ShareRoomModal';
 import MarketDetailModal from './components/modals/MarketDetailModal';
+import VisitStorefrontModal from './components/modals/VisitStorefrontModal.js';
 
 /**
  * Main application component.
@@ -46,7 +47,7 @@ function App() {
     isSignedIn, showServerHealthModal, 
     agentDossierId, showAboutPage, showOnboarding, showProfileView, 
     openOnboarding, setIsSignedIn, showCreateRoomModal, showManageRoomModal,
-    showShareRoomModal, shareModalData, marketDetailModalData
+    showShareRoomModal, shareModalData, marketDetailModalData, showVisitStorefrontModal
   } = useUI();
   const { availablePersonal } = useAgent();
   const { hasCompletedOnboarding } = useUser();
@@ -121,6 +122,7 @@ function App() {
       {showProfileView && <ProfileView />}
       {showCreateRoomModal && <CreateRoomModal />}
       {showManageRoomModal && <ManageRoomModal />}
+      {showVisitStorefrontModal && <VisitStorefrontModal />}
       {showShareRoomModal && shareModalData && <ShareRoomModal data={shareModalData} />}
       {marketDetailModalData && <MarketDetailModal market={marketDetailModalData} />}
       <ToastContainer />

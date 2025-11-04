@@ -6,10 +6,6 @@
 // This file is the central export for all Zustand stores and related state management utilities.
 // It re-exports from individual store files to provide a single, consistent import path.
 
-// FIX: Re-exporting all state stores from their individual modules.
-// This resolves the "is not exported" build error by making `useArenaStore`,
-// `useAutonomyStore`, and `useWalletStore` available through this central entry point,
-// which is what `api.service.ts` and other modules expect.
 export * from './arena.js';
 export * from './autonomy.js';
 export * from './wallet.js';
@@ -17,20 +13,14 @@ export * from './wallet.js';
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-// FIX: Import `ObjectId` from `mongodb` to resolve 'Cannot find name' errors when creating new agent IDs.
 import { ObjectId } from 'mongodb';
 import { PRESET_AGENTS, DEFAULT_VRM_URL, AVAILABLE_VOICES } from '../presets/agents.js';
-// FIX: Imported types from the canonical type definitions file.
-// FIX: Import AgentMode type from canonical source.
-// FIX: Add AgentMode to import to resolve type errors in this file and consuming components.
 import type { BettingIntel, Agent, User, Bet, MarketIntel, Room, AgentMode, NotificationSettings } from '../types/index.js';
-// FIX: Add .js extension for ES module compatibility.
 import { apiService } from '../services/api.service.js';
 
 /**
  * User
  */
-// FIX: Import User type from canonical source.
 export type { User } from '../types/index.js';
 
 export const useUser = create(
@@ -42,7 +32,6 @@ export const useUser = create(
     setName: (name: string) => void;
     setInfo: (info: string) => void;
     updateNotificationSettings: (settings: { phone?: string; notificationSettings?: NotificationSettings }) => Promise<void>;
-    // FIX: Added missing updateUserSettings function to fix type error in SecurityTab.tsx.
     updateUserSettings: (settings: Partial<User>) => Promise<void>;
     completeOnboarding: () => void;
     setLastSeen: (timestamp: Date | null) => void;
@@ -78,7 +67,6 @@ export const useUser = create(
           if (isNewUser) {
             console.log(`[Auth] New user registration flow for ${handleWithAt}`);
             
-            // For new users, register them first
             console.log(`[Auth] Calling registerUser for ${handleWithAt}`);
             const { user } = await apiService.registerUser(handleWithAt);
             
@@ -100,15 +88,12 @@ export const useUser = create(
               solanaWalletAddress: user.solanaWalletAddress || null
             };
             
-            // Update user state
             console.log(`[Auth] Updating local user state for ${handleWithAt}`);
             set(userData);
             
-            // Mark user as signed in
             console.log(`[Auth] Setting isSignedIn to true for ${handleWithAt}`);
             useUI.getState().setIsSignedIn(true);
             
-            // For new users, we'll let the bootstrap process handle the onboarding
             console.log(`[Auth] Bootstrapping data for new user ${handleWithAt}`);
             await apiService.bootstrap(handleWithAt);
             
@@ -116,13 +101,10 @@ export const useUser = create(
           } else {
             console.log(`[Auth] Existing user login flow for ${handleWithAt}`);
             
-            // For existing users, bootstrap their data
             console.log(`[Auth] Bootstrapping data for existing user ${handleWithAt}`);
             await apiService.bootstrap(handleWithAt);
             
-            // Mark user as signed in after bootstrap
             console.log(`[Auth] Setting isSignedIn to true for existing user ${handleWithAt}`);
-            useUI.getState().setIsSignedIn(true);
             
             console.log(`[Auth] Existing user login completed for ${handleWithAt} in ${Date.now() - startTime}ms`);
           }
@@ -156,7 +138,6 @@ export const useUser = create(
     }
   },
   
-  // User methods
   setUserApiKey: async (key: string) => {
   },
 
@@ -175,7 +156,6 @@ export const useUser = create(
       throw error;
     }
   },
-  // FIX: Added missing updateUserSettings function to fix type error in SecurityTab.tsx.
   updateUserSettings: async (settings) => {
     try {
         await apiService.request('/api/users/settings', {
@@ -227,7 +207,6 @@ export const useUser = create(
 export const createNewAgent = (properties?: Partial<Agent>): Partial<Agent> => {
   const { handle } = useUser.getState();
   
-  // The client no longer generates an ID. It only assembles the data to be sent.
   const baseAgent: Partial<Agent> = {
     name: properties?.name || 'New Quant',
     personality: properties?.personality || '',
@@ -250,16 +229,14 @@ export const createNewAgent = (properties?: Partial<Agent>): Partial<Agent> => {
   };
 
   if (properties?.templateId) {
-    // FIX: Access `id` property which now exists on Agent type.
     const preset = PRESET_AGENTS.find(p => p.id === properties.templateId);
     if (preset) {
       return {
         ...baseAgent,
         ...preset,
-        ...properties, // User overrides (like name) come last
+        ...properties,
         ownerHandle: handle,
-        templateId: undefined, // Don't persist this
-        // FIX: Access `id` property which now exists on Agent type.
+        templateId: undefined,
         copiedFromId: preset.id,
       };
     }
@@ -284,7 +261,6 @@ export const useAgent = create(
     ensureCurrentAgentIsPersonal: () => Promise<string>;
   }>(
     (set, get) => ({
-      // FIX: Ensure initial state matches Agent and Agent[] types
       current: PRESET_AGENTS[0],
       availablePresets: PRESET_AGENTS,
       availablePersonal: [],
@@ -457,6 +433,9 @@ export const useUI = create<{
   showIntelDossierModal: BettingIntel | null;
   openIntelDossier: (intel: BettingIntel) => void;
   closeIntelDossier: () => void;
+  showVisitStorefrontModal: boolean;
+  openVisitStorefrontModal: () => void;
+  closeVisitStorefrontModal: () => void;
 }>(set => ({
   isMobileNavOpen: true,
   toggleMobileNav: () => set(state => ({ isMobileNavOpen: !state.isMobileNavOpen })),
@@ -520,6 +499,9 @@ export const useUI = create<{
   showIntelDossierModal: null,
   openIntelDossier: (intel) => set({ showIntelDossierModal: intel }),
   closeIntelDossier: () => set({ showIntelDossierModal: null }),
+  showVisitStorefrontModal: false,
+  openVisitStorefrontModal: () => set({ showVisitStorefrontModal: true }),
+  closeVisitStorefrontModal: () => set({ showVisitStorefrontModal: false }),
 }));
 
 /**

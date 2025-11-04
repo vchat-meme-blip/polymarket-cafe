@@ -79,7 +79,7 @@ const RoomCardActions = ({ onListenIn, onShowDetails, isConversationActive, disa
 export default function IntelExchangeView() {
     const { rooms, agentLocations, activeConversations } = useArenaStore();
   const { current: userAgent } = useAgent();
-  const { openListenInModal, openHelpModal, setShowRoomDetailModal, openServerHealthModal, initialArenaFocus, setInitialArenaFocus } = useUI();
+  const { openListenInModal, openHelpModal, setShowRoomDetailModal, openServerHealthModal, initialArenaFocus, setInitialArenaFocus, openVisitStorefrontModal } = useUI();
   const [focusedRoomId, setFocusedRoomId] = useState<string | null>(null);
   const roomStripRef = useRef<HTMLDivElement>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -143,6 +143,9 @@ export default function IntelExchangeView() {
        <button className="button" onClick={handleFindRoom} title="Jump to a random active room">
           <span className="icon">casino</span> Find Intel
       </button>
+      <button className="button" onClick={openVisitStorefrontModal} title="Go to a specific storefront by its ID">
+          <span className="icon">store</span> Visit Storefront
+      </button>
        <button className="button" onClick={openServerHealthModal} title="View live server statistics and activity feed">
           <span className="icon">monitoring</span> Server Health
       </button>
@@ -174,8 +177,8 @@ export default function IntelExchangeView() {
 
       <div className={styles.arenaMainContent}>
         {focusedRoom ? (
-          // FIX: Removed the 'key' prop to resolve a TypeScript error. Component updates will be handled by prop changes.
           <RoomCard
+            key={focusedRoom.id}
             room={focusedRoom}
             userAgent={userAgent}
           />

@@ -1,6 +1,3 @@
-
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -22,6 +19,7 @@ import BetSlipPanel from './BetSlipPanel';
 import WatchlistPanel from './WatchlistPanel';
 import ArbitragePanel from './ArbitragePanel';
 import LiquidityPanel from '../trading-floor/LiquidityPanel.js';
+import IntelEconomyPanel from './IntelEconomyPanel.js';
 
 type DashboardTab = 'betSlip' | 'markets' | 'intel' | 'watchlists' | 'arbitrage' | 'liquidity';
 
@@ -72,6 +70,7 @@ export default function Dashboard() {
       </div>
       <div className={styles.dashboardRight}>
         <PortfolioPanel />
+        <IntelEconomyPanel />
         {ownedRoomId ? <ManageRoomPanel /> : <AgentActionsPanel />}
         
         <div className={styles.tabbedPanel}>

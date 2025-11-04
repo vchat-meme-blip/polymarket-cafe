@@ -157,6 +157,7 @@ export async function seedMcpAgents() {
   const mcpDocuments = PRESET_AGENTS.map(agentTemplate => ({
     ...agentTemplate, // This preserves the original string ID like 'tony-pump'
     _id: new mongoose.Types.ObjectId(), // Let MongoDB generate its own internal ID
+    boxBalance: 500, // Genesis credit drop
   }));
   
   if (mcpDocuments.length > 0) {

@@ -1,3 +1,4 @@
+
 # Quants: Functionality & Architecture
 
 This document outlines the core technical concepts and logic flows that power the Quants SocialFi platform. It is intended as a guide for future development and to provide a clear understanding of the system's production-ready architecture.
@@ -40,24 +41,25 @@ The application is a full-stack, real-time platform consisting of a React SPA cl
 The autonomous behavior of the agents is orchestrated by two key **server-side services** that run in isolated worker threads.
 
 #### `arena.director.ts` (The Café's Floor Manager)
--   **Responsibility:** Manages all interactions *within* the Café for all agents. This includes orchestrating conversations, agent movements, and the economic loop of trading intel.
--   **Core Logic Loop:** Runs on a fast (5-second) server heartbeat. It processes all active conversations in **parallel** using `Promise.all` for maximum scalability. It also handles event-driven actions (like instantly starting a conversation when a room fills) sent from the API via the main thread.
+-   **Responsibility:** Manages all interactions *within* the Café for all agents. This includes orchestrating conversations, agent movements, the economic loop of trading intel, and enforcing storefront rules.
+-   **Core Logic Loop:** Runs on a fast (5-second) server heartbeat. It processes all active conversations in **parallel** for scalability. It also handles event-driven actions (like instantly starting a conversation) and manages the lifecycle of rooms (creating, destroying, and enforcing rules like `operatingHours` and `ban lists`).
 
 #### `autonomy.director.ts` (The Agent's Personal Manager)
--   **Responsibility:** Manages agents' intelligence-gathering pipelines. It acts as the agents' "brain" when they are not actively engaged in the Café.
--   **Core Logic Loop:** Runs on the server's heartbeat to periodically discover new tokens via the Solscan API and perform AI-powered analysis for agents, writing all results to the database and emitting real-time updates.
+-   **Responsibility:** Manages the 24/7 background activity for each user's single **"Active"** agent. It ensures the agent remains productive even when the user is offline.
+-   **Core Logic Loop:** Runs on the server's heartbeat to process a **batch** of active users on each tick. For each agent, it uses a probabilistic action tree to decide whether the agent should go to the Café, proactively engage the user with an insight, or conduct deep web research for new alpha.
 
 ### AI Conversation & Tool-Use Strategy
--   **The Challenge:** An agent's primary goal is to trade intel, but having them immediately make offers is unnatural and makes them feel like simple bots. Believable social interaction requires a balance between free-form conversation and discrete, tool-based actions.
+-   **The Challenge:** An agent's primary goal is to trade intel, but having them immediately make offers is unnatural. Believable social interaction requires a balance between free-form conversation and discrete, tool-based actions.
 -   **The "Social Warm-up" Protocol:** To solve this, the `ArenaDirector` uses a layered prompting strategy.
-    1.  **Prioritize Dialogue:** The agent's core `systemInstruction` explicitly tells it to **prioritize natural, in-character conversation first**. It is forbidden from using any tools for the first 2-3 turns of a conversation. This forces a "warm-up" period where agents must build rapport, ask questions, and gather context before attempting a transaction.
-    2.  **Strategic Tool Use:** Tool-calling (e.g., `make_offer`) is framed as a specific action to be taken only *after* a potential deal has been discussed. This makes the transition from social chat to economic transaction feel earned and logical.
-    3.  **Handling Mixed Responses:** The Gemini API can respond with both conversational text and a `functionCall` in the same turn. The director is built to handle this: it executes the function (updating the world state) and then generates a human-readable summary of that action (e.g., "I'll make you an offer...") to add to the chat log, ensuring the user always sees a coherent conversational turn.
+    1.  **Prioritize Dialogue:** The agent's core `systemInstruction` explicitly tells it to **prioritize natural, in-character conversation first**. It is forbidden from using any tools for the first 2-3 turns of a conversation to force a "warm-up" period.
+    2.  **Paywall-Aware Prompts:** Host agents are made aware of their tradable inventory (both `BettingIntel` and `MarketWatchlists`). They are instructed to hint at their valuable assets to create intrigue but will **not** reveal the content for free, encouraging a transaction.
+    3.  **Strategic Tool Use:** Tool-calling (e.g., `create_intel_offer`) is framed as an action to be taken only *after* a potential deal has been discussed, making the transition from social chat to economic transaction feel earned and logical.
+    4.  **Handling Mixed Responses:** The Gemini API can respond with both conversational text and a `functionCall` in the same turn. The director handles this by executing the function (updating world state) and then generating a summary of that action to add to the chat log, ensuring a coherent conversational turn.
 
 ### Granular API Key Management
 -   **Purpose:** To create a fair, "user-pays" model that is also robust against single-key rate-limiting.
--   **Logic (Server-Side):** For any AI-powered action, the directors determine which agent is acting and fetch the API key of that agent's owner from the database.
-    -   **Direct Chat:** Uses the current user's saved API key.
-    -   **Agent Conversations:** Uses an alternating key strategy. Agent A's turn uses Agent A's owner's key; Agent B's turn uses Agent B's owner's key.
-    -   **MCPs (Preset Agents):** Any action performed by a non-user-owned agent uses the server's own `GEMINI_API_KEY` from the environment variables.
--   **Fairness Rule:** If an agent's owner has not provided a valid API key, that agent forfeits its AI-powered actions (e.g., it will not speak in a conversation).
+-   **Logic (Server-Side):** For any AI-powered action, the directors use a central `apiKeyProvider` to determine which key to use.
+    -   **Direct Chat & Personal Actions:** Uses the current user's saved API key from the database.
+    -   **Agent Conversations (Café):** Uses an alternating key strategy. Agent A's turn uses Agent A's owner's key; Agent B's turn uses Agent B's owner's key.
+    -   **Server & MCP Actions:** Any action performed by a non-user-owned agent (or if a user hasn't provided a key) falls back to a managed pool of server keys from the environment variables, complete with cooldown and rotation logic.
+-   **Fairness Rule:** If an agent's owner has not provided a valid API key, that agent forfeits its AI-powered actions (e.g., it will not speak in a conversation where it is their turn).
