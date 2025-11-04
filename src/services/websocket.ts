@@ -12,7 +12,8 @@ export class WebSocketService {
   private maxRetryDelay = 30000; // Max 30 seconds
   private connectionUrl: string;
   private isConnected = false;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+  // FIX: Changed NodeJS.Timeout to ReturnType<typeof setTimeout> for browser compatibility.
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     // Use wss:// for secure connections, fallback to ws:// for development

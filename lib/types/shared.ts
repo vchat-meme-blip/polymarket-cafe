@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
+// This file defines the shared data structures used across the client and server.
+// These are the "source of truth" for what data looks like.
+
 // Notification Settings
 export type NotificationSettings = {
   agentResearch: boolean;
@@ -93,7 +96,6 @@ export type Interaction = {
 export type Offer = {
   fromId: string;
   toId: string;
-  // FIX: Add roomId to the Offer type, as it's a required piece of information for trade execution.
   roomId: string;
   type: 'intel' | 'watchlist';
   intelId?: string;
@@ -196,7 +198,7 @@ export type BettingIntel = {
     pnlGenerated: {
         amount: number;
         currency: string;
-    };
+        };
     sourceAgentId?: string;
     pricePaid?: number;
     bountyId?: string;
@@ -257,4 +259,19 @@ export type Intel = {
   bountyId?: string;
   timestamp: number;
   source: string;
+};
+
+export type AgentTask = {
+  id: string;
+  agentId: string;
+  objective: string;
+  type: 'monitor_markets' | 'research_topic';
+  parameters: {
+    market_type?: string;
+    keywords?: string;
+  };
+  status: 'pending' | 'in_progress' | 'completed';
+  createdAt: number;
+  updatedAt: number;
+  updates: string[];
 };

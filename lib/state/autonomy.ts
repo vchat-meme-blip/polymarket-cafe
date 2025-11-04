@@ -4,8 +4,7 @@
 */
 import { create } from 'zustand';
 import { useWalletStore } from './wallet.js';
-// FIX: Imported types from the canonical types file.
-import { AgentActivity, BettingIntel, Bounty } from '../types/index.js';
+import { AgentActivity, BettingIntel, Bounty, AgentTask } from '../types/index.js';
 
 interface ServerHydrationData {
     bounties: Bounty[];
@@ -17,6 +16,7 @@ export type AutonomyState = {
   statusMessage: string;
   intelBank: BettingIntel[];
   bounties: Bounty[];
+  tasks: AgentTask[];
   lastActivity: Record<string, number>;
   isAutonomyEnabled: boolean;
   gatherIntelCooldown: number;
@@ -36,6 +36,9 @@ export type AutonomyState = {
   setResearchIntelCooldown: (cooldown: number) => void;
   addBounty: (objective: string, reward: number) => void;
   completeBounty: (bountyId: string) => void;
+  setTasks: (tasks: AgentTask[]) => void;
+  addTask: (task: AgentTask) => void;
+  updateTask: (taskId: string, updates: Partial<AgentTask>) => void;
 };
 
 export const useAutonomyStore = create<AutonomyState>((set, get) => ({
@@ -43,6 +46,7 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
   statusMessage: 'Contemplating the digital void...',
   intelBank: [],
   bounties: [],
+  tasks: [],
   lastActivity: {},
   isAutonomyEnabled: true,
   gatherIntelCooldown: 1000 * 60 * 5, // 5 minutes
@@ -196,6 +200,13 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
       ),
     }));
   },
+  setTasks: (tasks: AgentTask[]) => set({ tasks }),
+  addTask: (task: AgentTask) => set(state => ({ tasks: [...state.tasks, task] })),
+  updateTask: (taskId: string, updates: Partial<AgentTask>) => set(state => ({
+    tasks: state.tasks.map(task => 
+      task.id === taskId ? { ...task, ...updates, updatedAt: Date.now() } : task
+    ),
+  })),
 }));
 
 

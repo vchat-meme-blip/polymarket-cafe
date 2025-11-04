@@ -1,0 +1,14 @@
+.createTaskModal {
+    text-align: center;
+}
+.createTaskModal h2 {
+    color: var(--brand-cyan);
+    margin-bottom: 8px;
+}
+.createTaskModal p {
+    color: var(--Neutral-60);
+    margin-bottom: 24px;
+}
+.createTaskForm {
+    text-align: left;
+}

@@ -4,7 +4,6 @@
 */
 import { useState } from 'react';
 import Modal from '../Modal';
-// FIX: Fix import for `useUI` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
 import { useUI } from '../../lib/state/index.js';
 import c from 'classnames';
 import ProfileTab from './ProfileTab';
@@ -27,7 +26,7 @@ export default function ProfileView() {
     <Modal onClose={onClose}>
       <div className={styles.profileView}>
         <div className={styles.modalHeader}>
-            {/* The primary close button is now in the parent Modal component */}
+            <h2>Settings</h2>
         </div>
         <div className={styles.modalTabs}>
           <button

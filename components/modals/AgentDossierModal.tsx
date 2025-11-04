@@ -89,10 +89,8 @@ const ProfileTab = ({ agent, onUpdate, onSave }: { agent: Partial<Agent>, onUpda
                     <select 
                         value={agent.modelUrl} 
                         onChange={e => {
-                            // Find the preset that matches this model URL
                             const selectedPreset = PRESET_AGENTS.find(p => p.modelUrl === e.target.value);
                             if (selectedPreset) {
-                                // Apply the preset's personality and other attributes
                                 onUpdate({
                                     modelUrl: selectedPreset.modelUrl,
                                     personality: selectedPreset.personality,
@@ -107,7 +105,6 @@ const ProfileTab = ({ agent, onUpdate, onSave }: { agent: Partial<Agent>, onUpda
                             }
                         }}
                     >
-                        {/* FIX: Access id property which now exists on Agent type */}
                         {PRESET_AGENTS.map(p => <option key={p.id} value={p.modelUrl}>{p.name}</option>)}
                     </select>
                 </label>
@@ -269,7 +266,6 @@ const LedgerAndReportTab = ({ agentId }: { agentId: string }) => {
 
     const storefrontPnl = useMemo(() => {
         return storefrontTradeHistory.reduce((total, trade) => {
-            // Assume the owner is the seller
             return total + trade.price;
         }, 0);
     }, [storefrontTradeHistory]);
@@ -505,16 +501,22 @@ const IntelBriefingTab = ({ agent, onUpdate }: { agent: Partial<Agent>, onUpdate
 
 export default function AgentDossierModal({ agentId }: { agentId: string }) {
     const { closeAgentDossier, isCreatingAgentInDossier } = useUI();
-    const { availablePersonal } = useAgent();
+    const { availablePersonal, addAgent, update } = useAgent();
     const { handle } = useUser();
     
     const [activeTab, setActiveTab] = useState('profile');
     const [isSaving, setIsSaving] = useState(false);
 
-    const initialAgentData = availablePersonal.find(a => a.id === agentId) || 
-                             (isCreatingAgentInDossier ? createNewAgent({ id: agentId }) : null);
+    const initialAgentData = useMemo(() => {
+        return availablePersonal.find(a => a.id === agentId) || 
+               (isCreatingAgentInDossier ? createNewAgent({ id: agentId }) : null);
+    }, [agentId, availablePersonal, isCreatingAgentInDossier]);
                              
     const [formData, setFormData] = useState<Partial<Agent> | null>(initialAgentData);
+
+    useEffect(() => {
+        setFormData(initialAgentData);
+    }, [initialAgentData]);
 
     if (!formData) {
         console.error("Dossier opened for a non-existent agent!");
@@ -526,25 +528,20 @@ export default function AgentDossierModal({ agentId }: { agentId: string }) {
         setIsSaving(true);
     
         if (isCreatingAgentInDossier) {
-            // FIX: The server now generates the agent ID.
-            // We call the API, get the saved agent with a real ID, and then add it to the local store.
-            // This avoids optimistic updates with temporary IDs and fixes the type error.
             const agentToCreate = { ...formData, ownerHandle: handle };
             try {
                 const { agent: savedAgent } = await apiService.saveNewAgent(agentToCreate);
-                useAgent.getState().addAgent(savedAgent);
+                addAgent(savedAgent);
             } catch (error) {
                 console.error('Failed to create agent:', error);
-                // Optionally add a toast message for the user
             }
         } else {
-            // FIX: Add a guard to ensure formData and its id exist before updating.
             if (!formData.id) {
                 console.error("Cannot update agent without an ID.");
                 setIsSaving(false);
                 return;
             }
-            useAgent.getState().update(formData.id, formData);
+            update(formData.id, formData);
             await apiService.updateAgent(formData.id, formData);
         }
     

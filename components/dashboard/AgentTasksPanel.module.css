@@ -1,0 +1,72 @@
+.agentTasksPanel {
+    flex-grow: 1; /* Allow it to take more space if available */
+    min-height: 200px; /* Ensure it has a minimum height */
+}
+.tasksHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.tasksHeader .button {
+    padding: 6px 10px;
+    font-size: 12px;
+}
+.taskList {
+    overflow-y: auto;
+    max-height: 250px; /* Or adjust as needed */
+    margin-top: 12px;
+}
+.taskItem {
+    background: var(--Neutral-10);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid var(--Neutral-20);
+}
+.taskItem details {
+    width: 100%;
+}
+.taskItem summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    list-style: none;
+}
+.taskItem summary::-webkit-details-marker {
+    display: none;
+}
+.taskObjective {
+    font-weight: 500;
+}
+.taskStatus {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+.taskStatus.pending { background-color: var(--Neutral-30); color: var(--Neutral-80); }
+.taskStatus.in_progress { background-color: var(--Blue-800); color: var(--Blue-400); }
+.taskStatus.completed { background-color: var(--Green-700); color: var(--Green-500); }
+.taskUpdates {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--Neutral-30);
+    font-size: 13px;
+    color: var(--Neutral-80);
+}
+.taskUpdates ul {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-left: 16px;
+}
+.taskUpdates li {
+    list-style-type: '» ';
+}
+.emptyTasks {
+    text-align: center;
+    color: var(--Neutral-60);
+    font-style: italic;
+    padding: 20px;
+}

@@ -30,6 +30,7 @@ import { apiService } from './lib/services/api.service.js';
 import { socketService } from './lib/services/socket.service';
 import ServerHealthModal from './components/modals/ServerHealthModal';
 import AgentDossierModal from './components/modals/AgentDossierModal';
+import AutonomyModal from './components/modals/AutonomyModal';
 import AboutPage from './components/about/AboutPage';
 import ProfileView from './components/profile/ProfileView';
 import CreateRoomModal from './components/modals/CreateRoomModal';
@@ -37,6 +38,7 @@ import ManageRoomModal from './components/modals/ManageRoomModal';
 import ShareRoomModal from './components/modals/ShareRoomModal';
 import MarketDetailModal from './components/modals/MarketDetailModal';
 import VisitStorefrontModal from './components/modals/VisitStorefrontModal.js';
+import CreateTaskModal from './components/modals/CreateTaskModal';
 
 /**
  * Main application component.
@@ -47,7 +49,8 @@ function App() {
     isSignedIn, showServerHealthModal, 
     agentDossierId, showAboutPage, showOnboarding, showProfileView, 
     openOnboarding, setIsSignedIn, showCreateRoomModal, showManageRoomModal,
-    showShareRoomModal, shareModalData, marketDetailModalData, showVisitStorefrontModal
+    showShareRoomModal, shareModalData, marketDetailModalData, showVisitStorefrontModal,
+    showAutonomyModal, showCreateTaskModal
   } = useUI();
   const { availablePersonal } = useAgent();
   const { hasCompletedOnboarding } = useUser();
@@ -119,6 +122,8 @@ function App() {
       {showOnboarding && <Onboarding />}
       {showServerHealthModal && <ServerHealthModal />}
       {agentDossierId && <AgentDossierModal agentId={agentDossierId} />}
+      {showAutonomyModal && <AutonomyModal />}
+      {showCreateTaskModal && <CreateTaskModal />}
       {showProfileView && <ProfileView />}
       {showCreateRoomModal && <CreateRoomModal />}
       {showManageRoomModal && <ManageRoomModal />}

@@ -1,16 +1,15 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 import { API_BASE_URL } from '../config.js';
-// FIX: Import types from canonical source to avoid circular dependencies and resolve type errors.
-import type { Agent, User, Bet, MarketIntel, Room, Interaction, MarketWatchlist } from '../types/index.js';
-// FIX: Add missing imports for state stores.
-import { useAgent, useUser, useArenaStore, useAutonomyStore, useWalletStore } from '../state/index.js';
+import type { Agent, User, Bet, MarketIntel, Room, Interaction, MarketWatchlist, AgentTask } from '../types/index.js';
+import { useAgent, useUser } from '../state/index.js';
+import { useArenaStore } from '../state/arena.js';
+import { useAutonomyStore } from '../state/autonomy.js';
+import { useWalletStore } from '../state/wallet.js';
 
 class ApiService {
-  // FIX: Make request method public for generic use.
   public async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     const handle = useUser.getState().handle;
@@ -18,7 +17,6 @@ class ApiService {
     const headers = {
       'Content-Type': 'application/json',
       ...options?.headers,
-      // Include user handle for authentication on the backend
       'X-User-Handle': handle || '',
     };
 
@@ -31,7 +29,6 @@ class ApiService {
           : `Request failed with status ${response.status}`;
         throw new Error(errorMessage);
       }
-      // Handle cases where the response body might be empty (e.g., for a 204 No Content)
       const text = await response.text();
       return text ? JSON.parse(text) : ({} as T);
     } catch (error) {
@@ -44,7 +41,6 @@ class ApiService {
   async bootstrap(handle: string): Promise<{ success: boolean }> {
       const data = await this.request<any>(`/api/bootstrap/${handle}`);
       
-      // Hydrate all stores with server data
       useUser.getState()._setHandle(data.user.handle);
       useUser.setState(data.user);
       useAgent.setState({
@@ -110,6 +106,18 @@ class ApiService {
   async deleteMarketWatchlist(agentId: string, watchlistId: string): Promise<void> {
     await this.request<void>(`/api/agents/${agentId}/watchlists/${watchlistId}`, {
         method: 'DELETE',
+    });
+  }
+
+  // --- Agent Tasks ---
+  async getTasks(agentId: string): Promise<AgentTask[]> {
+    return this.request<AgentTask[]>(`/api/agents/${agentId}/tasks`);
+  }
+
+  async createTask(agentId: string, task: Omit<AgentTask, 'id' | 'createdAt' | 'updatedAt' | 'updates'>): Promise<AgentTask> {
+    return this.request<AgentTask>(`/api/agents/${agentId}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify(task),
     });
   }
 

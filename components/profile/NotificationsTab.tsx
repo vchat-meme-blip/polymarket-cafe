@@ -3,8 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { useState, FormEvent } from 'react';
-import { useUser } from '../../lib/state';
-import { useUI } from '../../lib/state/index.js';
+import { useUser, useUI } from '../../lib/state/index.js';
 import styles from './Profile.module.css';
 
 type NotificationsTabProps = {
@@ -20,7 +19,7 @@ export default function NotificationsTab({ onSave }: NotificationsTabProps) {
         agentResearch: true,
         agentTrades: true,
         newMarkets: false,
-        agentEngagements: false,
+        agentEngagements: true, // Default new setting to true
     });
     const [isSaving, setIsSaving] = useState(false);
 
@@ -57,7 +56,7 @@ export default function NotificationsTab({ onSave }: NotificationsTabProps) {
                         placeholder="e.g., +14155552671"
                     />
                     <p className={styles.stepHint}>
-                        Enter your number with country code to receive WhatsApp alerts.
+                        Enter your number with country code to receive WhatsApp alerts from your agent.
                     </p>
                 </div>
 

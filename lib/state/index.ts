@@ -436,6 +436,12 @@ export const useUI = create<{
   showVisitStorefrontModal: boolean;
   openVisitStorefrontModal: () => void;
   closeVisitStorefrontModal: () => void;
+  showAutonomyModal: boolean;
+  openAutonomyModal: () => void;
+  closeAutonomyModal: () => void;
+  showCreateTaskModal: boolean;
+  openCreateTaskModal: () => void;
+  closeCreateTaskModal: () => void;
 }>(set => ({
   isMobileNavOpen: true,
   toggleMobileNav: () => set(state => ({ isMobileNavOpen: !state.isMobileNavOpen })),
@@ -502,6 +508,12 @@ export const useUI = create<{
   showVisitStorefrontModal: false,
   openVisitStorefrontModal: () => set({ showVisitStorefrontModal: true }),
   closeVisitStorefrontModal: () => set({ showVisitStorefrontModal: false }),
+  showAutonomyModal: false,
+  openAutonomyModal: () => set({ showAutonomyModal: true }),
+  closeAutonomyModal: () => set({ showAutonomyModal: false }),
+  showCreateTaskModal: false,
+  openCreateTaskModal: () => set({ showCreateTaskModal: true }),
+  closeCreateTaskModal: () => set({ showCreateTaskModal: false }),
 }));
 
 /**
