@@ -1,3 +1,4 @@
+
 /// <reference types="node" />
 
 // FIX: Changed express import style to resolve middleware type overload errors.
@@ -209,10 +210,11 @@ function setupWorkers() {
   marketWatcherWorker = createWorker('./workers/market-watcher.worker.mjs');
 
   const workers = { arena: arenaWorker, resolution: resolutionWorker, autonomy: autonomyWorker, marketWatcher: marketWatcherWorker };
+  const io = webSocketService.getIO();
 
   Object.entries(workers).forEach(([name, worker]) => {
     worker.on('message', (message: any) => {
-      if (message.type === 'socketEmit') {
+      if (message.type === 'socketEmit' && io) {
         if (message.room) {
           io.to(message.room).emit(message.event, message.payload);
         } else {
@@ -312,59 +314,49 @@ if (isProduction) {
 }
 
 
-// --- Socket.IO Setup ---
-const socketConfig: any = {
-  cors: corsOptions,
-  allowEIO3: true,
-  transports: (process.env.WS_TRANSPORTS || 'websocket,polling').split(','),
-  path: process.env.WS_PATH || '/socket.io/',
-  serveClient: false,
-  connectTimeout: 30000,
-  pingTimeout: 25000,
-  pingInterval: 20000,
-};
-const io = new SocketIOServer(server, socketConfig);
-export { io };
+// --- Socket.IO Connection Handling (delegated from service) ---
+const io = webSocketService.getIO();
+if (io) {
+    io.engine.on("connection_error", (err) => {
+      console.error('[Socket.IO] Connection error:', err.message);
+      console.error('Error details:', err);
+    });
 
-io.engine.on("connection_error", (err) => {
-  console.error('[Socket.IO] Connection error:', err.message);
-  console.error('Error details:', err);
-});
-
-io.on('connection', (socket) => {
-  const clientAddress = socket.handshake.address;
-  const clientOrigin = socket.handshake.headers.origin || 'unknown';
-  
-  console.log(`[Socket.IO] New connection from ${clientAddress} (Origin: ${clientOrigin})`);
-  
-  socket.on('authenticate', async (handle: string) => {
-    try {
-      const user = await usersCollection.findOne({ handle });
-      if (user) {
-        const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
-        rooms.forEach(room => socket.leave(room));
-        
-        await socket.join(handle);
-        console.log(`[Socket.IO] User ${handle} authenticated and joined room ${handle}`);
-        socket.emit('authenticated', { success: true, handle });
-      } else {
-        console.log(`[Socket.IO] Authentication failed: User ${handle} not found`);
-        socket.emit('authentication_error', { error: 'User not found' });
-      }
-    } catch (error) {
-      console.error(`[Socket.IO] Authentication error for ${handle}:`, error);
-      socket.emit('authentication_error', { error: 'Internal server error' });
-    }
-  });
-  
-  socket.on('disconnect', (reason: string) => {
-    console.log(`[Socket.IO] Client ${socket.id} disconnected: ${reason}`);
-  });
-  
-  socket.on('error', (error: Error) => {
-    console.error(`[Socket.IO] Error from client ${socket.id}:`, error);
-  });
-});
+    io.on('connection', (socket) => {
+      const clientAddress = socket.handshake.address;
+      const clientOrigin = socket.handshake.headers.origin || 'unknown';
+      
+      console.log(`[Socket.IO] New connection from ${clientAddress} (Origin: ${clientOrigin})`);
+      
+      socket.on('authenticate', async (handle: string) => {
+        try {
+          const user = await usersCollection.findOne({ handle });
+          if (user) {
+            const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
+            rooms.forEach(room => socket.leave(room));
+            
+            await socket.join(handle);
+            console.log(`[Socket.IO] User ${handle} authenticated and joined room ${handle}`);
+            socket.emit('authenticated', { success: true, handle });
+          } else {
+            console.log(`[Socket.IO] Authentication failed: User ${handle} not found`);
+            socket.emit('authentication_error', { error: 'User not found' });
+          }
+        } catch (error) {
+          console.error(`[Socket.IO] Authentication error for ${handle}:`, error);
+          socket.emit('authentication_error', { error: 'Internal server error' });
+        }
+      });
+      
+      socket.on('disconnect', (reason: string) => {
+        console.log(`[Socket.IO] Client ${socket.id} disconnected: ${reason}`);
+      });
+      
+      socket.on('error', (error: Error) => {
+        console.error(`[Socket.IO] Error from client ${socket.id}:`, error);
+      });
+    });
+}
 
 
 // --- Error Handling ---
@@ -429,8 +421,12 @@ export async function startServer() {
           console.log(`[Server] Server listening on http://${HOST}:${PORT}`);
           console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
           console.log(`[Server] Database: ${process.env.MONGODB_URI ? 'Configured' : 'Not Configured'}`);
-          console.log(`[Server] WebSocket path: ${socketConfig.path}`);
-          console.log(`[Server] Allowed transports: ${socketConfig.transports.join(', ')}`);
+          
+          if (webSocketService.getIO()) {
+            const socketConfig = (webSocketService.getIO() as any).opts;
+            console.log(`[Server] WebSocket path: ${socketConfig.path}`);
+            console.log(`[Server] Allowed transports: ${socketConfig.transports.join(', ')}`);
+          }
 
           // Centralized Seeding Logic
           try {

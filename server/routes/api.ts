@@ -1,5 +1,4 @@
 
-
 import { Router } from 'express';
 import mongoose, { Collection } from 'mongoose';
 import { TradeRecord, BettingIntel, MarketWatchlist } from '../../lib/types/shared.js';
@@ -133,7 +132,6 @@ router.post('/users/register', async (req, res) => {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       phone: '',
-      // FIX: Added missing properties to the `notificationSettings` object to match the `NotificationSettings` type.
       notificationSettings: {
         agentResearch: true,
         agentTrades: true,
@@ -298,6 +296,21 @@ router.put('/agents/:agentId', async (req, res) => {
   if (!result) return res.status(404).json({ message: 'Agent not found or not owned by user' });
   res.json({ agent: result });
 });
+  
+router.get('/agents/:agentId/tasks', async (req, res) => {
+    const { agentId } = req.params;
+    try {
+        const agent = await agentsCollection.findOne({ id: agentId });
+        if (!agent) {
+            return res.status(404).send('Agent not found');
+        }
+        // Ensure tasks is an array, defaulting to empty if it doesn't exist
+        res.json((agent as any).tasks || []);
+    } catch (error) {
+        console.error(`[API] Error fetching tasks for agent ${agentId}:`, error);
+        res.status(500).json({ message: 'Failed to fetch tasks.' });
+    }
+});
 
 router.post('/agents/:agentId/watchlists', async (req, res) => {
     const { agentId } = req.params;
@@ -354,7 +367,54 @@ router.delete('/agents/:agentId/watchlists/:watchlistId', async (req, res) => {
     }
 });
 
-// --- AI Endpoints ---
+// --- Agent Tasks ---
+router.get('/agents/:agentId/tasks', async (req, res) => {
+    const { agentId } = req.params;
+    try {
+        const agent = await agentsCollection.findOne({ id: agentId });
+        if (!agent) {
+            return res.status(404).send('Agent not found');
+        }
+        res.json((agent as any).tasks || []);
+    } catch (error) {
+        console.error(`[API] Error fetching tasks for agent ${agentId}:`, error);
+        res.status(500).json({ message: 'Failed to fetch tasks.' });
+    }
+});
+
+router.post('/agents/:agentId/tasks', async (req, res) => {
+  const { agentId } = req.params;
+  const { userHandle } = res.locals;
+  const taskData = req.body;
+
+  try {
+      const agent = await agentsCollection.findOne({ id: agentId, ownerHandle: userHandle });
+      if (!agent) {
+          return res.status(404).json({ message: 'Agent not found or you do not own this agent.' });
+      }
+
+      const newTask = {
+          ...taskData,
+          id: new ObjectId().toHexString(),
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          updates: [`Task created: "${taskData.objective}"`],
+      };
+
+      await agentsCollection.updateOne(
+          { _id: agent._id },
+          { $push: { tasks: newTask as any } }
+      );
+
+      res.status(201).json(newTask);
+  } catch (error) {
+      console.error('Error creating task:', error);
+      res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+
+// --- Agent Actions & AI ---
 router.post('/ai/brainstorm-personality', async (req, res) => {
   try {
     const apiKey = (process.env.OPENAI_API_KEYS || '').split(',')[0] || process.env.GEMINI_API_KEY;
