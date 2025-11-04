@@ -12,3 +12,9 @@
 .createTaskForm {
     text-align: left;
 }
+.createTaskForm .button {
+    justify-content: center;
+}
+.createTaskForm select {
+    width: 100%;
+}

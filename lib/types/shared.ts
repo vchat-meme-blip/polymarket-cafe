@@ -12,6 +12,9 @@ export type NotificationSettings = {
   agentTrades: boolean;
   newMarkets: boolean;
   agentEngagements: boolean;
+  autonomyCafe: boolean;
+  autonomyEngage: boolean;
+  autonomyResearch: boolean;
 };
 
 // User type
@@ -30,7 +33,7 @@ export type User = {
   currentAgentId?: string;
   ownedRoomId?: string;
   phone?: string;
-  notificationSettings?: NotificationSettings;
+  notificationSettings: NotificationSettings;
 };
 
 export type AgentMode = 'Safe' | 'Degen' | 'Mag7';
@@ -264,11 +267,10 @@ export type Intel = {
 export type AgentTask = {
   id: string;
   agentId: string;
-  objective: string;
-  type: 'monitor_markets' | 'research_topic';
+  objective: string; // User-facing description
+  type: 'one_time_research' | 'continuous_monitoring';
   parameters: {
-    market_type?: string;
-    keywords?: string;
+    topic: string; // The subject of the research or monitoring
   };
   status: 'pending' | 'in_progress' | 'completed';
   createdAt: number;

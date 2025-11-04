@@ -110,17 +110,8 @@ export function useLiveApi({
         apiKey: user.userApiKey || process.env.GEMINI_API_KEY || '', // Fallback for server key
         dangerouslyAllowBrowser: true 
     });
-    const systemInstruction = createSystemInstructions(currentAgent, {
-        name: user.name,
-        info: user.info,
-        handle: user.handle,
-        hasCompletedOnboarding: user.hasCompletedOnboarding,
-        lastSeen: user.lastSeen,
-        solanaWalletAddress: user.solanaWalletAddress,
-        userApiKey: user.userApiKey,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-    }, true);
+    // FIX: Pass the complete user object, which satisfies the 'User' type, instead of manually creating an incomplete object. This resolves the type error and makes the code more robust.
+    const systemInstruction = createSystemInstructions(currentAgent, user, true);
 
     textChatRef.current = {
         openai,

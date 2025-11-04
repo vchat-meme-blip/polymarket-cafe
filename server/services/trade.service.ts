@@ -50,7 +50,7 @@ class TradeService {
                     ownerHandle: buyer.ownerHandle,
                     sourceAgentId: sellerId,
                     pricePaid: price,
-                    isTradable: false,
+                    isTradable: false, // <-- New copy is not tradable
                     createdAt: new Date(),
                     pnlGenerated: { amount: 0, currency: 'USD' },
                 };
@@ -60,6 +60,7 @@ class TradeService {
                 const savedDoc = await bettingIntelCollection.findOne({ _id: insertedId }, { session });
                 if (!savedDoc) throw new Error('Failed to save new intel for buyer.');
 
+                // Update PNL on original intel piece for seller
                 await bettingIntelCollection.updateOne({ _id: originalIntel._id }, { $inc: { 'pnlGenerated.amount': price } }, { session });
 
                 newAsset = { ...savedDoc, id: savedDoc._id.toString() } as unknown as BettingIntel;
@@ -72,10 +73,11 @@ class TradeService {
                 if (!sellerWatchlist) throw new Error(`Watchlist with ID ${watchlistId} not found on seller.`);
                 if (!sellerWatchlist.isTradable) throw new Error("Watchlist is not marked as tradable.");
 
+                // Create a new, non-tradable copy for the buyer
                 const newWatchlistForBuyer: MarketWatchlist = {
                     ...sellerWatchlist,
                     id: new ObjectId().toHexString(),
-                    isTradable: false,
+                    isTradable: false, // <-- New copy is not tradable
                     sourceAgentId: sellerAgentId,
                     pricePaid: price,
                     createdAt: Date.now(),
@@ -102,6 +104,7 @@ class TradeService {
             ]);
 
             await session.commitTransaction();
+            console.log(`[TradeService] Trade successful between ${seller.name} and ${buyer.name} for ${price} BOX.`);
             return { trade, newAsset };
 
         } catch (error) {

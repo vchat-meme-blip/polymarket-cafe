@@ -1,6 +1,8 @@
 .agentTasksPanel {
     flex-grow: 1; /* Allow it to take more space if available */
     min-height: 200px; /* Ensure it has a minimum height */
+    display: flex;
+    flex-direction: column;
 }
 .tasksHeader {
     display: flex;
@@ -13,8 +15,9 @@
 }
 .taskList {
     overflow-y: auto;
-    max-height: 250px; /* Or adjust as needed */
+    flex-grow: 1;
     margin-top: 12px;
+    padding-right: 4px;
 }
 .taskItem {
     background: var(--Neutral-10);
@@ -38,12 +41,15 @@
 }
 .taskObjective {
     font-weight: 500;
+    font-size: 14px;
 }
 .taskStatus {
     font-size: 12px;
     padding: 4px 8px;
-    border-radius: 6px;
+    border-radius: 99px;
     font-weight: 500;
+    flex-shrink: 0;
+    margin-left: 8px;
 }
 .taskStatus.pending { background-color: var(--Neutral-30); color: var(--Neutral-80); }
 .taskStatus.in_progress { background-color: var(--Blue-800); color: var(--Blue-400); }
@@ -69,4 +75,5 @@
     color: var(--Neutral-60);
     font-style: italic;
     padding: 20px;
+    margin: auto;
 }

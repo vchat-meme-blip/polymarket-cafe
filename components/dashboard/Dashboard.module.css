@@ -880,6 +880,8 @@
 .agentTasksPanel {
     flex-grow: 1; /* Allow it to take more space if available */
     min-height: 200px; /* Ensure it has a minimum height */
+    display: flex;
+    flex-direction: column;
 }
 .tasksHeader {
     display: flex;
@@ -892,13 +894,15 @@
 }
 .taskList {
     overflow-y: auto;
-    max-height: 250px; /* Or adjust as needed */
+    flex-grow: 1;
+    margin-top: 12px;
 }
 .taskItem {
     background: var(--Neutral-10);
     padding: 12px;
     border-radius: 8px;
     margin-bottom: 8px;
+    border: 1px solid var(--Neutral-20);
 }
 .taskItem details {
     width: 100%;
@@ -940,4 +944,11 @@
 }
 .taskUpdates li {
     list-style-type: '» ';
+}
+.emptyTasks {
+    text-align: center;
+    color: var(--Neutral-60);
+    font-style: italic;
+    padding: 20px;
+    margin: auto;
 }

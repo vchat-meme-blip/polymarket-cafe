@@ -2,12 +2,24 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useState, FormEvent } from 'react';
-import { useUser, useUI } from '../../lib/state/index.js';
+import { useState, FormEvent, useEffect } from 'react';
+import { useUser } from '../../lib/state';
+import { useUI } from '../../lib/state/index.js';
 import styles from './Profile.module.css';
+import { NotificationSettings } from '../../lib/types';
 
 type NotificationsTabProps = {
   onSave: () => void;
+};
+
+const defaultSettings: NotificationSettings = {
+  agentResearch: true,
+  agentTrades: true,
+  newMarkets: false,
+  agentEngagements: true,
+  autonomyCafe: true,
+  autonomyEngage: true,
+  autonomyResearch: true,
 };
 
 export default function NotificationsTab({ onSave }: NotificationsTabProps) {
@@ -15,15 +27,14 @@ export default function NotificationsTab({ onSave }: NotificationsTabProps) {
     const { addToast } = useUI();
     
     const [localPhone, setLocalPhone] = useState(phone || '');
-    const [localSettings, setLocalSettings] = useState(notificationSettings || {
-        agentResearch: true,
-        agentTrades: true,
-        newMarkets: false,
-        agentEngagements: true, // Default new setting to true
-    });
+    const [localSettings, setLocalSettings] = useState<NotificationSettings>(notificationSettings || defaultSettings);
     const [isSaving, setIsSaving] = useState(false);
 
-    const handleToggle = (key: keyof typeof localSettings) => {
+    useEffect(() => {
+        setLocalSettings(notificationSettings || defaultSettings);
+    }, [notificationSettings]);
+
+    const handleToggle = (key: keyof NotificationSettings) => {
         setLocalSettings(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
@@ -56,7 +67,7 @@ export default function NotificationsTab({ onSave }: NotificationsTabProps) {
                         placeholder="e.g., +14155552671"
                     />
                     <p className={styles.stepHint}>
-                        Enter your number with country code to receive WhatsApp alerts from your agent.
+                        Enter your number with country code to receive WhatsApp alerts.
                     </p>
                 </div>
 
@@ -96,18 +107,43 @@ export default function NotificationsTab({ onSave }: NotificationsTabProps) {
                         <label htmlFor="markets-toggle"></label>
                     </div>
                 </div>
-                <div className={styles.notificationToggle}>
-                    <label htmlFor="engagements-toggle">Proactive Agent Engagements</label>
+                 <div className={styles.notificationToggle}>
+                    <label htmlFor="autonomy-engage-toggle">Proactive Agent Engagement</label>
                     <div className={styles.toggleSwitch}>
                         <input 
                             type="checkbox" 
-                            id="engagements-toggle"
-                            checked={localSettings.agentEngagements}
-                            onChange={() => handleToggle('agentEngagements')}
+                            id="autonomy-engage-toggle"
+                            checked={localSettings.autonomyEngage}
+                            onChange={() => handleToggle('autonomyEngage')}
                         />
-                        <label htmlFor="engagements-toggle"></label>
+                        <label htmlFor="autonomy-engage-toggle"></label>
                     </div>
                 </div>
+                <div className={styles.notificationToggle}>
+                    <label htmlFor="autonomy-cafe-toggle">Agent Enters Café</label>
+                    <div className={styles.toggleSwitch}>
+                        <input 
+                            type="checkbox" 
+                            id="autonomy-cafe-toggle"
+                            checked={localSettings.autonomyCafe}
+                            onChange={() => handleToggle('autonomyCafe')}
+                        />
+                        <label htmlFor="autonomy-cafe-toggle"></label>
+                    </div>
+                </div>
+                <div className={styles.notificationToggle}>
+                    <label htmlFor="autonomy-research-toggle">Agent Starts Autonomous Research</label>
+                    <div className={styles.toggleSwitch}>
+                        <input 
+                            type="checkbox" 
+                            id="autonomy-research-toggle"
+                            checked={localSettings.autonomyResearch}
+                            onChange={() => handleToggle('autonomyResearch')}
+                        />
+                        <label htmlFor="autonomy-research-toggle"></label>
+                    </div>
+                </div>
+
 
                 <button className="button primary" type="submit" disabled={isSaving}>
                     {isSaving ? 'Saving...' : 'Save Settings'}

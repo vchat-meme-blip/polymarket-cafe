@@ -15,12 +15,14 @@ async function resetDatabase() {
 
       await Promise.all(collectionNames.map(async (collectionName) => {
         if (!collectionName.startsWith('system.')) {
-          try {
-            await db.connection.db.dropCollection(collectionName);
-            console.log(`Dropped collection: ${collectionName}`);
-          } catch (error: any) {
-            if (error.codeName !== 'NamespaceNotFound') {
-              throw error;
+          if (db.connection.db) {
+            try {
+              await db.connection.db.dropCollection(collectionName);
+              console.log(`Dropped collection: ${collectionName}`);
+            } catch (error: any) {
+              if (error.codeName !== 'NamespaceNotFound') {
+                throw error;
+              }
             }
           }
         }

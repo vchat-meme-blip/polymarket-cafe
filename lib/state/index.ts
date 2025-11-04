@@ -54,7 +54,10 @@ export const useUser = create(
         agentResearch: true,
         agentTrades: true,
         newMarkets: false,
-        agentEngagements: false,
+        agentEngagements: true,
+        autonomyCafe: true,
+        autonomyEngage: true,
+        autonomyResearch: true,
       },
       
       signIn: async (handle: string, isNewUser: boolean = false) => {
@@ -221,6 +224,7 @@ export const createNewAgent = (properties?: Partial<Agent>): Partial<Agent> => {
     modelUrl: properties?.modelUrl || DEFAULT_VRM_URL,
     bettingHistory: [],
     currentPnl: 0,
+    intelPnl: 0,
     bettingIntel: [],
     marketWatchlists: [],
     boxBalance: 0, 

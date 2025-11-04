@@ -4,37 +4,49 @@
 */
 import React, { useState } from 'react';
 import Modal from '../Modal';
-import { useUI, useAutonomyStore, useAgent } from '../../lib/state/index.js';
+import { useUI, useAgent } from '../../lib/state/index.js';
+import { useAutonomyStore } from '../../lib/state/autonomy.js';
 import { apiService } from '../../lib/services/api.service.js';
-import styles from './Modals.module.css';
+import { AgentTask } from '../../lib/types/index.js';
+import styles from './CreateTaskModal.module.css';
 
 export default function CreateTaskModal() {
-    const { closeCreateTaskModal } = useUI();
+    const { closeCreateTaskModal, addToast } = useUI();
+    const { current: currentAgent } = useAgent();
     const { addTask } = useAutonomyStore();
-    const { current: agent } = useAgent();
-    const [objective, setObjective] = useState('');
-    const [isSaving, setIsSaving] = useState(false);
+
+    const [taskType, setTaskType] = useState<'one_time_research' | 'continuous_monitoring'>('one_time_research');
+    const [topic, setTopic] = useState('');
+    const [isCreating, setIsCreating] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!objective.trim()) return;
+        if (!topic.trim()) {
+            addToast({ type: 'error', message: 'A topic is required for the task.' });
+            return;
+        }
+        setIsCreating(true);
 
-        setIsSaving(true);
+        const taskData: Omit<AgentTask, 'id' | 'createdAt' | 'updatedAt' | 'updates'> = {
+            agentId: currentAgent.id,
+            type: taskType,
+            objective: taskType === 'one_time_research' 
+                ? `Conduct a one-time research report on "${topic}"`
+                : `Continuously monitor news and opportunities related to "${topic}"`,
+            parameters: { topic },
+            status: 'pending',
+        };
+
         try {
-            // A simplified task creation logic. In a real app, this would be more complex.
-            const newTask = await apiService.createTask(agent.id, {
-                objective,
-                type: 'research_topic', // Defaulting to a general research type
-                parameters: { keywords: objective },
-                status: 'pending',
-            });
+            const newTask = await apiService.createTask(currentAgent.id, taskData);
             addTask(newTask);
+            addToast({ type: 'system', message: 'New task assigned to your agent.' });
             closeCreateTaskModal();
         } catch (error) {
-            console.error("Failed to create task:", error);
-            // In a real app, show a toast notification on error
+            console.error('Failed to create task', error);
+            addToast({ type: 'error', message: 'Failed to create task. Please try again.' });
         } finally {
-            setIsSaving(false);
+            setIsCreating(false);
         }
     };
 
@@ -42,21 +54,33 @@ export default function CreateTaskModal() {
         <Modal onClose={closeCreateTaskModal}>
             <div className={`${styles.modalContentPane} ${styles.createTaskModal}`}>
                 <h2>Assign New Task</h2>
-                <p>Give your agent a new objective to work on autonomously.</p>
+                <p>Give your active agent, {currentAgent.name}, a new objective.</p>
                 <form onSubmit={handleSubmit} className={styles.createTaskForm}>
-                    <label>
-                        <span>Objective</span>
+                    <div className="formGroup">
+                        <label>Task Type</label>
+                        <select value={taskType} onChange={e => setTaskType(e.target.value as any)} disabled={isCreating}>
+                            <option value="one_time_research">One-Time Research Report</option>
+                            <option value="continuous_monitoring">Continuous Monitoring</option>
+                        </select>
+                    </div>
+                    <div className="formGroup">
+                        <label htmlFor="topic">Topic / Keywords</label>
                         <textarea
-                            rows={4}
-                            value={objective}
-                            onChange={(e) => setObjective(e.target.value)}
-                            placeholder="e.g., 'Keep an eye on breaking sports markets and notify me of good opportunities.'"
+                            id="topic"
+                            rows={3}
+                            value={topic}
+                            onChange={e => setTopic(e.target.value)}
+                            placeholder={
+                                taskType === 'one_time_research'
+                                ? "e.g., The upcoming Ethereum ETF decision"
+                                : "e.g., Breaking news on sports markets"
+                            }
                             required
-                            disabled={isSaving}
+                            disabled={isCreating}
                         />
-                    </label>
-                    <button type="submit" className="button primary" style={{justifyContent: 'center'}} disabled={isSaving}>
-                        {isSaving ? 'Assigning...' : 'Assign Task'}
+                    </div>
+                    <button type="submit" className="button primary" disabled={isCreating}>
+                        {isCreating ? 'Assigning...' : 'Assign Task'}
                     </button>
                 </form>
             </div>

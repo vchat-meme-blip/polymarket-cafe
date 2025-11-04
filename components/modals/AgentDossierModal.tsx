@@ -18,6 +18,8 @@ import { useArenaStore } from '../../lib/state/arena.js';
 import { ttsService } from '../../lib/services/tts.service.js';
 import { useAutonomyStore } from '../../lib/state/autonomy.js';
 
+type DossierTab = 'profile' | 'intel' | 'operations' | 'activity';
+
 const ProfileTab = ({ agent, onUpdate, onSave }: { agent: Partial<Agent>, onUpdate: (updates: Partial<Agent>) => void, onSave: () => void }) => {
     const [isBrainstorming, setIsBrainstorming] = useState(false);
     const [personalityKeywords, setPersonalityKeywords] = useState('');
@@ -504,7 +506,7 @@ export default function AgentDossierModal({ agentId }: { agentId: string }) {
     const { availablePersonal, addAgent, update } = useAgent();
     const { handle } = useUser();
     
-    const [activeTab, setActiveTab] = useState('profile');
+    const [activeTab, setActiveTab] = useState<DossierTab>('profile');
     const [isSaving, setIsSaving] = useState(false);
 
     const initialAgentData = useMemo(() => {

@@ -1,4 +1,5 @@
 
+
 import { Router } from 'express';
 import mongoose, { Collection } from 'mongoose';
 import { TradeRecord, BettingIntel, MarketWatchlist } from '../../lib/types/shared.js';
@@ -132,11 +133,15 @@ router.post('/users/register', async (req, res) => {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       phone: '',
+      // FIX: Added missing properties to the `notificationSettings` object to match the `NotificationSettings` type.
       notificationSettings: {
         agentResearch: true,
         agentTrades: true,
         newMarkets: false,
-        agentEngagements: false,
+        agentEngagements: true,
+        autonomyCafe: true,
+        autonomyEngage: true,
+        autonomyResearch: true,
       },
     };
 

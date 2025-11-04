@@ -8,6 +8,9 @@
 .autonomyModal > p {
     color: var(--Neutral-60);
     margin-bottom: 24px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
 }
 .decisionTree {
     display: flex;
@@ -31,15 +34,16 @@
     font-size: 14px;
     color: var(--Neutral-60);
     line-height: 1.5;
+    margin-bottom: 12px;
 }
 .treeNode .percentage {
     font-weight: bold;
     color: var(--brand-yellow);
 }
 .autonomyControls {
-    margin-top: 24px;
-    padding-top: 24px;
-    border-top: 1px solid var(--Neutral-30);
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--Neutral-30);
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -48,25 +52,30 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: var(--Neutral-10);
-    padding: 12px 16px;
+    background: var(--Neutral-15);
+    padding: 10px 12px;
     border-radius: 8px;
 }
 .toggleControl label {
     font-weight: 500;
     color: var(--Neutral-90);
+    cursor: pointer;
 }
+
 .toggleSwitch {
     position: relative;
     display: inline-block;
     width: 44px;
     height: 24px;
+    flex-shrink: 0;
 }
+
 .toggleSwitch input {
     opacity: 0;
     width: 0;
     height: 0;
 }
+
 .toggleSwitch label {
     position: absolute;
     cursor: pointer;
@@ -78,6 +87,7 @@
     transition: .4s;
     border-radius: 24px;
 }
+
 .toggleSwitch label:before {
     position: absolute;
     content: "";
@@ -89,9 +99,11 @@
     transition: .4s;
     border-radius: 50%;
 }
+
 .toggleSwitch input:checked + label {
     background-color: var(--brand-primary);
 }
+
 .toggleSwitch input:checked + label:before {
     transform: translateX(20px);
 }

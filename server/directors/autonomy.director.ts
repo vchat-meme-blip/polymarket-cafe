@@ -1,4 +1,3 @@
-
 import { agentsCollection, bettingIntelCollection, usersCollection, betsCollection } from '../db.js';
 import { ObjectId } from 'mongodb';
 import type { Agent, User } from '../../lib/types/shared.js';
@@ -152,17 +151,13 @@ export class AutonomyDirector {
         try {
             const actionRoll = Math.random();
 
-            if (actionRoll < 0.7) { // 70% chance: Go to Café
+            if (actionRoll < 0.7) { // 70% Chance: Go to Café
                 this.emitToMain?.({
                     type: 'forwardToWorker',
                     worker: 'arena',
                     message: { type: 'moveAgentToCafe', payload: { agentId: agent.id } }
                 });
             } else if (actionRoll < 0.9) { // 20% chance: Proactive User Engagement
-                this.emitToMain?.({
-                    type: 'systemLog',
-                    payload: { type: 'system', message: `AutonomyDirector: Agent ${agent.name} is performing a "Proactive Engagement" for user ${user.handle}.` }
-                });
                 await this.proactiveEngagement(user, agent);
             } else { // 10% chance: Deep Research
                 const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
@@ -189,6 +184,11 @@ export class AutonomyDirector {
     
     private async proactiveEngagement(user: User, agent: Agent) {
         if (!agent.isProactive || !agent.ownerHandle) return;
+
+        this.emitToMain?.({
+            type: 'systemLog',
+            payload: { type: 'system', message: `AutonomyDirector: Agent ${agent.name} is performing a "Proactive Engagement" for user ${user.handle}.` }
+        });
 
         const engagementRoll = Math.random();
         if (engagementRoll < 0.5) {

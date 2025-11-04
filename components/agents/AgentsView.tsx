@@ -1,16 +1,14 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-// FIX: Fix imports for `useAgent` and `useUI` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
 import { useAgent, useUI, createNewAgent } from '../../lib/state/index.js';
 import c from 'classnames';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, View } from '@react-three/drei';
 import { VrmModel } from './VrmAvatar';
 import styles from './AgentsView.module.css';
-import { useRef } from 'react';
+import React, { useRef, createRef } from 'react';
 
 export default function AgentsView() {
   const {
@@ -20,6 +18,13 @@ export default function AgentsView() {
   } = useAgent();
   const { openAgentDossier } = useUI();
   const mainCanvasRef = useRef<HTMLDivElement>(null);
+  
+  // Create and manage an array of refs, one for each agent card's viewport div.
+  // This ensures that each <View> has a stable reference to track.
+  const viewRefs = useRef<React.RefObject<HTMLDivElement>[]>([]);
+  viewRefs.current = availablePersonal.map(
+    (_, i) => viewRefs.current[i] ?? createRef<HTMLDivElement>()
+  );
 
   const handleCreateNew = () => {
     const newAgent = createNewAgent({ name: 'New Quant' });
@@ -46,7 +51,7 @@ export default function AgentsView() {
         {availablePersonal.map((agent, index) => (
           <div key={agent.id} className={styles.agentCard} onClick={() => handleViewDossier(agent.id)}>
             <div className={styles.agentCardHeader}>
-              <div className={styles.agentCardPreview} data-vrm-index={index} />
+              <div className={styles.agentCardPreview} ref={viewRefs.current[index]} />
               <h3
                 className={c(styles.agentCardName, {
                   [styles.activeAgent]: agent.id === currentAgent.id,
@@ -83,17 +88,17 @@ export default function AgentsView() {
         className={styles.mainCanvas}
         shadows
         gl={{ antialias: true, alpha: true }}
-        eventSource={mainCanvasRef as any} // Attach events to the parent div
       >
         <View.Port />
         {availablePersonal.map((agent, index) => (
-          <View key={agent.id} index={index + 1} track={{ current: (mainCanvasRef.current?.querySelector(`[data-vrm-index="${index}"]`) as HTMLElement) ?? null }}>
+          <View key={agent.id} index={index + 1} track={viewRefs.current[index] as any}>
             <ambientLight intensity={1.5} />
             <directionalLight position={[3, 5, 2]} intensity={2} castShadow />
-            <group position={[0, -1.2, 0]} scale={1.2} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI, 0]}>
+            {/* Adjusted positioning to properly center the model in the card */}
+            <group position={[0, -1.0, 0]} scale={1.2} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI, 0]}>
               <VrmModel modelUrl={agent.modelUrl || ''} isSpeaking={false} />
             </group>
-            <OrbitControls makeDefault enableZoom={false} enablePan={false} target={[0, 1.2, 0]} />
+            <OrbitControls makeDefault enableZoom={false} enablePan={false} target={[0, 1.0, 0]} />
           </View>
         ))}
       </Canvas>
