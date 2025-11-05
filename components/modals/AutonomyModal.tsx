@@ -5,7 +5,6 @@
 import React from 'react';
 import Modal from '../Modal';
 import { useUI, useUser } from '../../lib/state/index.js';
-import { useAutonomyStore } from '../../lib/state/autonomy.js';
 import styles from './AutonomyModal.module.css';
 import c from 'classnames';
 import { NotificationSettings } from '../../lib/types/index.js';
@@ -21,12 +20,19 @@ const ToggleControl = ({ label, checked, onChange, title }: { label: string; che
 );
 
 export default function AutonomyModal() {
-  const { closeAutonomyModal, setChatPrompt } = useUI();
-  const { isAutonomyEnabled, toggleAutonomy } = useAutonomyStore();
-  const { notificationSettings, updateNotificationSettings } = useUser();
+  const { closeAutonomyModal, setChatPrompt, addToast } = useUI();
+  const { isAutonomyEnabled, notificationSettings, updateNotificationSettings, updateUserSettings } = useUser();
 
-  const handleToggle = async (key: keyof NotificationSettings) => {
-    // notificationSettings is guaranteed to be defined by the type fix
+  const handleToggleAutonomy = async () => {
+    try {
+      await updateUserSettings({ isAutonomyEnabled: !isAutonomyEnabled });
+      addToast({ type: 'system', message: `Autonomy ${!isAutonomyEnabled ? 'enabled' : 'disabled'}.` });
+    } catch (error) {
+      addToast({ type: 'error', message: 'Failed to update autonomy setting.' });
+    }
+  };
+
+  const handleToggleNotification = async (key: keyof NotificationSettings) => {
     await updateNotificationSettings({
       notificationSettings: { ...notificationSettings, [key]: !notificationSettings[key] },
     });
@@ -46,8 +52,8 @@ export default function AutonomyModal() {
         <div className={styles.autonomyControls}>
             <ToggleControl 
                 label="Enable Autonomy"
-                checked={isAutonomyEnabled}
-                onChange={toggleAutonomy}
+                checked={isAutonomyEnabled || false}
+                onChange={handleToggleAutonomy}
                 title="When enabled, your active agent will perform actions in the background."
             />
         </div>
@@ -61,7 +67,7 @@ export default function AutonomyModal() {
             <ToggleControl
               label="Notify on Action"
               checked={notificationSettings.autonomyCafe}
-              onChange={() => handleToggle('autonomyCafe')}
+              onChange={() => handleToggleNotification('autonomyCafe')}
             />
           </div>
           <div className={styles.treeNode}>
@@ -70,7 +76,7 @@ export default function AutonomyModal() {
              <ToggleControl
               label="Notify on Action"
               checked={notificationSettings.autonomyEngage}
-              onChange={() => handleToggle('autonomyEngage')}
+              onChange={() => handleToggleNotification('autonomyEngage')}
             />
           </div>
           <div className={styles.treeNode}>
@@ -79,7 +85,7 @@ export default function AutonomyModal() {
              <ToggleControl
               label="Notify on Action"
               checked={notificationSettings.autonomyResearch}
-              onChange={() => handleToggle('autonomyResearch')}
+              onChange={() => handleToggleNotification('autonomyResearch')}
             />
           </div>
         </div>

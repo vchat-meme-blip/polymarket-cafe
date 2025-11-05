@@ -30,7 +30,7 @@ class WebSocketService {
     console.log('[WebSocket] Initializing WebSocket server...');
     this.isInitialized = true;
     this.io = new SocketIOServer(server, {
-      path: '/socket.io/', // FIX: Explicitly set the path
+      path: '/socket.io/',
       cors: {
         origin: (origin, callback) => {
           const allowedOrigins = [
@@ -78,6 +78,15 @@ class WebSocketService {
       this.connectionCounts.set(ip, connectionCount + 1);
 
       console.log(`[WebSocket] Client connected: ${connectionId} (${ip})`);
+      
+      socket.on('authenticate', (handle: string) => {
+        if (handle && typeof handle === 'string') {
+            socket.join(handle);
+            console.log(`[WebSocket] Socket ${socket.id} authenticated and joined room: ${handle}`);
+        } else {
+            console.warn(`[WebSocket] Invalid handle received for authentication: ${handle}`);
+        }
+      });
 
       socket.on('disconnect', () => {
         this.connections.delete(connectionId);

@@ -1,11 +1,10 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 import { audioContext as getAudioContext } from '../utils.js';
 import { API_BASE_URL } from '../config.js';
-import { ttsQueue } from '../../src/utils/ttsQueue';
+import { ttsQueue } from '../utils/ttsQueue.js';
 
 export type ElevenLabsVoice = {
   id: string;

@@ -1,35 +1,29 @@
 /// <reference types="node" />
 
-import './env.js';
-import connectDB, { seedDatabase } from './db.js';
-import { startServer } from './server.js';
+import { startServer } from './startup.js';
 
-// Check if this is the main module
-const isMainModule = import.meta.url === `file://${process.argv[1]}`;
+let serverInstance: { stop: () => Promise<void> } | null = null;
 
 async function main() {
-  if (!process.env.MONGODB_URI || process.env.MONGODB_URI.trim() === '') {
-    console.error('\n[FATAL STARTUP ERROR] MONGODB_URI is not defined in your environment.');
-    console.error('The server cannot start without a database connection string.');
-    console.error('Please ensure you have a `.env.local` or `.env` file in the project root with the following content:');
-    console.error('MONGODB_URI="your_mongodb_connection_string_here"\n');
-    process.exit(1);
-  }
-
   try {
-    console.log('[Startup] MONGODB_URI found. Connecting to database...');
-    await connectDB();
-    console.log('[Startup] Database connection successful. Checking for initial data...');
-    await seedDatabase();
-    console.log('[Startup] Database seeding check complete. Starting server...');
-    await startServer();
+    serverInstance = await startServer();
+    console.log('[Server] Main process started successfully.');
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error('[Server] Fatal error during startup:', error);
     process.exit(1);
   }
 }
 
-// Only run main() if this is the main module
-if (isMainModule) {
-  main().catch(console.error);
+async function gracefulShutdown() {
+  console.log('[Server] Received shutdown signal. Cleaning up...');
+  if (serverInstance) {
+    await serverInstance.stop();
+  }
+  process.exit(0);
 }
+
+// Handle shutdown signals
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
+
+main();

@@ -35,6 +35,7 @@ export type User = {
   phone?: string;
   notificationSettings: NotificationSettings;
   bookmarkedMarketIds?: string[];
+  isAutonomyEnabled?: boolean;
 };
 
 export type AgentMode = 'Safe' | 'Degen' | 'Mag7';
@@ -230,7 +231,6 @@ export type Notification = {
     id: string;
     userId: string;
     agentId?: string;
-    // FIX: Added autonomy-related notification types to align with usage in AutonomyDirector.
     type: 'agentResearch' | 'agentTrade' | 'newMarkets' | 'agentEngagement' | 'autonomyCafe' | 'autonomyEngage' | 'autonomyResearch';
     message: string;
     timestamp: number;

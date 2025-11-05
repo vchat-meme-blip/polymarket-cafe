@@ -1,11 +1,9 @@
 import { useEffect } from 'react';
 import { useArenaStore, USER_ID } from '../lib/state/arena';
-// FIX: Fix imports for `useAgent`, `useUI`, `useUser`, and `useSystemLogStore` by changing the path from `../lib/state` to `../lib/state/index.js`.
 import { useAgent, useUI, useUser, useSystemLogStore } from '../lib/state/index.js';
 import { socketService } from '../lib/services/socket.service';
 import { useAutonomyStore } from '../lib/state/autonomy';
-// FIX: Imported `TradeRecord` type from its canonical source to resolve type errors.
-import type { TradeRecord, ActivityLogEntry } from '../lib/types/index.js';
+import type { TradeRecord, ActivityLogEntry, AgentTask } from '../lib/types/index.js';
 
 export function useCafeSocket() {
     const { 
@@ -15,15 +13,13 @@ export function useCafeSocket() {
         removeRoom, 
         recordActivityInRoom,
         updateRoomFromSocket,
-        // FIX: Added `setLastTradeDetails` action from the store.
         setLastTradeDetails,
-        // FIX: Added `recordTrade` action from the store.
         recordTrade 
     } = useArenaStore();
-    const { addIntelFromSocket, addActivityLog } = useAutonomyStore();
+    const { addIntelFromSocket, addActivityLog, updateTask: updateTaskInStore } = useAutonomyStore();
     const { addLog } = useSystemLogStore();
     const { handle } = useUser();
-    const { addToast, setIsAgentResponding } = useUI();
+    const { addToast, setIsAgentResponding, openTaskDetailModal, taskDetailModalData } = useUI();
 
     useEffect(() => {
         socketService.connect();
@@ -103,7 +99,6 @@ export function useCafeSocket() {
                 text: data.text,
                 timestamp: Date.now(),
             });
-            // Trigger speaking animation
             setIsAgentResponding(true);
             const messageDuration = Math.max(1000, data.text.length * 50);
             setTimeout(() => setIsAgentResponding(false), messageDuration);
@@ -112,6 +107,13 @@ export function useCafeSocket() {
         const handleNewActivityLog = (logEntry: ActivityLogEntry) => {
             addActivityLog(logEntry);
         };
+
+        const handleTaskUpdated = (task: AgentTask) => {
+            updateTaskInStore(task.id, task);
+            if (taskDetailModalData?.id === task.id) {
+                openTaskDetailModal(task);
+            }
+        }
 
         socketService.on('worldState', handleWorldState);
         socketService.on('agentThinking', handleAgentThinking);
@@ -125,6 +127,7 @@ export function useCafeSocket() {
         socketService.on('agentMoved', handleAgentMoved);
         socketService.on('proactiveMessage', handleProactiveMessage);
         socketService.on('newActivityLog', handleNewActivityLog);
+        socketService.on('taskUpdated', handleTaskUpdated);
 
         return () => {
             socketService.off('worldState', handleWorldState);
@@ -139,7 +142,8 @@ export function useCafeSocket() {
             socketService.off('agentMoved', handleAgentMoved);
             socketService.off('proactiveMessage', handleProactiveMessage);
             socketService.off('newActivityLog', handleNewActivityLog);
+            socketService.off('taskUpdated', handleTaskUpdated);
             socketService.disconnect();
         };
-    }, [handle, syncWorldState, setThinkingAgent, addConversationTurn, removeRoom, recordActivityInRoom, updateRoomFromSocket, setLastTradeDetails, recordTrade, addIntelFromSocket, addLog, addToast, setIsAgentResponding, addActivityLog]);
+    }, [handle, syncWorldState, setThinkingAgent, addConversationTurn, removeRoom, recordActivityInRoom, updateRoomFromSocket, setLastTradeDetails, recordTrade, addIntelFromSocket, addLog, addToast, setIsAgentResponding, addActivityLog, updateTaskInStore, taskDetailModalData, openTaskDetailModal]);
 }

@@ -21,7 +21,6 @@ export type AutonomyState = {
   tasks: AgentTask[];
   activityLog: ActivityLogEntry[];
   lastActivity: Record<string, number>;
-  isAutonomyEnabled: boolean;
   gatherIntelCooldown: number;
   researchIntelCooldown: number;
   hydrate: (data: ServerHydrationData) => void;
@@ -34,7 +33,6 @@ export type AutonomyState = {
   addIntelFromSocket: (intel: BettingIntel) => void;
   addIntelBatch: (intelItems: Partial<BettingIntel>[]) => void;
   updateIntel: (intelId: string, updates: Partial<BettingIntel>) => void;
-  toggleAutonomy: () => void;
   setGatherIntelCooldown: (cooldown: number) => void;
   setResearchIntelCooldown: (cooldown: number) => void;
   addBounty: (objective: string, reward: number) => void;
@@ -54,7 +52,6 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
   tasks: [],
   activityLog: [],
   lastActivity: {},
-  isAutonomyEnabled: true,
   gatherIntelCooldown: 1000 * 60 * 5, // 5 minutes
   researchIntelCooldown: 1000 * 60 * 2, // 2 minutes
 
@@ -159,9 +156,6 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
     }));
   },
 
-  toggleAutonomy: () =>
-    set(state => ({ isAutonomyEnabled: !state.isAutonomyEnabled })),
-
   setGatherIntelCooldown: cooldown => set({ gatherIntelCooldown: cooldown }),
 
   setResearchIntelCooldown: cooldown => set({ researchIntelCooldown: cooldown }),
@@ -170,7 +164,6 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
     const { balance, addTransaction } = useWalletStore.getState();
     if (balance < reward) {
       console.error("Attempted to add bounty with insufficient funds.");
-      // The UI component calling this should handle the user feedback (e.g., alert).
       return;
     }
 
