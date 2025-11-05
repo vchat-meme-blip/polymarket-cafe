@@ -53,7 +53,11 @@ export default function TaskDetailModal({ task }: { task: AgentTask }) {
                             <ul>
                                 {task.updates.slice().reverse().map(update => (
                                     <li key={update.timestamp}>
-                                        <span className={styles.timestamp}>{format(update.timestamp, 'MMM d, HH:mm:ss')}:</span>
+                                        <span className={styles.timestamp}>
+                                            {typeof update.timestamp === 'number' && !isNaN(update.timestamp)
+                                                ? format(update.timestamp, 'MMM d, HH:mm:ss') + ':'
+                                                : 'Invalid Date:'}
+                                        </span>
                                         <span className={styles.message}>{update.message}</span>
                                     </li>
                                 ))}

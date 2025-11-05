@@ -15,7 +15,7 @@ import BetSlipPanel from './BetSlipPanel';
 import WatchlistPanel from './WatchlistPanel';
 import ArbitragePanel from './ArbitragePanel';
 import LiquidityPanel from '../trading-floor/LiquidityPanel.js';
-import OperationsCenter from './OperationsCenter'; // NEW
+import OperationsCenter from './OperationsCenter';
 
 type DashboardTab = 'betSlip' | 'markets' | 'intel' | 'watchlists' | 'arbitrage' | 'liquidity';
 
@@ -65,7 +65,6 @@ export default function Dashboard() {
         </div>
       </div>
       <div className={styles.dashboardRight}>
-        {/* OLD CLUTTERED PANELS REMOVED, REPLACED BY OperationsCenter */}
         <OperationsCenter />
         
         {/* Market-related tabbed panel remains */}
