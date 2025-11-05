@@ -1,4 +1,6 @@
 
+
+
 import { Router } from 'express';
 import mongoose, { Collection } from 'mongoose';
 import { TradeRecord, BettingIntel, MarketWatchlist } from '../../lib/types/shared.js';
@@ -21,7 +23,7 @@ import { cafeMusicService } from '../services/cafeMusic.service.js';
 import { polymarketService } from '../services/polymarket.service.js';
 import { kalshiService } from '../services/kalshi.service.js';
 import { leaderboardService } from '../services/leaderboard.service.js';
-import { Agent, User, Interaction, Room, MarketIntel, AgentMode, Bet } from '../../lib/types/index.js';
+import { Agent, User, Interaction, Room, MarketIntel, AgentMode, Bet, AgentTask, toSharedUser } from '../../lib/types/index.js';
 import { createSystemInstructions } from '../../lib/prompts.js';
 import { ObjectId } from 'mongodb';
 import OpenAI from 'openai';
@@ -159,9 +161,15 @@ router.put('/users/current-agent', async (req, res) => {
     if (!agentId) return res.status(400).json({ message: "Agent ID is required." });
 
     try {
+        // FIX: Look up agent by its string `id` to get its `_id` (ObjectId) which is required by the UserDocument schema for `currentAgentId`.
+        const agent = await agentsCollection.findOne({ id: agentId });
+        if (!agent) {
+            return res.status(404).json({ message: "Agent not found." });
+        }
+
         const result = await usersCollection.updateOne(
             { handle: userHandle },
-            { $set: { currentAgentId: agentId, updatedAt: Date.now() } }
+            { $set: { currentAgentId: agent._id, updatedAt: Date.now() } }
         );
         if (result.modifiedCount === 0) {
             return res.status(404).json({ message: "User not found." });
@@ -304,7 +312,6 @@ router.get('/agents/:agentId/tasks', async (req, res) => {
         if (!agent) {
             return res.status(404).send('Agent not found');
         }
-        // Ensure tasks is an array, defaulting to empty if it doesn't exist
         res.json((agent as any).tasks || []);
     } catch (error) {
         console.error(`[API] Error fetching tasks for agent ${agentId}:`, error);
@@ -368,20 +375,6 @@ router.delete('/agents/:agentId/watchlists/:watchlistId', async (req, res) => {
 });
 
 // --- Agent Tasks ---
-router.get('/agents/:agentId/tasks', async (req, res) => {
-    const { agentId } = req.params;
-    try {
-        const agent = await agentsCollection.findOne({ id: agentId });
-        if (!agent) {
-            return res.status(404).send('Agent not found');
-        }
-        res.json((agent as any).tasks || []);
-    } catch (error) {
-        console.error(`[API] Error fetching tasks for agent ${agentId}:`, error);
-        res.status(500).json({ message: 'Failed to fetch tasks.' });
-    }
-});
-
 router.post('/agents/:agentId/tasks', async (req, res) => {
   const { agentId } = req.params;
   const { userHandle } = res.locals;
@@ -393,9 +386,10 @@ router.post('/agents/:agentId/tasks', async (req, res) => {
           return res.status(404).json({ message: 'Agent not found or you do not own this agent.' });
       }
 
-      const newTask = {
+      const newTask: AgentTask = {
           ...taskData,
           id: new ObjectId().toHexString(),
+          agentId: agentId,
           createdAt: Date.now(),
           updatedAt: Date.now(),
           // FIX: Changed 'updates' from string[] to object[] to match the AgentTask type.
@@ -577,5 +571,154 @@ router.get('/leaderboard/pnl', async (req, res) => {
 router.get('/leaderboard/intel', async (req, res) => {
     res.json(await leaderboardService.getIntelLeaderboard());
 });
+
+router.get('/agents/:agentId/activity', async (req, res) => {
+    const { agentId } = req.params;
+    try {
+        const summary = await aiService.generateDailySummary({ trades: [], intel: [] }); // Mock data for now
+        res.json({ summary });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to generate summary" });
+    }
+});
+
+router.post('/agents/:agentId/intel', async (req, res) => {
+    const { agentId } = req.params;
+    const intelData = req.body;
+    try {
+        const newIntel = {
+            ...intelData,
+            _id: new ObjectId(),
+            ownerAgentId: new ObjectId(agentId),
+            createdAt: new Date(),
+        };
+        await bettingIntelCollection.insertOne(newIntel as any);
+        res.status(201).json(newIntel);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to add intel' });
+    }
+});
+
+
+// Arena Actions
+router.post('/arena/send-to-cafe', (req, res) => {
+    req.arenaWorker?.postMessage({ type: 'moveAgentToCafe', payload: req.body });
+    res.status(202).send();
+});
+
+router.post('/arena/recall-agent', (req, res) => {
+    req.arenaWorker?.postMessage({ type: 'recallAgent', payload: req.body });
+    res.status(202).send();
+});
+
+router.post('/arena/create-room', (req, res) => {
+    req.arenaWorker?.postMessage({ type: 'createAndHostRoom', payload: req.body });
+    res.status(202).send();
+});
+
+router.post('/rooms/purchase', async (req, res) => {
+    const { name } = req.body;
+    const { userHandle } = res.locals;
+    try {
+        const newRoom = {
+            id: `room-${new ObjectId().toHexString()}`,
+            name,
+            agentIds: [],
+            hostId: null,
+            topics: [],
+            warnFlags: 0,
+            rules: ['All sales are final.'],
+            activeOffer: null,
+            vibe: 'General Chat ☕️',
+            isOwned: true,
+            ownerHandle: userHandle,
+        };
+        const result = await roomsCollection.insertOne(newRoom as any);
+        const userDoc = await usersCollection.findOneAndUpdate(
+            { handle: userHandle },
+            // FIX: 'ownedRoomId' in the User document must be an ObjectId, not the room's string 'id'. Use the 'insertedId' from the insert operation.
+            { $set: { ownedRoomId: result.insertedId } },
+            { returnDocument: 'after' }
+        );
+        
+        const roomForPayload = { ...newRoom, _id: result.insertedId };
+        req.arenaWorker?.postMessage({ type: 'roomUpdated', payload: { room: roomForPayload } });
+        
+        const user = userDoc ? toSharedUser(userDoc as UserDocument) : null;
+        res.status(201).json({ room: roomForPayload, user });
+    } catch (error) {
+        console.error('[API] Error purchasing room:', error);
+        res.status(500).json({ message: "Failed to purchase room" });
+    }
+});
+
+router.put('/rooms/:roomId', async (req, res) => {
+    const { roomId } = req.params;
+    const updates = req.body;
+    const { userHandle } = res.locals;
+    try {
+        const result = await roomsCollection.findOneAndUpdate(
+            { id: roomId, ownerHandle: userHandle },
+            { $set: updates },
+            { returnDocument: 'after' }
+        );
+        if (!result) {
+            return res.status(404).json({ message: "Room not found or you are not the owner." });
+        }
+        req.arenaWorker?.postMessage({ type: 'roomUpdated', payload: { room: result } });
+        res.json({ room: result });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to update room" });
+    }
+});
+
+router.delete('/rooms/:roomId', async (req, res) => {
+    const { roomId } = req.params;
+    const { userHandle } = res.locals;
+    try {
+        const result = await roomsCollection.deleteOne({ id: roomId, ownerHandle: userHandle });
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ message: "Room not found or you are not the owner." });
+        }
+        await usersCollection.updateOne({ handle: userHandle }, { $unset: { ownedRoomId: "" } });
+        req.arenaWorker?.postMessage({ type: 'roomDeleted', payload: { roomId } });
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ message: "Failed to delete room" });
+    }
+});
+
+
+router.post('/arena/kick', (req, res) => {
+    // This just forwards the request to the worker; no DB access needed here
+    req.arenaWorker?.postMessage({ type: 'kickAgent', payload: req.body });
+    res.status(202).send();
+});
+
+router.post('/autonomy/start-research', (req, res) => {
+    req.autonomyWorker?.postMessage({ type: 'startResearch', payload: req.body });
+    res.status(202).send();
+});
+
+// Music Service Endpoint
+router.get('/music/cafe/:roomId', async (req, res) => {
+    const { roomId } = req.params;
+    const { refresh } = req.query;
+
+    if (!elevenLabsService.isConfigured()) {
+        return res.status(503).json({ error: 'Music service is not configured.' });
+    }
+
+    try {
+        const { buffer, prompt } = await cafeMusicService.getTrack(roomId, { forceRefresh: !!refresh });
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('X-Music-Prompt', prompt);
+        res.send(buffer);
+    } catch (error) {
+        console.error(`[API] Error generating music for room ${roomId}:`, error);
+        res.status(500).json({ error: 'Failed to generate music.' });
+    }
+});
+
 
 export default router;

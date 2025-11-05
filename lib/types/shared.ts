@@ -286,9 +286,11 @@ export type AgentTask = {
 };
 
 export type ActivityLogEntry = {
-  id: number;
+  id: string;
   timestamp: number;
-  type: 'move' | 'conversation' | 'intel' | 'system';
+  agentId: string;
+  agentName: string;
+  type: 'cafe' | 'research' | 'trade' | 'engagement' | 'system';
   message: string;
   triggeredNotification?: boolean;
 };

@@ -6,30 +6,26 @@ import React, { useEffect } from 'react';
 import { useUI, useAgent } from '../../lib/state/index.js';
 import { useAutonomyStore } from '../../lib/state/autonomy.js';
 import { apiService } from '../../lib/services/api.service.js';
-import styles from './Dashboard.module.css';
+import styles from './AgentTasksPanel.module.css';
 import { AgentTask } from '../../lib/types/index.js';
 import { formatDistanceToNow } from 'date-fns';
 
 const TaskItem = ({ task }: { task: AgentTask }) => {
+    const { openTaskDetailModal } = useUI();
     return (
         <div className={styles.taskItem}>
-            <details>
-                <summary>
-                    <span className={styles.taskObjective}>{task.objective}</span>
-                    <span className={`${styles.taskStatus} ${styles[task.status]}`}>
-                        {task.status.replace('_', ' ')}
-                    </span>
-                </summary>
-                <div className={styles.taskUpdates}>
-                    <p><strong>Last Updated:</strong> {formatDistanceToNow(task.updatedAt, { addSuffix: true })}</p>
-                    {task.updates.length > 0 && (
-                        <ul>
-                            {/* FIX: The 'update' object cannot be rendered directly. Render the 'message' property instead. */}
-                            {task.updates.map((update, i) => <li key={i}>{update.message}</li>)}
-                        </ul>
-                    )}
-                </div>
-            </details>
+            <div className={styles.taskItemHeader}>
+                <span className={styles.taskObjective}>{task.objective}</span>
+                <span className={`${styles.taskStatus} ${styles[task.status]}`}>
+                    {task.status.replace('_', ' ')}
+                </span>
+            </div>
+            <div className={styles.taskItemFooter}>
+                <span className={styles.taskTime}>Updated {formatDistanceToNow(new Date(task.updatedAt), { addSuffix: true })}</span>
+                <button className="button secondary" onClick={() => openTaskDetailModal(task)}>
+                    <span className="icon">manage_history</span> Manage
+                </button>
+            </div>
         </div>
     );
 };
@@ -48,11 +44,13 @@ export default function AgentTasksPanel() {
                 console.error("Failed to fetch agent tasks:", error);
             }
         };
-        fetchTasks();
+        if (currentAgent.id) {
+            fetchTasks();
+        }
     }, [currentAgent.id, setTasks]);
 
     return (
-        <div className={`${styles.dashboardPanel} ${styles.agentTasksPanel}`}>
+        <div className={styles.agentTasksPanel}>
             <div className={styles.tasksHeader}>
                 <h3 className={styles.dashboardPanelTitle}>
                     <span className="icon">task_alt</span>
@@ -63,7 +61,7 @@ export default function AgentTasksPanel() {
                 </button>
             </div>
             <div className={styles.taskList}>
-                {tasks.length > 0 ? (
+                {tasks && tasks.length > 0 ? (
                     tasks.map(task => <TaskItem key={task.id} task={task} />)
                 ) : (
                     <div className={styles.emptyTasks}>
