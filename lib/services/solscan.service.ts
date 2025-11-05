@@ -1,4 +1,9 @@
-import { shuffle } from 'lodash';
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+*/
+import _ from 'lodash';
+const { shuffle } = _;
 
 // Must end with slash so path joining preserves /v2.0
 const API_BASE_URL = 'https://pro-api.solscan.io/v2.0/';

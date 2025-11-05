@@ -5,7 +5,8 @@
 import { Agent, Room, Interaction, Offer, TradeRecord, BettingIntel, MarketWatchlist } from '../../lib/types/index.js';
 import { aiService } from '../services/ai.service.js';
 import { tradeService } from '../services/trade.service.js';
-import { shuffle } from 'lodash';
+import pkg from 'lodash';
+const { shuffle } = pkg;
 import { agentsCollection, bettingIntelCollection, roomsCollection } from '../db.js';
 import { ObjectId } from 'mongodb';
 

@@ -1,4 +1,3 @@
-
 /// <reference types="node" />
 
 // FIX: Changed express import style to resolve middleware type overload errors.
@@ -21,9 +20,9 @@ import helmet from 'helmet';
 
 // Import routes and services
 import apiRouter from './routes/api.js';
-import { usersCollection, agentsCollection, roomsCollection } from './db.js';
+// FIX: Import the db instance instead of collections directly to avoid race conditions.
+import { db, usersCollection, seedMcpAgents } from './db.js';
 import { ApiKeyManager } from './services/apiKey.service.js';
-import { seedMcpAgents } from './db.js';
 
 // Module augmentation for Express Request
 declare global {
@@ -430,6 +429,8 @@ export async function startServer() {
 
           // Centralized Seeding Logic
           try {
+            // FIX: Get collection directly from the live DB connection to avoid race condition.
+            const agentsCollection = db.connection.collection('agents');
             const agentCount = await agentsCollection.countDocuments();
             if (agentCount === 0) {
               await seedMcpAgents();
