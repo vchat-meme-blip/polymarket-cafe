@@ -15,6 +15,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import helmet from 'helmet';
+import fs from 'fs';
 
 import apiRouter from './routes/api.js';
 import { db, seedDatabase } from './db.js';
@@ -187,10 +188,49 @@ app.use(attachWorkers as any);
 app.use('/api', apiRouter);
 
 if (isProduction) {
-  const clientBuildPath = path.join(__dirname, '..', 'client');
-  app.use(express.static(clientBuildPath) as any);
+  const clientBuildPath = path.join(__dirname, '..', '..', 'client');
+  console.log(`[Server] Serving static files from: ${clientBuildPath}`);
+  
+  // Log directory contents for debugging
+  try {
+    console.log('[Server] Directory contents:', fs.readdirSync(path.dirname(clientBuildPath)));
+    console.log('[Server] Client directory exists:', fs.existsSync(clientBuildPath));
+    if (fs.existsSync(clientBuildPath)) {
+      console.log('[Server] Client directory contents:', fs.readdirSync(clientBuildPath));
+    }
+  } catch (err) {
+    console.error('[Server] Error reading directory:', err);
+  }
+  
+  // Serve static files with caching
+  app.use(express.static(clientBuildPath, {
+    maxAge: '1y',
+    etag: true,
+    index: false
+  }) as any);
+  
+  // Handle SPA routing
   app.get('*', (req, res) => {
-    res.sendFile(path.join(clientBuildPath, 'index.html'));
+    console.log(`[Server] Serving SPA for route: ${req.path}`);
+    const indexPath = path.join(clientBuildPath, 'index.html');
+    console.log(`[Server] Attempting to serve: ${indexPath}`);
+    
+    res.sendFile(indexPath, (err) => {
+      if (err) {
+        console.error('[Server] Error serving SPA:', {
+          error: err.message,
+          path: indexPath,
+          exists: fs.existsSync(indexPath),
+          directory: fs.existsSync(clientBuildPath) ? fs.readdirSync(clientBuildPath) : 'Directory does not exist'
+        });
+        res.status(404).json({
+          error: 'File not found',
+          path: indexPath,
+          exists: fs.existsSync(indexPath),
+          directory: fs.existsSync(clientBuildPath) ? fs.readdirSync(clientBuildPath) : 'Directory does not exist'
+        });
+      }
+    });
   });
 }
 
