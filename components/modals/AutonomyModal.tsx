@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import React from 'react';
-import Modal from '../Modal';
+import Modal from '../../components/Modal';
 import { useUI, useUser } from '../../lib/state/index.js';
 import { useAutonomyStore } from '../../lib/state/autonomy.js';
 import styles from './AutonomyModal.module.css';
