@@ -16,7 +16,7 @@
     "dev:server": "nodemon -q --watch server --ext ts,mts,js,mjs,json --exec \"node --import tsx server/index.ts\"",
     "build:client": "vite build",
     "clean:dist": "rimraf dist",
-    "build:server": "tsc --project tsconfig.server.json --noEmit false --skipLibCheck true --pretty --noImplicitAny false --strictNullChecks false --strictFunctionTypes false --strictBindCallApply false --noImplicitThis false --noUnusedLocals false --noUnusedParameters false --noImplicitReturns false --noFallthroughCasesInSwitch false --outDir dist/server --rootDir .",
+    "build:server": "tsc --project tsconfig.server.json --noEmit false --skipLibCheck true --pretty --noImplicitAny false --strictNullChecks false --strictFunctionTypes false --strictBindCallApply false --noImplicitThis false --noUnusedLocals false --noUnusedParameters false --noImplicitReturns false --noFallthroughCasesInSwitch false --outDir dist/server",
     "postbuild:server": "tsc-alias -p tsconfig.server.json",
     "build": "npm run clean:dist && npm run build:client && npm run build:server && npm run postbuild:server",
     "start": "NODE_ENV=production node dist/server/index.js",

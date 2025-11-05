@@ -1,6 +1,4 @@
 
-
-
 import { Router } from 'express';
 import mongoose, { Collection } from 'mongoose';
 import { TradeRecord, BettingIntel, MarketWatchlist } from '../../lib/types/shared.js';
@@ -304,21 +302,83 @@ router.put('/agents/:agentId', async (req, res) => {
   if (!result) return res.status(404).json({ message: 'Agent not found or not owned by user' });
   res.json({ agent: result });
 });
-  
-router.get('/agents/:agentId/tasks', async (req, res) => {
+
+router.post('/agents/:agentId/intel', async (req, res) => {
     const { agentId } = req.params;
+    const intelData = req.body;
     try {
         const agent = await agentsCollection.findOne({ id: agentId });
         if (!agent) {
-            return res.status(404).send('Agent not found');
+            return res.status(404).json({ message: 'Agent not found.' });
         }
-        res.json((agent as any).tasks || []);
+        const newIntel = {
+            ...intelData,
+            _id: new ObjectId(),
+            ownerAgentId: agent._id,
+            createdAt: new Date(),
+        };
+        await bettingIntelCollection.insertOne(newIntel as any);
+        res.status(201).json(newIntel);
     } catch (error) {
-        console.error(`[API] Error fetching tasks for agent ${agentId}:`, error);
-        res.status(500).json({ message: 'Failed to fetch tasks.' });
+        console.error(`[API] Error adding intel for agent ${agentId}:`, error);
+        res.status(500).json({ message: 'Failed to add intel' });
     }
 });
 
+router.get('/agents/:agentId/activity', async (req, res) => {
+  const { agentId } = req.params;
+  const todayStr = formatISO(startOfToday(), { representation: 'date' });
+
+  try {
+    // FIX: Convert agentId string from params to ObjectId for querying.
+    const agentObjectId = new ObjectId(agentId);
+    let dailySummary = await dailySummariesCollection.findOne({ agentId: agentObjectId, date: todayStr });
+    
+    if (dailySummary) {
+      return res.json({ summary: dailySummary.summary });
+    }
+
+    // FIX: Map database documents to shared types before passing them to the AI service.
+    const [recentTradesDocs, recentIntelDocs] = await Promise.all([
+        tradeHistoryCollection.find({ $or: [{ fromId: agentObjectId }, { toId: agentObjectId }] }).sort({ timestamp: -1 }).limit(10).toArray(),
+        bettingIntelCollection.find({ ownerAgentId: agentObjectId }).sort({ createdAt: -1 }).limit(5).toArray()
+    ]);
+    
+    const recentTrades: TradeRecord[] = recentTradesDocs.map(doc => ({
+        ...doc,
+        id: doc._id.toString(),
+        fromId: doc.fromId.toString(),
+        toId: doc.toId.toString(),
+        roomId: doc.roomId.toString(),
+        timestamp: new Date(doc.timestamp).getTime(),
+    } as any));
+
+    const recentIntel: BettingIntel[] = recentIntelDocs.map(doc => ({
+        ...doc,
+        id: doc._id.toString(),
+        ownerAgentId: doc.ownerAgentId.toString(),
+        sourceAgentId: doc.sourceAgentId?.toString(),
+        bountyId: doc.bountyId?.toString(),
+        createdAt: new Date(doc.createdAt).getTime(),
+    } as any));
+    
+    const activities = { trades: recentTrades, intel: recentIntel };
+    const newSummaryText = await aiService.generateDailySummary(activities);
+
+    if (newSummaryText) {
+      const newSummary = { agentId: agentObjectId, date: todayStr, summary: newSummaryText };
+      await dailySummariesCollection.insertOne(newSummary as any);
+      return res.json({ summary: newSummaryText });
+    } else {
+        return res.json({ summary: "No significant activity to report for today." });
+    }
+    
+  } catch (error) {
+      console.error(`[API] Error getting activity for agent ${agentId}:`, error);
+      res.status(500).json({ message: "Failed to generate activity summary." });
+  }
+});
+  
 router.post('/agents/:agentId/watchlists', async (req, res) => {
     const { agentId } = req.params;
     const { userHandle } = res.locals;
@@ -375,6 +435,20 @@ router.delete('/agents/:agentId/watchlists/:watchlistId', async (req, res) => {
 });
 
 // --- Agent Tasks ---
+router.get('/agents/:agentId/tasks', async (req, res) => {
+    const { agentId } = req.params;
+    try {
+        const agent = await agentsCollection.findOne({ id: agentId });
+        if (!agent) {
+            return res.status(404).send('Agent not found');
+        }
+        res.json((agent as any).tasks || []);
+    } catch (error) {
+        console.error(`[API] Error fetching tasks for agent ${agentId}:`, error);
+        res.status(500).json({ message: 'Failed to fetch tasks.' });
+    }
+});
+
 router.post('/agents/:agentId/tasks', async (req, res) => {
   const { agentId } = req.params;
   const { userHandle } = res.locals;
@@ -392,7 +466,6 @@ router.post('/agents/:agentId/tasks', async (req, res) => {
           agentId: agentId,
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          // FIX: Changed 'updates' from string[] to object[] to match the AgentTask type.
           updates: [{
               timestamp: Date.now(),
               message: `Task created: "${taskData.objective}"`
@@ -409,6 +482,65 @@ router.post('/agents/:agentId/tasks', async (req, res) => {
       console.error('Error creating task:', error);
       res.status(500).json({ message: 'Internal server error' });
   }
+});
+
+router.put('/agents/:agentId/tasks/:taskId', async (req, res) => {
+    const { agentId, taskId } = req.params;
+    const { userHandle } = res.locals;
+    const updates = req.body;
+
+    try {
+        const agent = await agentsCollection.findOne({ id: agentId, ownerHandle: userHandle });
+        if (!agent) {
+            return res.status(404).json({ message: 'Agent not found or you do not own this agent.' });
+        }
+
+        const updateQuery: { $set: any, $push?: any } = { $set: {} };
+        for (const key in updates) {
+            if (key !== 'updates') {
+                updateQuery.$set[`tasks.$.${key}`] = updates[key];
+            }
+        }
+        updateQuery.$set['tasks.$.updatedAt'] = Date.now();
+
+        const result = await agentsCollection.updateOne(
+            { _id: agent._id, 'tasks.id': taskId },
+            updateQuery
+        );
+
+        if (result.modifiedCount === 0) {
+            return res.status(404).json({ message: 'Task not found or no changes made.' });
+        }
+        
+        const updatedAgent = await agentsCollection.findOne({ _id: agent._id });
+        // FIX: Add a type assertion to inform TypeScript that `tasks` exists on the agent document.
+        const updatedTask = (updatedAgent as any)?.tasks.find((t: AgentTask) => t.id === taskId);
+
+        res.status(200).json(updatedTask);
+    } catch (error) {
+        console.error(`Error updating task ${taskId}:`, error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+router.delete('/agents/:agentId/tasks/:taskId', async (req, res) => {
+    const { agentId, taskId } = req.params;
+    const { userHandle } = res.locals;
+
+    try {
+        const result = await agentsCollection.updateOne(
+            { id: agentId, ownerHandle: userHandle },
+            { $pull: { tasks: { id: taskId } as any } }
+        );
+
+        if (result.modifiedCount === 0) {
+            return res.status(404).json({ message: 'Task not found or you do not own this agent.' });
+        }
+        res.status(204).send();
+    } catch (error) {
+        console.error(`Error deleting task ${taskId}:`, error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
 });
 
 
@@ -495,19 +627,24 @@ router.get('/markets/live', async (req, res) => {
     const { category, page, limit } = req.query;
     const pageNum = parseInt(page as string) || 1;
     const limitNum = parseInt(limit as string) || 20;
-
-    console.log(`[API] Fetching live markets for category: ${category}, page: ${pageNum}, limit: ${limitNum}`);
     
     const { markets, hasMore } = await polymarketService.searchMarkets('', category as string | undefined, pageNum, limitNum);
 
-    res.json({
-        markets,
-        hasMore,
-    });
+    res.json({ markets, hasMore });
   } catch (error) {
     console.error('[API] Failed to fetch live markets:', error);
     res.status(500).json({ message: 'Failed to fetch live markets' });
   }
+});
+
+router.get('/markets/liquidity', async (req, res) => {
+    try {
+        const markets = await polymarketService.getLiquidityOpportunities();
+        res.json(markets);
+    } catch (error) {
+        console.error('[API] Failed to fetch liquidity opportunities:', error);
+        res.status(500).json({ message: 'Failed to fetch liquidity opportunities' });
+    }
 });
 
 router.get('/markets/comments/:eventId', async (req, res) => {
@@ -516,7 +653,19 @@ router.get('/markets/comments/:eventId', async (req, res) => {
         const comments = await polymarketService.getMarketComments(eventId, 'Event');
         res.json(comments);
     } catch (error) {
+        console.error('[API] Failed to fetch event comments:', error);
         res.status(500).json({ message: 'Failed to fetch event comments' });
+    }
+});
+
+router.get('/markets/:marketId/comments', async (req, res) => {
+    try {
+        const { marketId } = req.params;
+        const comments = await polymarketService.getMarketComments(marketId, 'Market');
+        res.json(comments);
+    } catch (error) {
+        console.error('[API] Failed to fetch market comments:', error);
+        res.status(500).json({ message: 'Failed to fetch market comments' });
     }
 });
 
@@ -572,34 +721,6 @@ router.get('/leaderboard/intel', async (req, res) => {
     res.json(await leaderboardService.getIntelLeaderboard());
 });
 
-router.get('/agents/:agentId/activity', async (req, res) => {
-    const { agentId } = req.params;
-    try {
-        const summary = await aiService.generateDailySummary({ trades: [], intel: [] }); // Mock data for now
-        res.json({ summary });
-    } catch (error) {
-        res.status(500).json({ message: "Failed to generate summary" });
-    }
-});
-
-router.post('/agents/:agentId/intel', async (req, res) => {
-    const { agentId } = req.params;
-    const intelData = req.body;
-    try {
-        const newIntel = {
-            ...intelData,
-            _id: new ObjectId(),
-            ownerAgentId: new ObjectId(agentId),
-            createdAt: new Date(),
-        };
-        await bettingIntelCollection.insertOne(newIntel as any);
-        res.status(201).json(newIntel);
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to add intel' });
-    }
-});
-
-
 // Arena Actions
 router.post('/arena/send-to-cafe', (req, res) => {
     req.arenaWorker?.postMessage({ type: 'moveAgentToCafe', payload: req.body });
@@ -621,7 +742,8 @@ router.post('/rooms/purchase', async (req, res) => {
     const { userHandle } = res.locals;
     try {
         const newRoom = {
-            id: `room-${new ObjectId().toHexString()}`,
+            _id: new ObjectId(),
+            id: '',
             name,
             agentIds: [],
             hostId: null,
@@ -633,15 +755,15 @@ router.post('/rooms/purchase', async (req, res) => {
             isOwned: true,
             ownerHandle: userHandle,
         };
+        newRoom.id = newRoom._id.toHexString();
         const result = await roomsCollection.insertOne(newRoom as any);
         const userDoc = await usersCollection.findOneAndUpdate(
             { handle: userHandle },
-            // FIX: 'ownedRoomId' in the User document must be an ObjectId, not the room's string 'id'. Use the 'insertedId' from the insert operation.
             { $set: { ownedRoomId: result.insertedId } },
             { returnDocument: 'after' }
         );
         
-        const roomForPayload = { ...newRoom, _id: result.insertedId };
+        const roomForPayload = { ...newRoom };
         req.arenaWorker?.postMessage({ type: 'roomUpdated', payload: { room: roomForPayload } });
         
         const user = userDoc ? toSharedUser(userDoc as UserDocument) : null;
@@ -690,7 +812,6 @@ router.delete('/rooms/:roomId', async (req, res) => {
 
 
 router.post('/arena/kick', (req, res) => {
-    // This just forwards the request to the worker; no DB access needed here
     req.arenaWorker?.postMessage({ type: 'kickAgent', payload: req.body });
     res.status(202).send();
 });

@@ -67,6 +67,7 @@ export type Agent = {
   portfolio: Record<string, number>;
   templateId?: string;
   copiedFromId?: string;
+  tasks?: AgentTask[];
 };
 
 // Arena types
@@ -145,6 +146,7 @@ export type DailySummary = {
     agentId: string;
     date: string; 
     summary: string;
+    id?: string;
 };
 
 export type TransactionType = 'send' | 'receive' | 'claim' | 'stipend' | 'escrow' | 'room_purchase';

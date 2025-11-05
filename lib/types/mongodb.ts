@@ -99,7 +99,8 @@ export interface MarketWatchlistDocument extends WithObjectId<Omit<SharedMarketW
 export interface DailySummaryDocument extends Omit<SharedDailySummary, 'agentId' | 'date' | 'id'> {
   _id: ObjectId;
   agentId: ObjectId;
-  date: Date;
+  // FIX: Change date type to string to match how it's stored in the database.
+  date: string;
   // Convert MongoDB document to shared type
   toShared(): SharedDailySummary;
 }
