@@ -187,23 +187,55 @@ const attachWorkers: RequestHandler = (req, res, next) => {
 app.use(attachWorkers as any);
 app.use('/api', apiRouter);
 
+// In production, try multiple possible locations for client files
+const possibleClientPaths = [
+  path.join(process.cwd(), 'dist', 'client'),      // Local development
+  path.join(process.cwd(), 'client'),              // Some deployments
+  path.join(__dirname, '..', 'client'),            // Relative to server
+  path.join(__dirname, '..', '..', 'client'),      // Another possible location
+  '/app/dist/client',                              // Common Docker/container path
+  '/app/client'                                    // Fallback container path
+];
+
 if (isProduction) {
-  // In production, the client files are in the 'dist/client' directory
-  const clientBuildPath = path.join(process.cwd(), 'dist', 'client');
+  let clientBuildPath: string | null = null;
   
-  // Serve static files from the client build directory
-  app.use(express.static(clientBuildPath, {
-    maxAge: '1y', // Cache static assets for 1 year
-    etag: true,   // Enable ETag generation
-    index: false   // Don't serve index.html for directory requests
-  }) as any);
+  // Find the first valid client build path
+  for (const possiblePath of possibleClientPaths) {
+    try {
+      if (fs.existsSync(path.join(possiblePath, 'index.html'))) {
+        clientBuildPath = possiblePath;
+        console.log(`Found client build at: ${clientBuildPath}`);
+        break;
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.warn(`Error checking path ${possiblePath}:`, errorMessage);
+    }
+  }
   
-  // Handle SPA routing - serve index.html for all other routes
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(clientBuildPath, 'index.html'));
-  });
-  
-  console.log(`Serving static files from: ${clientBuildPath}`);
+  if (!clientBuildPath) {
+    console.error('Could not find client build directory. Tried:', possibleClientPaths);
+  } else {
+    // Serve static files from the client build directory
+    app.use(express.static(clientBuildPath, {
+      maxAge: '1y', // Cache static assets for 1 year
+      etag: true,   // Enable ETag generation
+      index: false   // Don't serve index.html for directory requests
+    }) as any);
+    
+    // Handle SPA routing - serve index.html for all other routes
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(clientBuildPath!, 'index.html'), (err) => {
+        if (err) {
+          console.error('Error sending file:', err);
+          res.status(404).send('File not found');
+        }
+      });
+    });
+    
+    console.log(`Serving static files from: ${clientBuildPath}`);
+  }
 } else {
   // In development, let Vite handle the frontend
   app.get('*', (req, res) => {
