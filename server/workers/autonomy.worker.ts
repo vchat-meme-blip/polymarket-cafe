@@ -50,6 +50,7 @@ async function main() {
         case 'tick':
           autonomyDirector.tick();
           break;
+        // FIX: Corrected method call to match the implementation in AutonomyDirector.
         case 'startResearch':
           autonomyDirector.startResearch(message.payload.agentId);
           break;

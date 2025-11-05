@@ -55,7 +55,8 @@ export interface AgentDocument extends Omit<SharedAgent,
   toShared(): SharedAgent;
 }
 
-export interface RoomDocument extends Omit<SharedRoom, 'id' | 'agentIds' | 'hostId' | 'bannedAgentIds'> {
+// FIX: Removed 'id' from the Omit type to ensure the 'id' property from SharedRoom is inherited.
+export interface RoomDocument extends Omit<SharedRoom, 'agentIds' | 'hostId' | 'bannedAgentIds'> {
   _id: ObjectId;
   agentIds: ObjectId[];
   hostId: ObjectId | null;

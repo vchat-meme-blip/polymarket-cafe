@@ -25,13 +25,15 @@ class NotificationService {
         }
     }
 
-    public async logAndSendNotification(notificationData: Omit<Notification, 'id' | 'timestamp' | 'wasSent'>) {
+    public async logAndSendNotification(notificationData: Omit<Notification, 'id' | 'timestamp' | 'wasSent'>): Promise<boolean> {
         const newNotification: Notification = {
             ...notificationData,
             id: new ObjectId().toHexString(),
             timestamp: Date.now(),
             wasSent: false,
         };
+
+        let notificationSent = false;
 
         try {
             // Step 1: Log the notification to the database
@@ -45,18 +47,10 @@ class NotificationService {
                 let shouldSend = false;
 
                 switch (notificationData.type) {
-                    case 'agentResearch':
-                        shouldSend = settings?.agentResearch ?? false;
-                        break;
-                    case 'agentTrade':
-                        shouldSend = settings?.agentTrades ?? false;
-                        break;
-                    case 'newMarkets':
-                        shouldSend = settings?.newMarkets ?? false;
-                        break;
-                    case 'agentEngagement':
-                         shouldSend = settings?.agentEngagements ?? false;
-                         break;
+                    case 'agentResearch': shouldSend = settings?.agentResearch ?? false; break;
+                    case 'agentTrade': shouldSend = settings?.agentTrades ?? false; break;
+                    case 'newMarkets': shouldSend = settings?.newMarkets ?? false; break;
+                    case 'agentEngagement': shouldSend = settings?.agentEngagements ?? false; break;
                 }
 
                 if (shouldSend) {
@@ -66,8 +60,8 @@ class NotificationService {
                         to: `whatsapp:${user.phone}`
                     });
                     
-                    // Step 3: Update the log to mark it as sent
                     await notificationsCollection.updateOne({ id: newNotification.id }, { $set: { wasSent: true } });
+                    notificationSent = true;
                     console.log(`[NotificationService] Logged and sent WhatsApp message to ${user.handle}`);
                 } else {
                     console.log(`[NotificationService] Logged notification for ${user.handle} but did not send (user preference disabled).`);
@@ -78,6 +72,8 @@ class NotificationService {
         } catch (error) {
             console.error(`[NotificationService] Failed to log or send notification:`, error);
         }
+
+        return notificationSent;
     }
 }
 

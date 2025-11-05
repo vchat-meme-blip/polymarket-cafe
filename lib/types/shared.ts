@@ -228,7 +228,8 @@ export type Notification = {
     id: string;
     userId: string;
     agentId?: string;
-    type: 'agentResearch' | 'agentTrade' | 'newMarkets' | 'agentEngagement';
+    // FIX: Added autonomy-related notification types to align with usage in AutonomyDirector.
+    type: 'agentResearch' | 'agentTrade' | 'newMarkets' | 'agentEngagement' | 'autonomyCafe' | 'autonomyEngage' | 'autonomyResearch';
     message: string;
     timestamp: number;
     wasSent: boolean;

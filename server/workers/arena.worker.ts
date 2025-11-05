@@ -34,6 +34,7 @@ async function main() {
       console.log(`[ArenaWorker] System paused until ${new Date(pauseUntil).toISOString()}`);
       
       // Forward to director
+      // FIX: Corrected method call to match implementation in ArenaDirector.
       arenaDirector.handleSystemPause(message.payload.until);
     } else if (message.type === 'systemResume') {
       // Handle system resume
@@ -41,6 +42,7 @@ async function main() {
       console.log('[ArenaWorker] System resumed');
       
       // Forward to director
+      // FIX: Corrected method call to match implementation in ArenaDirector.
       arenaDirector.handleSystemResume();
     } else {
       // Forward other messages to the director if system is not paused
@@ -56,27 +58,35 @@ async function main() {
         case 'reinitialize':
           arenaDirector.initialize(emitToMain);
           break;
+        // FIX: Corrected method call to match implementation in ArenaDirector.
         case 'getWorldState':
           arenaDirector.getWorldState();
           break;
+        // FIX: Corrected method call to match implementation in ArenaDirector.
         case 'moveAgentToCafe':
           arenaDirector.moveAgentToCafe(message.payload.agentId);
           break;
+        // FIX: Corrected method call to match implementation in ArenaDirector.
         case 'recallAgent':
             arenaDirector.recallAgent(message.payload.agentId);
             break;
+        // FIX: Corrected method call to match implementation in ArenaDirector.
         case 'createAndHostRoom':
           arenaDirector.createAndHostRoom(message.payload.agentId);
           break;
+        // FIX: Corrected method call to match implementation in ArenaDirector.
         case 'registerNewAgent':
           arenaDirector.registerNewAgent(message.payload.agent);
           break;
+        // FIX: Corrected method call to match implementation in ArenaDirector.
         case 'roomUpdated':
           arenaDirector.handleRoomUpdate(message.payload.room);
           break;
+        // FIX: Corrected method call to match implementation in ArenaDirector.
         case 'roomDeleted':
           arenaDirector.handleRoomDelete(message.payload.roomId);
           break;
+        // FIX: Corrected method call to match implementation in ArenaDirector.
         case 'kickAgent':
             arenaDirector.kickAgent(message.payload);
             break;

@@ -1,8 +1,8 @@
-import { agentsCollection, bettingIntelCollection, usersCollection, betsCollection } from '../db.js';
+import { agentsCollection, usersCollection, betsCollection, bettingIntelCollection } from '../db.js';
 import { ObjectId } from 'mongodb';
-import type { Agent, User } from '../../lib/types/shared.js';
+import type { Agent, User, ActivityLogEntry } from '../../lib/types/shared.js';
 import type { BettingIntelDocument } from '../../lib/types/mongodb.js';
-import type { BettingIntel, Bet } from '../../lib/types/shared.js';
+import type { BettingIntel } from '../../lib/types/shared.js';
 import { alphaService } from '../services/alpha.service.js';
 import { notificationService } from '../services/notification.service.js';
 import { aiService } from '../services/ai.service.js';
@@ -19,9 +19,8 @@ export class AutonomyDirector {
     private systemPaused = false;
     private pauseUntil = 0;
 
-    // For batch processing
     private currentUserOffset = 0;
-    private readonly BATCH_SIZE = 10; // Process 10 users per tick
+    private readonly BATCH_SIZE = 10; 
 
     public initialize(emitCallback: EmitToMainThread) {
         this.emitToMain = emitCallback;
@@ -44,7 +43,7 @@ export class AutonomyDirector {
             console.error(`[AutonomyDirector] Retryable function failed. Retries left: ${retries - 1}. Error:`, error);
             if (retries > 1) {
                 await new Promise(res => setTimeout(res, delay));
-                return this.retry(fn, retries - 1, delay * 2); // Exponential backoff
+                return this.retry(fn, retries - 1, delay * 2);
             }
             throw error;
         }
@@ -102,45 +101,30 @@ export class AutonomyDirector {
         }
     }
 
-    public async startResearch(agentId: string) {
-        const agentDoc = await agentsCollection.findOne({ id: agentId });
-        if (agentDoc) {
-            const agent: Agent = {
-                ...(agentDoc as any),
-                id: agentDoc._id.toString(),
-                bettingHistory: [],
-                bettingIntel: [],
-                marketWatchlists: [],
-            };
-            this.setAgentBusy(agent.id, true);
-            
-            try {
-                const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
-                if (newIntel && agent.ownerHandle) {
-                    const savedIntel = await this.saveIntel(newIntel as BettingIntel);
-                    
-                    if(savedIntel) {
-                        const message = `🔬 Research complete! Your agent, ${agent.name}, has new intel on "${savedIntel.market}".`;
-                        await notificationService.logAndSendNotification({
-                            userId: agent.ownerHandle,
-                            agentId: agent.id,
-                            type: 'agentResearch',
-                            message,
-                        });
-                        this.emitToMain?.({ type: 'socketEmit', event: 'newIntel', payload: { intel: savedIntel }, room: agent.ownerHandle });
-                    }
-                }
-            } catch (error) {
-                console.error(`[AutonomyDirector] Error during manual research for agent ${agent.name}:`, error);
-            } finally {
-                this.setAgentBusy(agent.id, false);
-            }
-        }
+    private _logActivity(agent: Agent, type: ActivityLogEntry['type'], message: string, triggeredNotification: boolean = false) {
+        if (!agent.ownerHandle) return;
+
+        const logEntry: ActivityLogEntry = {
+            id: new ObjectId().toHexString(),
+            timestamp: Date.now(),
+            agentId: agent.id,
+            agentName: agent.name,
+            type,
+            message,
+            triggeredNotification,
+        };
+        
+        this.emitToMain?.({
+            type: 'socketEmit',
+            event: 'newActivityLog',
+            payload: logEntry,
+            room: agent.ownerHandle,
+        });
     }
 
     private async processAgentAutonomy(agent: Agent, user: User) {
         const state = this.agentStates.get(agent.id) || { lastActionTime: 0, isBusy: false };
-        const AUTONOMY_COOLDOWN = 10 * 60 * 1000; // 10 minutes per agent action
+        const AUTONOMY_COOLDOWN = 10 * 60 * 1000;
 
         if (state.isBusy || Date.now() - state.lastActionTime < AUTONOMY_COOLDOWN) {
             return;
@@ -150,26 +134,42 @@ export class AutonomyDirector {
 
         try {
             const actionRoll = Math.random();
+            const ownerHandle = agent.ownerHandle;
+            if (!ownerHandle) throw new Error("Agent has no owner handle.");
 
             if (actionRoll < 0.7) { // 70% Chance: Go to Café
+                const message = `Decided to head to the Café to look for intel opportunities.`;
                 this.emitToMain?.({
                     type: 'forwardToWorker',
                     worker: 'arena',
                     message: { type: 'moveAgentToCafe', payload: { agentId: agent.id } }
                 });
+                // FIX: Corrected notification type to match the allowed types in the Notification definition.
+                const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyCafe', message: `${agent.name} is heading to the Café.` });
+                this._logActivity(agent, 'cafe', message, notified);
             } else if (actionRoll < 0.9) { // 20% chance: Proactive User Engagement
+                const message = `Reviewing recent activity to find an insight for ${user.handle}.`;
+                // FIX: Corrected notification type to match the allowed types in the Notification definition.
+                const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyEngage', message: `${agent.name} is formulating a new suggestion for you.` });
+                this._logActivity(agent, 'engagement', message, notified);
                 await this.proactiveEngagement(user, agent);
             } else { // 10% chance: Deep Research
+                const message = `Starting autonomous deep research on a trending market.`;
+                // FIX: Corrected notification type to match the allowed types in the Notification definition.
+                const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyResearch', message: `${agent.name} is starting a new research task.` });
+                this._logActivity(agent, 'research', message, notified);
+
                 const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
                 if (newIntel && agent.ownerHandle) {
                     const savedIntel = await this.saveIntel(newIntel as BettingIntel);
                     if (savedIntel) {
-                        const message = `🔬 Your agent, ${agent.name}, autonomously discovered new intel on "${savedIntel.market}".`;
+                        const successMessage = `Research complete! Discovered new intel on "${savedIntel.market}".`;
+                        this._logActivity(agent, 'research', successMessage, true); // Always notify on success
                         await notificationService.logAndSendNotification({
                             userId: agent.ownerHandle,
                             agentId: agent.id,
                             type: 'agentResearch',
-                            message,
+                            message: `🔬 Your agent, ${agent.name}, has new intel on "${savedIntel.market}".`,
                         });
                         this.emitToMain?.({ type: 'socketEmit', event: 'newIntel', payload: { intel: savedIntel }, room: agent.ownerHandle });
                     }
@@ -182,26 +182,64 @@ export class AutonomyDirector {
         }
     }
     
-    private async proactiveEngagement(user: User, agent: Agent) {
-        if (!agent.isProactive || !agent.ownerHandle) return;
+    // FIX: Add missing startResearch method.
+    public async startResearch(agentId: string) {
+        const agentDoc = await agentsCollection.findOne({ id: agentId });
+        if (!agentDoc) {
+            console.error(`[AutonomyDirector] startResearch called for non-existent agent ${agentId}`);
+            return;
+        }
 
-        this.emitToMain?.({
-            type: 'systemLog',
-            payload: { type: 'system', message: `AutonomyDirector: Agent ${agent.name} is performing a "Proactive Engagement" for user ${user.handle}.` }
-        });
+        const agent: Agent = { ...(agentDoc as any), id: agentDoc._id.toString() };
+        const ownerHandle = agent.ownerHandle;
+        if (!ownerHandle) return;
 
-        const engagementRoll = Math.random();
-        if (engagementRoll < 0.5) {
-            await this.checkTrendingMarkets(user, agent);
-        } else if (engagementRoll < 0.8) {
-            await this.reviewIntel(user, agent);
-        } else {
-            await this.reviewPortfolio(user, agent);
+        this.setAgentBusy(agent.id, true);
+        try {
+            this._logActivity(agent, 'research', 'Manual research task started.');
+
+            const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
+            if (newIntel && agent.ownerHandle) {
+                const savedIntel = await this.saveIntel(newIntel as BettingIntel);
+                if (savedIntel) {
+                    const successMessage = `Research complete! Discovered new intel on "${savedIntel.market}".`;
+                    this._logActivity(agent, 'research', successMessage, true);
+                    await notificationService.logAndSendNotification({
+                        userId: agent.ownerHandle,
+                        agentId: agent.id,
+                        type: 'agentResearch',
+                        message: `🔬 Your agent, ${agent.name}, has new intel on "${savedIntel.market}".`,
+                    });
+                    this.emitToMain?.({ type: 'socketEmit', event: 'newIntel', payload: { intel: savedIntel }, room: agent.ownerHandle });
+                }
+            }
+        } catch (error) {
+            console.error(`[AutonomyDirector] Error during manual research for agent ${agent.name}:`, error);
+        } finally {
+            this.setAgentBusy(agent.id, false);
         }
     }
 
+    private async proactiveEngagement(user: User, agent: Agent) {
+        if (!agent.isProactive || !agent.ownerHandle) return;
+
+        const engagementRoll = Math.random();
+        let engagementType = '';
+        if (engagementRoll < 0.5) {
+            engagementType = 'Checking trending markets.';
+            await this.checkTrendingMarkets(user, agent);
+        } else if (engagementRoll < 0.8) {
+            engagementType = 'Reviewing recently acquired intel.';
+            await this.reviewIntel(user, agent);
+        } else {
+            engagementType = 'Reviewing the current betting portfolio.';
+            await this.reviewPortfolio(user, agent);
+        }
+        this._logActivity(agent, 'engagement', `Performing proactive engagement: ${engagementType}`);
+    }
+
     private async checkTrendingMarkets(user: User, agent: Agent) {
-        const { markets } = await polymarketService.getLiveMarkets(5);
+        const { markets } = await polymarketService.getLiveMarkets(5, 'Breaking');
         if (markets.length === 0) return;
 
         const interestingMarket = markets[Math.floor(Math.random() * markets.length)];
@@ -209,6 +247,7 @@ export class AutonomyDirector {
         
         const message = await this.generateProactiveMessage(agent, prompt);
         if (message) {
+            this._logActivity(agent, 'engagement', `Sent proactive message about trending market "${interestingMarket.title}".`);
             this.sendProactiveMessage(user.handle!, agent, message);
         }
     }
@@ -225,6 +264,7 @@ export class AutonomyDirector {
 
         const message = await this.generateProactiveMessage(agent, prompt);
         if (message) {
+            this._logActivity(agent, 'engagement', `Sent proactive message reviewing intel on "${intel.market}".`);
             this.sendProactiveMessage(user.handle!, agent, message);
         }
     }
@@ -238,6 +278,7 @@ export class AutonomyDirector {
         
         const message = await this.generateProactiveMessage(agent, prompt);
         if (message) {
+            this._logActivity(agent, 'engagement', `Sent proactive message reviewing a bet on market ID ${betToReview.marketId}.`);
             this.sendProactiveMessage(user.handle!, agent, message);
         }
     }

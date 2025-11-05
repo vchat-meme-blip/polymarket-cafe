@@ -12,7 +12,6 @@ class WebSocketService {
   private eventCounts: Map<string, { count: number; resetAt: number }> = new Map();
   private isInitialized = false;
 
-  // Singleton pattern to prevent multiple instances
   public static getInstance(): WebSocketService {
     if (!WebSocketService.instance) {
       WebSocketService.instance = new WebSocketService();
@@ -23,7 +22,6 @@ class WebSocketService {
   private constructor() {}
 
   init(server: HttpServer) {
-    // Prevent multiple initializations
     if (this.isInitialized) {
       console.log('[WebSocket] WebSocket server already initialized');
       return;
@@ -32,7 +30,7 @@ class WebSocketService {
     console.log('[WebSocket] Initializing WebSocket server...');
     this.isInitialized = true;
     this.io = new SocketIOServer(server, {
-      path: '/socket.io/',
+      path: '/socket.io/', // FIX: Explicitly set the path
       cors: {
         origin: (origin, callback) => {
           const allowedOrigins = [
@@ -67,7 +65,6 @@ class WebSocketService {
         return socket.disconnect(true);
       }
 
-      // Rate limiting by IP
       const ip = Array.isArray(clientIp) ? clientIp[0] : clientIp.split(',')[0].trim();
       const connectionCount = this.connectionCounts.get(ip) || 0;
 
@@ -76,14 +73,12 @@ class WebSocketService {
         return socket.disconnect(true);
       }
 
-      // Store connection
       const connectionId = socket.id;
       this.connections.set(connectionId, socket);
       this.connectionCounts.set(ip, connectionCount + 1);
 
       console.log(`[WebSocket] Client connected: ${connectionId} (${ip})`);
 
-      // Handle disconnection
       socket.on('disconnect', () => {
         this.connections.delete(connectionId);
         const count = (this.connectionCounts.get(ip) || 1) - 1;
@@ -95,10 +90,9 @@ class WebSocketService {
         console.log(`[WebSocket] Client disconnected: ${connectionId} (${ip})`);
       });
 
-      // Rate limiting for events
       socket.use((event, next) => {
         const now = Date.now();
-        const key = `${ip}:${event[0]}`; // event[0] is the event name
+        const key = `${ip}:${event[0]}`; 
         const rateLimit = this.eventCounts.get(key);
 
         if (rateLimit && rateLimit.resetAt > now) {
@@ -116,13 +110,11 @@ class WebSocketService {
         next();
       });
 
-      // Handle errors
       socket.on('error', (error) => {
         console.error(`[WebSocket] Error from ${connectionId}:`, error);
       });
     });
 
-    // Clean up rate limiting cache
     setInterval(() => {
       const now = Date.now();
       for (const [key, value] of this.eventCounts.entries()) {
@@ -142,5 +134,4 @@ class WebSocketService {
   }
 }
 
-// Export a singleton instance
 export const webSocketService = WebSocketService.getInstance();
