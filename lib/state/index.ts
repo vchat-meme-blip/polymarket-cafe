@@ -15,7 +15,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { ObjectId } from 'mongodb';
 import { PRESET_AGENTS, DEFAULT_VRM_URL, AVAILABLE_VOICES } from '../presets/agents.js';
-import type { BettingIntel, Agent, User, Bet, MarketIntel, Room, AgentMode, NotificationSettings } from '../types/index.js';
+import type { BettingIntel, Agent, User, Bet, MarketIntel, Room, AgentMode, NotificationSettings, AgentTask } from '../types/index.js';
 import { apiService } from '../services/api.service.js';
 
 /**
@@ -446,6 +446,9 @@ export const useUI = create<{
   showCreateTaskModal: boolean;
   openCreateTaskModal: () => void;
   closeCreateTaskModal: () => void;
+  taskDetailModalData: AgentTask | null;
+  openTaskDetailModal: (task: AgentTask) => void;
+  closeTaskDetailModal: () => void;
 }>(set => ({
   isMobileNavOpen: true,
   toggleMobileNav: () => set(state => ({ isMobileNavOpen: !state.isMobileNavOpen })),
@@ -518,6 +521,9 @@ export const useUI = create<{
   showCreateTaskModal: false,
   openCreateTaskModal: () => set({ showCreateTaskModal: true }),
   closeCreateTaskModal: () => set({ showCreateTaskModal: false }),
+  taskDetailModalData: null,
+  openTaskDetailModal: (task: AgentTask) => set({ taskDetailModalData: task }),
+  closeTaskDetailModal: () => set({ taskDetailModalData: null }),
 }));
 
 /**

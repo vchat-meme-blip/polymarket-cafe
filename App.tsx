@@ -39,6 +39,7 @@ import ShareRoomModal from './components/modals/ShareRoomModal';
 import MarketDetailModal from './components/modals/MarketDetailModal';
 import VisitStorefrontModal from './components/modals/VisitStorefrontModal.js';
 import CreateTaskModal from './components/modals/CreateTaskModal';
+import TaskDetailModal from './components/modals/TaskDetailModal';
 
 /**
  * Main application component.
@@ -50,7 +51,7 @@ function App() {
     agentDossierId, showAboutPage, showOnboarding, showProfileView, 
     openOnboarding, setIsSignedIn, showCreateRoomModal, showManageRoomModal,
     showShareRoomModal, shareModalData, marketDetailModalData, showVisitStorefrontModal,
-    showAutonomyModal, showCreateTaskModal
+    showAutonomyModal, showCreateTaskModal, taskDetailModalData
   } = useUI();
   const { availablePersonal } = useAgent();
   const { hasCompletedOnboarding } = useUser();
@@ -124,6 +125,7 @@ function App() {
       {agentDossierId && <AgentDossierModal agentId={agentDossierId} />}
       {showAutonomyModal && <AutonomyModal />}
       {showCreateTaskModal && <CreateTaskModal />}
+      {taskDetailModalData && <TaskDetailModal task={taskDetailModalData} />}
       {showProfileView && <ProfileView />}
       {showCreateRoomModal && <CreateRoomModal />}
       {showManageRoomModal && <ManageRoomModal />}

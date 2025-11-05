@@ -11,7 +11,23 @@ import LiquidityPanel from './LiquidityPanel.js';
 
 type HubTab = 'Markets' | 'Arbitrage' | 'Liquidity' | 'Bookmarks';
 
-const MARKET_CATEGORIES = ['All', 'Sports', 'Crypto', 'Politics', 'Business', 'News', 'Trump', 'Tech', 'Breaking', 'Culture'];
+// NEW: Merged and expanded category list for a richer user experience.
+const MARKET_CATEGORIES = [
+    'All', 
+    'Breaking', 
+    'Sports', 
+    'Crypto', 
+    'Politics', 
+    'News',
+    'Business', 
+    'Stocks',
+    'Tech',
+    'Culture',
+    'Celebrity',
+    'War',
+    'Weather',
+    'Trump', // Kept for specific interest
+];
 
 const MAG7_WALLETS = [
     { name: 'ExhaustedBoyBilly', address: '0x44c1dfe43260c94ed4f1d00de2e1f80fb113ebc1' },
@@ -61,8 +77,7 @@ export default function PredictionHubView() {
             return (
                  <div className={styles.marketGrid}>
                     {markets.map(market => (
-                        // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
-                        <MarketCard market={market} onSelect={openMarketDetailModal} />
+                        <MarketCard key={market.id} market={market} onSelect={openMarketDetailModal} />
                     ))}
                 </div>
             );

@@ -24,7 +24,8 @@ const TaskItem = ({ task }: { task: AgentTask }) => {
                     <p><strong>Last Updated:</strong> {formatDistanceToNow(task.updatedAt, { addSuffix: true })}</p>
                     {task.updates.length > 0 && (
                         <ul>
-                            {task.updates.map((update, i) => <li key={i}>{update}</li>)}
+                            {/* FIX: The 'update' object cannot be rendered directly. Render the 'message' property instead. */}
+                            {task.updates.map((update, i) => <li key={i}>{update.message}</li>)}
                         </ul>
                     )}
                 </div>

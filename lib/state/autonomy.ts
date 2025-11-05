@@ -4,7 +4,7 @@
 */
 import { create } from 'zustand';
 import { useWalletStore } from './wallet.js';
-import { AgentActivity, BettingIntel, Bounty, AgentTask } from '../types/index.js';
+import { AgentActivity, BettingIntel, Bounty, AgentTask, ActivityLogEntry } from '../types/index.js';
 
 interface ServerHydrationData {
     bounties: Bounty[];
@@ -17,6 +17,7 @@ export type AutonomyState = {
   intelBank: BettingIntel[];
   bounties: Bounty[];
   tasks: AgentTask[];
+  activityLog: ActivityLogEntry[];
   lastActivity: Record<string, number>;
   isAutonomyEnabled: boolean;
   gatherIntelCooldown: number;
@@ -39,6 +40,7 @@ export type AutonomyState = {
   setTasks: (tasks: AgentTask[]) => void;
   addTask: (task: AgentTask) => void;
   updateTask: (taskId: string, updates: Partial<AgentTask>) => void;
+  addActivityLog: (logEntry: ActivityLogEntry) => void;
 };
 
 export const useAutonomyStore = create<AutonomyState>((set, get) => ({
@@ -47,6 +49,7 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
   intelBank: [],
   bounties: [],
   tasks: [],
+  activityLog: [],
   lastActivity: {},
   isAutonomyEnabled: true,
   gatherIntelCooldown: 1000 * 60 * 5, // 5 minutes
@@ -206,6 +209,9 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
     tasks: state.tasks.map(task => 
       task.id === taskId ? { ...task, ...updates, updatedAt: Date.now() } : task
     ),
+  })),
+  addActivityLog: (logEntry: ActivityLogEntry) => set(state => ({
+    activityLog: [logEntry, ...state.activityLog].slice(0, 100), // Keep last 100 logs
   })),
 }));
 

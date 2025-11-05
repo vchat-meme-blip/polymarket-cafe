@@ -5,7 +5,7 @@ import { useAgent, useUI, useUser, useSystemLogStore } from '../lib/state/index.
 import { socketService } from '../lib/services/socket.service';
 import { useAutonomyStore } from '../lib/state/autonomy';
 // FIX: Imported `TradeRecord` type from its canonical source to resolve type errors.
-import type { TradeRecord } from '../lib/types/index.js';
+import type { TradeRecord, ActivityLogEntry } from '../lib/types/index.js';
 
 export function useCafeSocket() {
     const { 
@@ -20,7 +20,7 @@ export function useCafeSocket() {
         // FIX: Added `recordTrade` action from the store.
         recordTrade 
     } = useArenaStore();
-    const { addIntelFromSocket } = useAutonomyStore();
+    const { addIntelFromSocket, addActivityLog } = useAutonomyStore();
     const { addLog } = useSystemLogStore();
     const { handle } = useUser();
     const { addToast, setIsAgentResponding } = useUI();
@@ -109,6 +109,9 @@ export function useCafeSocket() {
             setTimeout(() => setIsAgentResponding(false), messageDuration);
         };
 
+        const handleNewActivityLog = (logEntry: ActivityLogEntry) => {
+            addActivityLog(logEntry);
+        };
 
         socketService.on('worldState', handleWorldState);
         socketService.on('agentThinking', handleAgentThinking);
@@ -121,6 +124,7 @@ export function useCafeSocket() {
         socketService.on('systemMessage', handleSystemMessage);
         socketService.on('agentMoved', handleAgentMoved);
         socketService.on('proactiveMessage', handleProactiveMessage);
+        socketService.on('newActivityLog', handleNewActivityLog);
 
         return () => {
             socketService.off('worldState', handleWorldState);
@@ -134,7 +138,8 @@ export function useCafeSocket() {
             socketService.off('systemMessage', handleSystemMessage);
             socketService.off('agentMoved', handleAgentMoved);
             socketService.off('proactiveMessage', handleProactiveMessage);
+            socketService.off('newActivityLog', handleNewActivityLog);
             socketService.disconnect();
         };
-    }, [handle, syncWorldState, setThinkingAgent, addConversationTurn, removeRoom, recordActivityInRoom, updateRoomFromSocket, setLastTradeDetails, recordTrade, addIntelFromSocket, addLog, addToast, setIsAgentResponding]);
+    }, [handle, syncWorldState, setThinkingAgent, addConversationTurn, removeRoom, recordActivityInRoom, updateRoomFromSocket, setLastTradeDetails, recordTrade, addIntelFromSocket, addLog, addToast, setIsAgentResponding, addActivityLog]);
 }

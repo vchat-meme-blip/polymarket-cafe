@@ -8,17 +8,6 @@ import { MarketIntel } from '../../lib/types/index.js';
 const GAMMA_API = 'https://gamma-api.polymarket.com';
 const DATA_API = 'https://data-api.polymarket.com';
 
-const CATEGORY_TAG_MAP: Record<string, number> = {
-    'Sports': 1,
-    'Crypto': 2,
-    'Politics': 3,
-    'News': 5,
-    'Trump': 4,
-    'Tech': 9,
-    'Culture': 24,
-    'Business': 22,
-};
-
 /**
  * Maps a raw market and event object from the Polymarket API to our internal MarketIntel type.
  */
@@ -107,52 +96,65 @@ class PolymarketService {
   }
   
   async searchMarkets(query: string, category?: string, page: number = 1, limit: number = 40): Promise<{ markets: MarketIntel[], hasMore: boolean }> {
-    const useSearchEndpoint = !!query;
-    let endpoint = useSearchEndpoint ? 'public-search' : 'events';
-    
-    const params: any = {
-        limit: useSearchEndpoint ? undefined : limit,
-        limit_per_type: useSearchEndpoint ? limit : undefined,
-        offset: useSearchEndpoint ? undefined : (page - 1) * limit,
-        page: useSearchEndpoint ? page : undefined,
-        closed: false,
-    };
+    // SPECIAL CASE: "Breaking" category has its own logic that works.
+    if (category === 'Breaking' && !query) {
+        const data = await this.fetchFromApi(GAMMA_API, 'events', {
+            order: 'id', // Sort by newest event ID for "breaking"
+            ascending: false,
+            closed: false,
+            limit: limit,
+            offset: (page - 1) * limit
+        });
 
-    if (useSearchEndpoint) {
-        params.q = query;
-        if (category && category !== 'All' && category !== 'Breaking') {
-            params.events_tag = category; // public-search uses events_tag
+        if (!data || !Array.isArray(data)) {
+            console.warn('[PolymarketService] Received invalid data from /events for Breaking category.');
+            return { markets: [], hasMore: false };
         }
-        params.sort = 'volume';
-        params.ascending = false;
-    } else {
-        if (category && category !== 'All' && category !== 'Breaking') {
-            const tagId = CATEGORY_TAG_MAP[category];
-            if (tagId) {
-                params.tag_id = tagId; // /events endpoint uses tag_id
-            } else {
-                 console.warn(`[PolymarketService] Category "${category}" not found in tag map. Fetching all markets.`);
+
+        const markets: MarketIntel[] = [];
+        for (const event of data) {
+            if (event.markets && Array.isArray(event.markets)) {
+                for (const market of event.markets) {
+                    const mapped = mapMarket(market, event);
+                    if (mapped) {
+                        markets.push(mapped);
+                    }
+                }
             }
         }
-        params.sort = 'creation_date';
-        params.ascending = false;
+        const hasMore = data.length === limit;
+        return { markets, hasMore };
+    }
+
+    // DEFAULT CASE: Use the more reliable /public-search endpoint for all other queries and categories.
+    const params: any = {
+        page: page,
+        types: 'market',
+        order: 'desc'
+    };
+
+    // Use query if provided, otherwise use the category as the search term. 'All' becomes a wildcard.
+    params.q = query || (category && category !== 'All' ? category : '*');
+    
+    // CORRECTED PARAMETER: Use 'limit' instead of 'limit_per_type'
+    params.limit = limit;
+
+    // If using a category, use the corrected 'tag' parameter.
+    if (category && category !== 'All' && category !== 'Breaking') {
+        params.tag = category;
     }
     
-    // The 'Breaking' category is a special case that sorts by newest event ID
-    if (category === 'Breaking' && !useSearchEndpoint) {
-        params.sort = 'id';
-        delete params.tag_id;
+    if (params.q === '*') {
+        params.sort = 'liquidity';
     }
 
-    const data = await this.fetchFromApi(GAMMA_API, endpoint, params);
 
-    const events = (useSearchEndpoint ? data?.events : data) || [];
-    if (!Array.isArray(events)) {
-        return { markets: [], hasMore: false };
-    }
+    const data = await this.fetchFromApi(GAMMA_API, 'public-search', params);
+
+    if (!data?.events) return { markets: [], hasMore: false };
 
     const markets: MarketIntel[] = [];
-    for (const event of events) {
+    for (const event of data.events) {
       if (event.markets && Array.isArray(event.markets)) {
         for (const market of event.markets) {
           const mapped = mapMarket(market, event);
@@ -162,9 +164,7 @@ class PolymarketService {
         }
       }
     }
-
-    const hasMore = useSearchEndpoint ? (data?.pagination?.hasMore ?? false) : (events.length === limit);
-    return { markets, hasMore };
+    return { markets, hasMore: data.pagination?.hasMore ?? false };
   }
 
   async getLiveMarkets(limit = 50, category?: string, page: number = 1): Promise<{ markets: MarketIntel[], hasMore: boolean }> {
@@ -173,6 +173,7 @@ class PolymarketService {
 
   async getLiquidityOpportunities(limit = 20): Promise<MarketIntel[]> {
     const data = await this.fetchFromApi(GAMMA_API, 'markets', {
+        // CORRECTED PARAMETER TYPE: Explicitly use string 'false'
         closed: 'false',
         limit: 200, 
     });
@@ -210,8 +211,9 @@ class PolymarketService {
     }
 
     const data = await this.fetchFromApi(GAMMA_API, 'comments', {
-        parent_entity_id: numericId,
-        parent_entity_type: entityType,
+        // CORRECTED PARAMETERS:
+        entity_id: numericId,
+        entity_type: entityType,
         limit: 50,
         order: 'createdAt',
         ascending: false,

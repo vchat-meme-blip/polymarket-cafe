@@ -275,5 +275,20 @@ export type AgentTask = {
   status: 'pending' | 'in_progress' | 'completed';
   createdAt: number;
   updatedAt: number;
-  updates: string[];
+  updates: { timestamp: number, message: string }[];
+  result?: {
+    summary: string;
+  };
+  sources?: {
+    title: string;
+    url: string;
+  }[];
+};
+
+export type ActivityLogEntry = {
+  id: number;
+  timestamp: number;
+  type: 'move' | 'conversation' | 'intel' | 'system';
+  message: string;
+  triggeredNotification?: boolean;
 };

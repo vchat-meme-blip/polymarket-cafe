@@ -398,7 +398,11 @@ router.post('/agents/:agentId/tasks', async (req, res) => {
           id: new ObjectId().toHexString(),
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          updates: [`Task created: "${taskData.objective}"`],
+          // FIX: Changed 'updates' from string[] to object[] to match the AgentTask type.
+          updates: [{
+              timestamp: Date.now(),
+              message: `Task created: "${taskData.objective}"`
+          }],
       };
 
       await agentsCollection.updateOne(

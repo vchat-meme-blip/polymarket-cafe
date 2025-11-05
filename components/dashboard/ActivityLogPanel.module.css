@@ -1,0 +1,66 @@
+.activityLog {
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column-reverse; /* Newest logs at the bottom */
+    gap: 12px;
+}
+
+.activityItem {
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--Neutral-20);
+}
+.activityItem:last-child {
+    border-bottom: none;
+}
+
+.activityHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.activityIcon {
+    font-size: 16px;
+}
+.activityIcon.move { color: var(--brand-blue); }
+.activityIcon.conversation { color: var(--brand-pink); }
+.activityIcon.intel { color: var(--brand-purple); }
+.activityIcon.system { color: var(--Neutral-60); }
+
+.activityType {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    color: var(--Neutral-60);
+}
+.activityTimestamp {
+    font-size: 11px;
+    color: var(--Neutral-50);
+    margin-left: auto;
+}
+
+.activityDescription {
+    font-size: 13px;
+    color: var(--Neutral-80);
+    line-height: 1.5;
+    padding-left: 24px; /* Align with header text */
+    position: relative;
+}
+
+.notificationIcon {
+    position: absolute;
+    right: 0;
+    top: 0;
+    font-size: 16px;
+    color: var(--brand-yellow);
+}
+
+.emptyLog {
+  text-align: center;
+  color: var(--Neutral-60);
+  font-style: italic;
+  padding: 20px;
+  margin: auto;
+}

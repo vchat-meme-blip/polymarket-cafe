@@ -1,0 +1,89 @@
+.taskDetailModal h2 {
+    color: var(--brand-cyan);
+    margin-bottom: 4px;
+}
+.taskDetailModal .status {
+    font-size: 14px;
+    padding: 4px 10px;
+    border-radius: 99px;
+    font-weight: 500;
+    display: inline-block;
+    margin-bottom: 16px;
+}
+.taskDetailModal .status.pending { background-color: var(--Neutral-30); color: var(--Neutral-80); }
+.taskDetailModal .status.in_progress { background-color: var(--Blue-800); color: var(--Blue-400); }
+.taskDetailModal .status.completed { background-color: var(--Green-700); color: var(--Green-500); }
+
+.detailSection {
+    margin-bottom: 20px;
+}
+
+.detailSection h4 {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--Neutral-80);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--Neutral-30);
+}
+
+.objectiveText, .summaryText {
+    background: var(--Neutral-10);
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--Neutral-80);
+}
+
+.updatesLog {
+    max-height: 150px;
+    overflow-y: auto;
+    background: var(--Neutral-10);
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.updatesLog ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.updatesLog li {
+    display: flex;
+    gap: 8px;
+}
+.updatesLog .timestamp {
+    color: var(--Neutral-60);
+    flex-shrink: 0;
+}
+.updatesLog .message {
+    color: var(--Neutral-80);
+}
+
+.sourcesList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.sourceLink {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--Neutral-10);
+    padding: 8px 12px;
+    border-radius: 8px;
+    color: var(--brand-cyan);
+    text-decoration: none;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+.sourceLink:hover {
+    background: var(--Neutral-20);
+}
+.sourceLink .icon {
+    font-size: 18px;
+}
