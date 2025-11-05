@@ -18,7 +18,7 @@
     "clean:dist": "rimraf dist",
     "build:server": "tsc --project tsconfig.server.json && tsc-alias -p tsconfig.server.json",
     "build": "npm run clean:dist && npm run build:client && npm run build:server",
-    "start": "NODE_ENV=production node dist/server/server/index.js",
+    "start": "NODE_ENV=production node dist/server/index.js",
     "start:pm2": "NODE_ENV=production pm2-runtime ecosystem.config.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx --fix",
