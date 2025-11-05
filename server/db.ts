@@ -58,6 +58,8 @@ export let bettingIntelCollection: Collection<BettingIntelDocument>;
 export let marketWatchlistsCollection: Collection<Document>;
 export let dailySummariesCollection: Collection<DailySummaryDocument>;
 export let notificationsCollection: Collection<NotificationDocument>;
+export let agentInteractionsCollection: Collection<Document>;
+
 
 // Helper function to convert MongoDB document to plain object
 function toPlainObject<T>(doc: any): T {
@@ -102,6 +104,8 @@ const connectDB = async () => {
     marketWatchlistsCollection = mongoose.connection.collection<Document>('marketWatchlists');
     dailySummariesCollection = mongoose.connection.collection<DailySummaryDocument>('dailySummaries');
     notificationsCollection = mongoose.connection.collection<NotificationDocument>('notifications');
+    agentInteractionsCollection = mongoose.connection.collection<Document>('agent_interactions');
+
 
     // Create indexes
     await Promise.all([

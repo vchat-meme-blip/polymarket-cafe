@@ -5,6 +5,8 @@
 import { create } from 'zustand';
 import { useWalletStore } from './wallet.js';
 import { AgentActivity, BettingIntel, Bounty, AgentTask, ActivityLogEntry } from '../types/index.js';
+import { apiService } from '../services/api.service.js';
+import { useAgent } from './index.js';
 
 interface ServerHydrationData {
     bounties: Bounty[];
@@ -39,7 +41,8 @@ export type AutonomyState = {
   completeBounty: (bountyId: string) => void;
   setTasks: (tasks: AgentTask[]) => void;
   addTask: (task: AgentTask) => void;
-  updateTask: (taskId: string, updates: Partial<AgentTask>) => void;
+  updateTask: (taskId: string, updates: Partial<AgentTask>) => Promise<void>;
+  deleteTask: (taskId: string) => Promise<void>;
   addActivityLog: (logEntry: ActivityLogEntry) => void;
 };
 
@@ -205,11 +208,22 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
   },
   setTasks: (tasks: AgentTask[]) => set({ tasks }),
   addTask: (task: AgentTask) => set(state => ({ tasks: [...state.tasks, task] })),
-  updateTask: (taskId: string, updates: Partial<AgentTask>) => set(state => ({
-    tasks: state.tasks.map(task => 
-      task.id === taskId ? { ...task, ...updates, updatedAt: Date.now() } : task
-    ),
-  })),
+  updateTask: async (taskId: string, updates: Partial<AgentTask>) => {
+    const agentId = useAgent.getState().current.id;
+    const updatedTask = await apiService.updateTask(agentId, taskId, updates);
+    set(state => ({
+      tasks: state.tasks.map(task => 
+        task.id === taskId ? updatedTask : task
+      ),
+    }));
+  },
+  deleteTask: async (taskId: string) => {
+    const agentId = useAgent.getState().current.id;
+    await apiService.deleteTask(agentId, taskId);
+    set(state => ({
+        tasks: state.tasks.filter(task => task.id !== taskId),
+    }));
+  },
   addActivityLog: (logEntry: ActivityLogEntry) => set(state => ({
     activityLog: [logEntry, ...state.activityLog].slice(0, 100), // Keep last 100 logs
   })),

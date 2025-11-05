@@ -121,6 +121,19 @@ class ApiService {
     });
   }
 
+  async updateTask(agentId: string, taskId: string, updates: Partial<AgentTask>): Promise<AgentTask> {
+    return this.request<AgentTask>(`/api/agents/${agentId}/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteTask(agentId: string, taskId: string): Promise<void> {
+    await this.request<void>(`/api/agents/${agentId}/tasks/${taskId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // --- Agent Actions & AI ---
   async brainstormPersonality(keywords: string): Promise<{ personality: string }> {
     return this.request<{ personality: string }>('/api/ai/brainstorm-personality', {
