@@ -108,27 +108,24 @@ class PolymarketService {
   
   async searchMarkets(query: string, category?: string, page: number = 1, limit: number = 40): Promise<{ markets: MarketIntel[], hasMore: boolean }> {
     const useSearchEndpoint = !!query;
-    const endpoint = useSearchEndpoint ? 'public-search' : 'events';
+    let endpoint = useSearchEndpoint ? 'public-search' : 'events';
     
     const params: any = {
+        limit: useSearchEndpoint ? undefined : limit,
+        limit_per_type: useSearchEndpoint ? limit : undefined,
+        offset: useSearchEndpoint ? undefined : (page - 1) * limit,
+        page: useSearchEndpoint ? page : undefined,
         closed: false,
     };
 
     if (useSearchEndpoint) {
         params.q = query;
-        // CORRECTED PARAMETER: use `tag` instead of `events_tag`
         if (category && category !== 'All' && category !== 'Breaking') {
-            params.tag = category;
+            params.events_tag = category; // public-search uses events_tag
         }
-        // CORRECTED PARAMETER: use `limit` instead of `limit_per_type`
-        params.limit = limit;
-        params.page = page;
         params.sort = 'volume';
         params.ascending = false;
-    } else { // Using /events endpoint for browsing
-        params.limit = limit;
-        params.offset = (page - 1) * limit;
-
+    } else {
         if (category && category !== 'All' && category !== 'Breaking') {
             const tagId = CATEGORY_TAG_MAP[category];
             if (tagId) {
@@ -176,7 +173,6 @@ class PolymarketService {
 
   async getLiquidityOpportunities(limit = 20): Promise<MarketIntel[]> {
     const data = await this.fetchFromApi(GAMMA_API, 'markets', {
-        // CORRECTED PARAMETER TYPE: Explicitly use string 'false'
         closed: 'false',
         limit: 200, 
     });
@@ -214,9 +210,8 @@ class PolymarketService {
     }
 
     const data = await this.fetchFromApi(GAMMA_API, 'comments', {
-        // CORRECTED PARAMETERS:
-        entity_id: numericId,
-        entity_type: entityType,
+        parent_entity_id: numericId,
+        parent_entity_type: entityType,
         limit: 50,
         order: 'createdAt',
         ascending: false,
