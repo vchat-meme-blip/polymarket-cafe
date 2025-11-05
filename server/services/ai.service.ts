@@ -1,19 +1,84 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+*/
 import OpenAI from 'openai';
 import mongoose from 'mongoose';
 const { Types } = mongoose;
 
-// FIX: Add User type import
-import { Agent, Interaction, MarketIntel, Room, TradeRecord, BettingIntel, User } from '../../lib/types/index.js';
+import { Agent, Interaction, MarketIntel, Room, TradeRecord, BettingIntel, User, AgentTask } from '../../lib/types/index.js';
 import { apiKeyProvider } from './apiKey.provider.js';
-import { agentsCollection, bettingIntelCollection, notificationsCollection } from '../db.js';
+import { agentsCollection, bettingIntelCollection, notificationsCollection, usersCollection } from '../db.js';
 import { polymarketService } from './polymarket.service.js';
 import { kalshiService } from './kalshi.service.js';
 import { firecrawlService } from './firecrawl.service.js';
-// FIX: Add createSystemInstructions import
 import { createSystemInstructions } from '../../lib/prompts.js';
 
+// Define the tools available to the agent
+const agentTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+    {
+        type: 'function',
+        function: {
+            name: 'search_markets',
+            description: 'Search for prediction markets on Polymarket based on a query or category.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'The search query, e.g., "Trump".' },
+                    category: { type: 'string', description: 'A specific category to filter by, e.g., "Sports".' }
+                },
+                required: ['query'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'open_market_detail',
+            description: 'Opens the detailed view for a specific market to show the user more information.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    marketId: { type: 'string', description: 'The unique ID of the market to open, e.g., "polymarket-12345".' },
+                },
+                required: ['marketId'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'calculate_payout',
+            description: 'Calculates the potential profit for a bet given the odds and amount.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    price: { type: 'number', description: 'The price or odds of the outcome, from 0 to 1.' },
+                    amount: { type: 'number', description: 'The amount of the bet in USD.' },
+                },
+                required: ['price', 'amount'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'bookmark_and_monitor_market',
+            description: "Bookmarks a market for the user and assigns the agent to monitor it for significant changes.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    marketId: { type: 'string', description: 'The unique ID of the market to bookmark and monitor.' },
+                    marketTitle: { type: 'string', description: 'The title of the market.' },
+                },
+                required: ['marketId', 'marketTitle'],
+            },
+        }
+    }
+];
+
+
 class AiService {
-  // FIX: Add missing 'getDirectMessageResponse' method
   async getDirectMessageResponse(
     agent: Agent,
     user: User,
@@ -24,48 +89,89 @@ class AiService {
     const openai = new OpenAI({ apiKey });
     const systemPrompt = createSystemInstructions(agent, user, false);
 
-    // FIX: Explicitly type the role to satisfy OpenAI's ChatCompletionMessageParam type.
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemPrompt },
       ...history.map((turn) => {
         const role: 'assistant' | 'user' = turn.agentId === agent.id ? 'assistant' : 'user';
-        return {
-          role,
-          content: turn.text,
-        };
+        const content: any[] = [{ type: 'text', text: turn.text }];
+        // Add previous tool call results to history for context
+        if (turn.tool_calls) {
+            content.push(...(turn.tool_calls as any[]));
+        }
+        return { role, content };
       }),
       { role: 'user', content: message },
     ];
 
     try {
-      const completion = await openai.chat.completions.create({
+      const response = await openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: messages,
+        tools: agentTools,
+        tool_choice: 'auto',
       });
 
-      const responseText =
-        completion.choices[0].message.content?.trim() ?? '...';
+      const responseMessage = response.choices[0].message;
+      const toolCalls = responseMessage.tool_calls;
 
-      const agentMessage: Interaction = {
-        agentId: agent.id,
-        agentName: agent.name,
-        text: responseText,
-        timestamp: Date.now(),
-      };
+      if (toolCalls) {
+        messages.push(responseMessage); // Add assistant's tool call message to history
 
-      return agentMessage;
+        for (const toolCall of toolCalls) {
+          if (toolCall.type !== 'function') continue;
+          const functionName = toolCall.function.name;
+          const functionArgs = JSON.parse(toolCall.function.arguments);
+          let functionResponse;
+
+          if (functionName === 'search_markets') {
+            const { markets } = await polymarketService.searchMarkets(functionArgs.query, functionArgs.category);
+            functionResponse = { markets: markets.slice(0, 5) }; // Return top 5 results
+          } else if (functionName === 'calculate_payout') {
+            const profit = (functionArgs.amount / functionArgs.price) - functionArgs.amount;
+            functionResponse = { profit: profit.toFixed(2) };
+          } else {
+             // For tools handled by the client (open_market_detail, bookmark_and_monitor_market)
+             // we just return the tool call in the message.
+             return {
+                agentId: agent.id,
+                agentName: agent.name,
+                text: responseMessage.content || '',
+                timestamp: Date.now(),
+                tool_calls: toolCalls,
+             };
+          }
+          
+          messages.push({
+            tool_call_id: toolCall.id,
+            role: 'tool',
+            content: JSON.stringify(functionResponse),
+          });
+        }
+
+        const secondResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: messages,
+        });
+
+        return {
+            agentId: agent.id,
+            agentName: agent.name,
+            text: secondResponse.choices[0].message.content || '...',
+            timestamp: Date.now(),
+        };
+
+      }
+
+      const responseText = responseMessage.content?.trim() ?? '...';
+      return { agentId: agent.id, agentName: agent.name, text: responseText, timestamp: Date.now() };
+
     } catch (error) {
-      console.error(
-        `[AiService] OpenAI completion failed for direct message with ${agent.name}:`,
-        error
-      );
+      console.error(`[AiService] OpenAI completion failed for direct message with ${agent.name}:`, error);
       if (error instanceof OpenAI.APIError && error.status === 429) {
         apiKeyProvider.reportRateLimit(apiKey, 60);
       }
-      // Return a generic error message
       return {
-        agentId: agent.id,
-        agentName: agent.name,
+        agentId: agent.id, agentName: agent.name,
         text: "I'm having some trouble connecting right now. Let's talk later.",
         timestamp: Date.now(),
       };
@@ -186,10 +292,8 @@ class AiService {
       const toolCalls = choice.message.tool_calls;
 
       if (toolCalls) {
-          // FIX: Add a type guard (tc.type === 'function') before accessing tc.function to prevent errors when other tool types are present.
-          const endConversationCall = toolCalls.find(tc => tc.type === 'function' && tc.function.name === 'end_conversation');
-          if (endConversationCall) {
-              return { text: choice.message.content || "It was nice talking to you. Goodbye.", endConversation: true, toolCalls: [endConversationCall] };
+          if (toolCalls.some(tc => tc.type === 'function' && tc.function.name === 'end_conversation')) {
+              return { text: choice.message.content || "It was nice talking to you. Goodbye.", endConversation: true, toolCalls };
           }
       }
 
@@ -320,7 +424,7 @@ ${researchContext}
     } catch (error) {
       console.error(`[AiService] OpenAI completion failed for intel generation on "${market.title}":`, error);
        if (error instanceof OpenAI.APIError && error.status === 429 && apiKey) {
-            apiKeyProvider.reportRateLimit(apiKey, 60);
+            apiKeyProvider.reportRateLimit(apiKey, 30);
         }
       return null;
     }
@@ -332,13 +436,20 @@ ${researchContext}
 
     const openai = new OpenAI({ apiKey });
     
+    // NEW: Firecrawl integration
+    const firecrawlData = firecrawlService.isConfigured() ? await firecrawlService.search(market.title) : [];
+    const researchContext = firecrawlData.length > 0
+        ? `\n\nHere is some real-time web research on this topic:\n` + firecrawlData.map(r => `Source: ${r.title}\nContent: ${r.markdown.slice(0, 1500)}...`).join('\n\n')
+        : '';
+
     const systemPrompt = `You are ${agent.name}, an AI copilot for prediction markets. Your personality is: "${agent.personality}".`;
-    let userPrompt = `My user is looking at the following market. Provide a brief, in-character analysis (2-3 sentences) based on the data provided.
+    let userPrompt = `My user is looking at the following market. Provide a brief, in-character analysis (2-3 sentences) based on all the data provided.
     
     Market: "${market.title}"
     Description: ${market.description}
     Yes Odds: ${Math.round(market.odds.yes * 100)}¢
     Ends At: ${new Date(market.endsAt).toLocaleString()}
+    ${researchContext}
     `;
 
     if (comments && comments.length > 0) {

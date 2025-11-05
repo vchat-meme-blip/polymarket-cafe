@@ -34,6 +34,7 @@ export type User = {
   ownedRoomId?: string;
   phone?: string;
   notificationSettings: NotificationSettings;
+  bookmarkedMarketIds?: string[];
 };
 
 export type AgentMode = 'Safe' | 'Degen' | 'Mag7';
@@ -94,6 +95,7 @@ export type Interaction = {
   text: string;
   timestamp: number;
   markets?: MarketIntel[];
+  tool_calls?: any[];
 };
 
 export type Offer = {
