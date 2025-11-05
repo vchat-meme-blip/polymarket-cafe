@@ -1,8 +1,8 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-// FIX: Replaced the incorrect and outdated triple-slash directive for @react-three/fiber types with a direct import. This correctly augments the JSX namespace and resolves all TypeScript errors related to unrecognized 3D components like `<mesh>`, `<group>`, etc., across the entire application.
 import '@react-three/fiber';
 
 /**
