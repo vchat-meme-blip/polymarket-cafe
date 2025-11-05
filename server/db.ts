@@ -45,21 +45,21 @@ if (!uri) {
 // The connection options will be set in the mongoose.connect() call
 const connectionString = uri;
 
-// Collection references with proper typing
-export let usersCollection: Collection<UserDocument>;
-export let agentsCollection: Collection<AgentDocument>;
-export let roomsCollection: Collection<RoomDocument>;
-export let betsCollection: Collection<BetDocument>;
-export let bountiesCollection: Collection<BountyDocument>;
-export let activityLogCollection: Collection<Document>;
-export let tradeHistoryCollection: Collection<TradeRecordDocument>;
-export let transactionsCollection: Collection<TransactionDocument>;
-export let bettingIntelCollection: Collection<BettingIntelDocument>;
-export let marketWatchlistsCollection: Collection<Document>;
-export let dailySummariesCollection: Collection<DailySummaryDocument>;
-export let notificationsCollection: Collection<NotificationDocument>;
-export let agentInteractionsCollection: Collection<Document>;
-
+// Collection references with proper type
+export let usersCollection: mongoose.mongo.Collection<UserDocument>;
+export let agentsCollection: mongoose.mongo.Collection<AgentDocument>;
+export let roomsCollection: mongoose.mongo.Collection<RoomDocument>;
+export let betsCollection: mongoose.mongo.Collection<BetDocument>;
+export let bountiesCollection: mongoose.mongo.Collection<BountyDocument>;
+export let tradeRecordsCollection: mongoose.mongo.Collection<TradeRecordDocument>;
+export let transactionsCollection: mongoose.mongo.Collection<TransactionDocument>;
+export let bettingIntelCollection: mongoose.mongo.Collection<BettingIntelDocument>;
+export let dailySummariesCollection: mongoose.mongo.Collection<DailySummaryDocument>;
+export let notificationsCollection: mongoose.mongo.Collection<NotificationDocument>;
+export let agentInteractionsCollection: mongoose.mongo.Collection<mongoose.mongo.Document>;
+export let activityLogCollection: mongoose.mongo.Collection<mongoose.mongo.Document>;
+export let tradeHistoryCollection: mongoose.mongo.Collection<TradeRecordDocument>;
+export let marketWatchlistsCollection: mongoose.mongo.Collection<any>;
 
 // Helper function to convert MongoDB document to plain object
 function toPlainObject<T>(doc: any): T {
@@ -70,57 +70,63 @@ function toPlainObject<T>(doc: any): T {
 }
 
 // Initialize database connection and collections
-const connectDB = async () => {
-  if (mongoose.connection.readyState === 1) {
-    return mongoose.connection;
+export async function connectDB() {
+  if (mongoose.connection.readyState >= 1) {
+    // If already connected, ensure collections are initialized
+    if (!usersCollection) initializeCollections();
+    return;
   }
 
   try {
     await mongoose.connect(connectionString, {
-      serverSelectionTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
-      connectTimeoutMS: 30000,
-      tls: true,
-      tlsAllowInvalidCertificates: true,
-      maxPoolSize: 10,
-      minPoolSize: 1,
-      appName: 'polymarket-cafe',
-      retryWrites: true,
-      retryReads: true,
     });
 
-    console.log('MongoDB connected successfully.');
-
-    // Initialize collection references with proper typing
-    usersCollection = mongoose.connection.collection<UserDocument>('users');
-    agentsCollection = mongoose.connection.collection<AgentDocument>('agents');
-    roomsCollection = mongoose.connection.collection<RoomDocument>('rooms');
-    betsCollection = mongoose.connection.collection<BetDocument>('bets');
-    bountiesCollection = mongoose.connection.collection<BountyDocument>('bounties');
-    activityLogCollection = mongoose.connection.collection<Document>('activity_logs');
-    tradeHistoryCollection = mongoose.connection.collection<TradeRecordDocument>('trade_history');
-    transactionsCollection = mongoose.connection.collection<TransactionDocument>('transactions');
-    bettingIntelCollection = mongoose.connection.collection<BettingIntelDocument>('bettingIntel');
-    marketWatchlistsCollection = mongoose.connection.collection<Document>('marketWatchlists');
-    dailySummariesCollection = mongoose.connection.collection<DailySummaryDocument>('dailySummaries');
-    notificationsCollection = mongoose.connection.collection<NotificationDocument>('notifications');
-    agentInteractionsCollection = mongoose.connection.collection<Document>('agent_interactions');
-
-
-    // Create indexes
-    await Promise.all([
-      usersCollection.createIndex({ handle: 1 }, { unique: true }),
-      agentsCollection.createIndex({ id: 1 }, { unique: true }),
-      agentsCollection.createIndex({ ownerHandle: 1 }),
-      roomsCollection.createIndex({ id: 1 }, { unique: true })
-    ]);
-
-    return mongoose.connection;
+    initializeCollections();
+    
+    console.log('MongoDB connected and collections initialized');
   } catch (error) {
     console.error('MongoDB connection error:', error);
     process.exit(1);
   }
-};
+}
+
+function initializeCollections() {
+  if (!mongoose.connection.db) {
+    console.error('MongoDB connection not established');
+    return;
+  }
+
+  try {
+    // Initialize collections after connection is established with proper MongoDB Collection type
+    const db = mongoose.connection.db as unknown as mongoose.mongo.Db;
+    
+    usersCollection = db.collection<UserDocument>('users');
+    agentsCollection = db.collection<AgentDocument>('agents');
+    roomsCollection = db.collection<RoomDocument>('rooms');
+    betsCollection = db.collection<BetDocument>('bets');
+    bountiesCollection = db.collection<BountyDocument>('bounties');
+    tradeRecordsCollection = db.collection<TradeRecordDocument>('traderecords');
+    transactionsCollection = db.collection<TransactionDocument>('transactions');
+    bettingIntelCollection = db.collection<BettingIntelDocument>('bettingintel');
+    dailySummariesCollection = db.collection<DailySummaryDocument>('dailysummaries');
+    notificationsCollection = db.collection<NotificationDocument>('notifications');
+    agentInteractionsCollection = db.collection<mongoose.mongo.Document>('agentinteractions');
+    activityLogCollection = db.collection<mongoose.mongo.Document>('activity_logs');
+    tradeHistoryCollection = db.collection<TradeRecordDocument>('trade_history');
+  marketWatchlistsCollection = db.collection('market_watchlists');
+
+    // Create indexes
+    Promise.all([
+      usersCollection.createIndex({ email: 1 }, { unique: true }),
+      agentsCollection.createIndex({ name: 1 }, { unique: true }),
+      roomsCollection.createIndex({ name: 1 }, { unique: true }),
+    ]).catch(err => console.error('Error creating indexes:', err));
+  } catch (error) {
+    console.error('Error initializing collections:', error);
+  }
+}
 
 // Handle connection events
 mongoose.connection.on('connected', () => {
@@ -148,7 +154,6 @@ process.on('SIGINT', async () => {
 });
 
 export { mongoose as db };
-export default connectDB;
 
 export async function seedMcpAgents() {
   const agentCount = await agentsCollection.countDocuments({ ownerHandle: { $exists: false } });
@@ -206,6 +211,14 @@ export async function seedPublicRooms() {
 }
 
 export async function seedDatabase() {
+  try {
+    await connectDB(); // Ensure DB is connected
+    console.log('Starting database seeding...');
     await seedMcpAgents();
     await seedPublicRooms();
+    console.log('Database seeding completed successfully');
+  } catch (error) {
+    console.error('Error seeding database:', error);
+    throw error;
+  }
 }

@@ -17,9 +17,10 @@ import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 
 import apiRouter from './routes/api.js';
-import { db, seedDatabase } from './db.js';
+import { db, seedDatabase, connectDB } from './db.js';
 import { ApiKeyManager } from './services/apiKey.service.js';
 import { webSocketService } from './services/websocket.service.js';
+import fs from 'fs';
 
 declare global {
   namespace Express {
@@ -187,16 +188,44 @@ app.use(attachWorkers as any);
 app.use('/api', apiRouter);
 
 if (isProduction) {
-  const clientBuildPath = path.join(__dirname, '..', 'client');
-  app.use(express.static(clientBuildPath) as any);
+  // In production, the client files are in the 'dist/client' directory
+  const clientBuildPath = path.join(process.cwd(), 'dist', 'client');
+  
+  // Serve static files from the client build directory
+  app.use(express.static(clientBuildPath, {
+    maxAge: '1y', // Cache static assets for 1 year
+    etag: true,   // Enable ETag generation
+    index: false   // Don't serve index.html for directory requests
+  }) as any);
+  
+  // Handle SPA routing - serve index.html for all other routes
   app.get('*', (req, res) => {
     res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+  
+  console.log(`Serving static files from: ${clientBuildPath}`);
+} else {
+  // In development, let Vite handle the frontend
+  app.get('*', (req, res) => {
+    res.redirect(`http://localhost:3000${req.originalUrl}`);
   });
 }
 
 export async function startServer() {
+  // Ensure database is connected before starting the server
+  await connectDB();
+  
   const PORT = process.env.PORT || 3001;
   const HOST = process.env.HOST || '0.0.0.0';
+  
+  // Ensure the client build directory exists in production
+  if (isProduction) {
+    const clientBuildPath = path.join(process.cwd(), 'dist', 'client');
+    if (!fs.existsSync(path.join(clientBuildPath, 'index.html'))) {
+      console.error('Production build not found. Please build the client first.');
+      process.exit(1);
+    }
+  }
   
   return new Promise<void>((resolve, reject) => {
     server.listen(Number(PORT), HOST, async () => {
