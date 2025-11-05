@@ -12,6 +12,12 @@ import { formatDistanceToNow } from 'date-fns';
 
 const TaskItem = ({ task }: { task: AgentTask }) => {
     const { openTaskDetailModal } = useUI();
+
+    // FIX: Add a guard to prevent RangeError from invalid timestamps.
+    const updatedText = typeof task.updatedAt === 'number' && !isNaN(task.updatedAt)
+        ? `Updated ${formatDistanceToNow(new Date(task.updatedAt), { addSuffix: true })}`
+        : 'Updated recently';
+
     return (
         <div className={styles.taskItem}>
             <div className={styles.taskItemHeader}>
@@ -21,7 +27,7 @@ const TaskItem = ({ task }: { task: AgentTask }) => {
                 </span>
             </div>
             <div className={styles.taskItemFooter}>
-                <span className={styles.taskTime}>Updated {formatDistanceToNow(new Date(task.updatedAt), { addSuffix: true })}</span>
+                <span className={styles.taskTime}>{updatedText}</span>
                 <button className="button secondary" onClick={() => openTaskDetailModal(task)}>
                     <span className="icon">manage_history</span> Manage
                 </button>

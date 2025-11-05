@@ -58,6 +58,54 @@
     flex-grow: 1;
 }
 
+.performanceGrid, .controlGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.controlPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background-color: var(--Neutral-10);
+    border: 1px solid var(--Neutral-20);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.panelTitle {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--Neutral-90);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panelTitle .icon {
+  font-size: 24px;
+  color: var(--Neutral-60);
+}
+
+.controlPanel .button {
+  justify-content: flex-start;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  background-color: var(--Neutral-20);
+  color: var(--Neutral-90);
+}
+.controlPanel .button:hover:not(:disabled) {
+  background-color: var(--Neutral-30);
+  color: white;
+}
+.controlPanel .button .icon {
+  font-size: 20px;
+  color: var(--brand-cyan);
+}
+
 @media (min-width: 768px) {
     .tabButton {
         padding: 12px 16px;
@@ -65,5 +113,8 @@
     }
     .tabContent {
         padding: 20px;
+    }
+    .performanceGrid, .controlGrid {
+        gap: 24px;
     }
 }

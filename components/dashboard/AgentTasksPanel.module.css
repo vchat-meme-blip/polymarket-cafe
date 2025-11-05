@@ -1,13 +1,13 @@
 .agentTasksPanel {
-    flex-grow: 1; /* Allow it to take more space if available */
-    min-height: 200px; /* Ensure it has a minimum height */
     display: flex;
     flex-direction: column;
+    gap: 12px;
 }
 .tasksHeader {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-shrink: 0;
 }
 .tasksHeader .button {
     padding: 6px 10px;
@@ -16,8 +16,8 @@
 .taskList {
     overflow-y: auto;
     flex-grow: 1;
-    margin-top: 12px;
     padding-right: 4px;
+    min-height: 150px;
 }
 .taskItem {
     background: var(--Neutral-10);
@@ -25,51 +25,52 @@
     border-radius: 8px;
     margin-bottom: 8px;
     border: 1px solid var(--Neutral-20);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
-.taskItem details {
-    width: 100%;
-}
-.taskItem summary {
+.taskItemHeader {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    list-style: none;
-}
-.taskItem summary::-webkit-details-marker {
-    display: none;
+    align-items: flex-start;
+    gap: 8px;
 }
 .taskObjective {
     font-weight: 500;
     font-size: 14px;
+    line-height: 1.4;
 }
 .taskStatus {
-    font-size: 12px;
+    font-size: 11px;
     padding: 4px 8px;
     border-radius: 99px;
     font-weight: 500;
     flex-shrink: 0;
     margin-left: 8px;
+    text-transform: capitalize;
 }
 .taskStatus.pending { background-color: var(--Neutral-30); color: var(--Neutral-80); }
 .taskStatus.in_progress { background-color: var(--Blue-800); color: var(--Blue-400); }
 .taskStatus.completed { background-color: var(--Green-700); color: var(--Green-500); }
-.taskUpdates {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px dashed var(--Neutral-30);
-    font-size: 13px;
-    color: var(--Neutral-80);
-}
-.taskUpdates ul {
+
+.taskItemFooter {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding-left: 16px;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
 }
-.taskUpdates li {
-    list-style-type: '» ';
+.taskTime {
+    font-size: 12px;
+    color: var(--Neutral-60);
 }
+.taskItemFooter .button.secondary {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+.taskItemFooter .button.secondary .icon {
+    font-size: 16px;
+}
+
 .emptyTasks {
     text-align: center;
     color: var(--Neutral-60);

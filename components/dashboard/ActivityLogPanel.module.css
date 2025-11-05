@@ -2,14 +2,20 @@
     height: 100%;
     overflow-y: auto;
     display: flex;
-    flex-direction: column-reverse; /* Newest logs at the bottom */
+    flex-direction: column;
     gap: 12px;
 }
 
 .activityItem {
     padding-bottom: 12px;
     border-bottom: 1px solid var(--Neutral-20);
+    animation: fadeIn 0.3s ease-in-out;
 }
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 .activityItem:last-child {
     border-bottom: none;
 }
@@ -24,9 +30,10 @@
 .activityIcon {
     font-size: 16px;
 }
-.activityIcon.move { color: var(--brand-blue); }
-.activityIcon.conversation { color: var(--brand-pink); }
-.activityIcon.intel { color: var(--brand-purple); }
+.activityIcon.cafe { color: var(--brand-orange); }
+.activityIcon.research { color: var(--brand-purple); }
+.activityIcon.trade { color: var(--brand-green); }
+.activityIcon.engagement { color: var(--brand-pink); }
 .activityIcon.system { color: var(--Neutral-60); }
 
 .activityType {
