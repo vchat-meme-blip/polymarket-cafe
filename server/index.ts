@@ -1,6 +1,16 @@
 /// <reference types="node" />
 
+// Load environment variables first
+import './load-env.js';
+
 import { startServer } from './startup.js';
+
+// Before anything else, check for required environment variables
+if (!process.env.MONGODB_URI) {
+    console.error('[FATAL STARTUP ERROR] MONGODB_URI is not set. Please define it in your environment.');
+    process.exit(1);
+}
+console.log('[Server] MONGODB_URI found.');
 
 let serverInstance: { stop: () => Promise<void> } | null = null;
 
