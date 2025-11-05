@@ -3,11 +3,6 @@ import { notificationsCollection, usersCollection } from '../db.js';
 import { ObjectId } from 'mongodb';
 import { Notification } from '../../lib/types/index.js';
 
-type SendStatus = {
-    sent: boolean;
-    reason?: 'NO_PHONE' | 'NO_CLIENT' | 'DISABLED' | 'ERROR' | 'NOT_FOUND';
-};
-
 class NotificationService {
     private client: twilio.Twilio | null = null;
     private fromNumber: string | null = null;
@@ -30,7 +25,7 @@ class NotificationService {
         }
     }
 
-    public async logAndSendNotification(notificationData: Omit<Notification, 'id' | 'timestamp' | 'wasSent'>): Promise<SendStatus> {
+    public async logAndSendNotification(notificationData: Omit<Notification, 'id' | 'timestamp' | 'wasSent'>): Promise<boolean> {
         const newNotification: Notification = {
             ...notificationData,
             id: new ObjectId().toHexString(),
@@ -38,57 +33,47 @@ class NotificationService {
             wasSent: false,
         };
 
+        let notificationSent = false;
+
         try {
+            // Step 1: Log the notification to the database
             await notificationsCollection.insertOne(newNotification as any);
             
+            // Step 2: Check user preferences and send the notification
             const user = await usersCollection.findOne({ handle: notificationData.userId });
 
-            if (!user) {
-                console.log(`[NotificationService] Logged notification for ${notificationData.userId} but could not send (user not found).`);
-                return { sent: false, reason: 'NOT_FOUND' };
-            }
+            if (user && user.phone && this.client && this.fromNumber) {
+                const settings = user.notificationSettings;
+                let shouldSend = false;
 
-            if (!this.client || !this.fromNumber) {
-                console.log(`[NotificationService] Logged notification for ${user.handle} but could not send (client not configured).`);
-                return { sent: false, reason: 'NO_CLIENT' };
-            }
+                switch (notificationData.type) {
+                    case 'agentResearch': shouldSend = settings?.agentResearch ?? false; break;
+                    case 'agentTrade': shouldSend = settings?.agentTrades ?? false; break;
+                    case 'newMarkets': shouldSend = settings?.newMarkets ?? false; break;
+                    case 'agentEngagement': shouldSend = settings?.agentEngagements ?? false; break;
+                }
 
-            if (!user.phone) {
-                 console.log(`[NotificationService] Logged notification for ${user.handle} but could not send (missing phone).`);
-                 return { sent: false, reason: 'NO_PHONE' };
-            }
-            
-            const settings = user.notificationSettings;
-            let shouldSend = false;
-
-            switch (notificationData.type) {
-                case 'agentResearch': shouldSend = settings?.agentResearch ?? false; break;
-                case 'agentTrade': shouldSend = settings?.agentTrades ?? false; break;
-                case 'newMarkets': shouldSend = settings?.newMarkets ?? false; break;
-                case 'agentEngagement': shouldSend = settings?.agentEngagements ?? false; break;
-                case 'autonomyCafe': shouldSend = settings?.autonomyCafe ?? false; break;
-                case 'autonomyEngage': shouldSend = settings?.autonomyEngage ?? false; break;
-                case 'autonomyResearch': shouldSend = settings?.autonomyResearch ?? false; break;
-            }
-
-            if (shouldSend) {
-                await this.client.messages.create({
-                    body: newNotification.message,
-                    from: `whatsapp:${this.fromNumber}`,
-                    to: `whatsapp:${user.phone}`
-                });
-                
-                await notificationsCollection.updateOne({ id: newNotification.id }, { $set: { wasSent: true } });
-                console.log(`[NotificationService] Logged and sent WhatsApp message to ${user.handle}`);
-                return { sent: true };
+                if (shouldSend) {
+                    await this.client.messages.create({
+                        body: newNotification.message,
+                        from: `whatsapp:${this.fromNumber}`,
+                        to: `whatsapp:${user.phone}`
+                    });
+                    
+                    await notificationsCollection.updateOne({ id: newNotification.id }, { $set: { wasSent: true } });
+                    notificationSent = true;
+                    console.log(`[NotificationService] Logged and sent WhatsApp message to ${user.handle}`);
+                } else {
+                    console.log(`[NotificationService] Logged notification for ${user.handle} but did not send (user preference disabled).`);
+                }
             } else {
-                console.log(`[NotificationService] Logged notification for ${user.handle} but did not send (user preference disabled).`);
-                return { sent: false, reason: 'DISABLED' };
+                 console.log(`[NotificationService] Logged notification for ${notificationData.userId} but could not send (missing phone, client, or user).`);
             }
         } catch (error) {
             console.error(`[NotificationService] Failed to log or send notification:`, error);
-            return { sent: false, reason: 'ERROR' };
         }
+
+        return notificationSent;
     }
 }
 

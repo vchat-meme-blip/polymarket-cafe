@@ -1,39 +1,9 @@
 /// <reference types="node" />
 
-// Load environment variables first
-import './load-env.js';
+import { startServer as main } from './startup.js';
 
-import { startServer } from './startup.js';
+const isMainModule = import.meta.url === `file://${process.argv[1]}`;
 
-// Before anything else, check for required environment variables
-if (!process.env.MONGODB_URI) {
-    console.error('[FATAL STARTUP ERROR] MONGODB_URI is not set. Please define it in your environment.');
-    process.exit(1);
+if (isMainModule) {
+  main().catch(console.error);
 }
-console.log('[Server] MONGODB_URI found.');
-
-let serverInstance: { stop: () => Promise<void> } | null = null;
-
-async function main() {
-  try {
-    serverInstance = await startServer();
-    console.log('[Server] Main process started successfully.');
-  } catch (error) {
-    console.error('[Server] Fatal error during startup:', error);
-    process.exit(1);
-  }
-}
-
-async function gracefulShutdown() {
-  console.log('[Server] Received shutdown signal. Cleaning up...');
-  if (serverInstance) {
-    await serverInstance.stop();
-  }
-  process.exit(0);
-}
-
-// Handle shutdown signals
-process.on('SIGINT', gracefulShutdown);
-process.on('SIGTERM', gracefulShutdown);
-
-main();

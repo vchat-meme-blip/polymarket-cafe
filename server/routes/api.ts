@@ -1,3 +1,5 @@
+
+
 import { Router } from 'express';
 import mongoose, { Collection } from 'mongoose';
 import { TradeRecord, BettingIntel, MarketWatchlist } from '../../lib/types/shared.js';
@@ -29,7 +31,7 @@ import { startOfToday, formatISO } from 'date-fns';
 import { seedDatabase } from '../db.js';
 import { UserDocument } from '../../lib/types/mongodb.js';
 
-// Add global declaration to extend Express.Request with worker properties.
+// FIX: Add global declaration to extend Express.Request with worker properties.
 declare global {
   namespace Express {
     interface Request {
@@ -38,7 +40,6 @@ declare global {
     }
   }
 }
-
 
 const router = Router();
 
@@ -170,6 +171,7 @@ router.put('/users/current-agent', async (req, res) => {
     if (!agentId) return res.status(400).json({ message: "Agent ID is required." });
 
     try {
+        // FIX: Look up agent by its string `id` to get its `_id` (ObjectId) which is required by the UserDocument schema for `currentAgentId`.
         const agent = await agentsCollection.findOne({ id: agentId });
         if (!agent) {
             return res.status(404).json({ message: "Agent not found." });
@@ -340,6 +342,7 @@ router.get('/agents/:agentId/activity', async (req, res) => {
   const todayStr = formatISO(startOfToday(), { representation: 'date' });
 
   try {
+    // FIX: Convert agentId string from params to ObjectId for querying.
     const agentObjectId = new ObjectId(agentId);
     let dailySummary = await dailySummariesCollection.findOne({ agentId: agentObjectId, date: todayStr });
     
@@ -347,6 +350,7 @@ router.get('/agents/:agentId/activity', async (req, res) => {
       return res.json({ summary: dailySummary.summary });
     }
 
+    // FIX: Map database documents to shared types before passing them to the AI service.
     const [recentTradesDocs, recentIntelDocs] = await Promise.all([
         tradeHistoryCollection.find({ $or: [{ fromId: agentObjectId }, { toId: agentObjectId }] }).sort({ timestamp: -1 }).limit(10).toArray(),
         bettingIntelCollection.find({ ownerAgentId: agentObjectId }).sort({ createdAt: -1 }).limit(5).toArray()
@@ -521,6 +525,7 @@ router.put('/agents/:agentId/tasks/:taskId', async (req, res) => {
         }
         
         const updatedAgent = await agentsCollection.findOne({ _id: agent._id });
+        // FIX: Add a type assertion to inform TypeScript that `tasks` exists on the agent document.
         const updatedTask = (updatedAgent as any)?.tasks.find((t: AgentTask) => t.id === taskId);
 
         res.status(200).json(updatedTask);
@@ -558,7 +563,7 @@ router.post('/ai/brainstorm-personality', async (req, res) => {
     if (!apiKey) throw new Error("Server AI API key is not configured.");
     
     const openai = new OpenAI({ apiKey });
-    const prompt = `Brainstorm a detailed, first-person personality for an AI agent in a SocialFi simulation called "Quants Café". The agent's personality should be based on these keywords: "${req.body.keywords}". The description must be under 80 words.`;
+    const prompt = `Brainstorm a detailed, first-person personality for an AI agent in a SocialFi simulation. The personality should be based on these keywords: "${req.body.keywords}". The description must be under 80 words.`;
     
     const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',

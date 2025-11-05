@@ -30,7 +30,7 @@ class WebSocketService {
     console.log('[WebSocket] Initializing WebSocket server...');
     this.isInitialized = true;
     this.io = new SocketIOServer(server, {
-      path: '/socket.io/',
+      path: '/socket.io/', // FIX: Explicitly set the path
       cors: {
         origin: (origin, callback) => {
           const allowedOrigins = [

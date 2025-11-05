@@ -146,21 +146,18 @@ export class AutonomyDirector {
                 });
                 // FIX: Corrected notification type to match the allowed types in the Notification definition.
                 const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyCafe', message: `${agent.name} is heading to the Café.` });
-                // FIX: The `_logActivity` function expects a boolean for `triggeredNotification`, but `notified` is a SendStatus object. Use `notified.sent` instead.
-                this._logActivity(agent, 'cafe', message, notified.sent);
+                this._logActivity(agent, 'cafe', message, notified);
             } else if (actionRoll < 0.9) { // 20% chance: Proactive User Engagement
                 const message = `Reviewing recent activity to find an insight for ${user.handle}.`;
                 // FIX: Corrected notification type to match the allowed types in the Notification definition.
                 const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyEngage', message: `${agent.name} is formulating a new suggestion for you.` });
-                // FIX: The `_logActivity` function expects a boolean for `triggeredNotification`, but `notified` is a SendStatus object. Use `notified.sent` instead.
-                this._logActivity(agent, 'engagement', message, notified.sent);
+                this._logActivity(agent, 'engagement', message, notified);
                 await this.proactiveEngagement(user, agent);
             } else { // 10% chance: Deep Research
                 const message = `Starting autonomous deep research on a trending market.`;
                 // FIX: Corrected notification type to match the allowed types in the Notification definition.
                 const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyResearch', message: `${agent.name} is starting a new research task.` });
-                // FIX: The `_logActivity` function expects a boolean for `triggeredNotification`, but `notified` is a SendStatus object. Use `notified.sent` instead.
-                this._logActivity(agent, 'research', message, notified.sent);
+                this._logActivity(agent, 'research', message, notified);
 
                 const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
                 if (newIntel && agent.ownerHandle) {
