@@ -76,13 +76,15 @@ export function useDirectChatTTS() {
                 const agentMessagesToSpeak = newMessages.filter(msg => msg.agentId !== USER_ID && msg.text);
 
                 if (agentMessagesToSpeak.length > 0) {
+                    console.log(`[TTS] Queuing ${agentMessagesToSpeak.length} new message(s) for agent ${currentAgent.name}.`);
                     agentMessagesToSpeak.forEach(msg => {
                         if (!currentAgent.voice) {
-                            console.warn(`Agent ${currentAgent.name} has no voice configured. Skipping TTS.`);
+                            console.warn(`[TTS] Agent ${currentAgent.name} has no voice configured. Skipping TTS.`);
                             return;
                         }
                         const cleanedText = cleanTextForTTS(msg.text);
                         if (cleanedText) {
+                            console.log(`[TTS] Queued text: "${cleanedText.substring(0, 50)}..."`);
                             audioQueue.current.push(cleanedText);
                         }
                     });

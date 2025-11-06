@@ -111,13 +111,21 @@ class AiService {
 
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemPrompt },
-      ...history.map((turn) => {
+      ...history.map((turn): OpenAI.Chat.Completions.ChatCompletionMessageParam => {
         const role: 'assistant' | 'user' = turn.agentId === agent.id ? 'assistant' : 'user';
-        const content: any[] = [{ type: 'text', text: turn.text }];
-        if (turn.tool_calls) {
-            content.push(...(turn.tool_calls as any[]));
+        
+        if (role === 'assistant' && turn.tool_calls && turn.tool_calls.length > 0) {
+            return {
+                role: 'assistant',
+                content: turn.text || null,
+                tool_calls: turn.tool_calls,
+            };
+        } else {
+            return {
+                role,
+                content: turn.text || '',
+            };
         }
-        return { role, content };
       }),
       { role: 'user', content: message },
     ];
