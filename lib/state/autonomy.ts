@@ -12,6 +12,7 @@ interface ServerHydrationData {
     bounties: Bounty[];
     intel: BettingIntel[];
     activityLog: ActivityLogEntry[];
+    tasks: AgentTask[];
 }
 
 export type AutonomyState = {
@@ -60,6 +61,7 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
       bounties: data.bounties,
       intelBank: data.intel,
       activityLog: data.activityLog || [],
+      tasks: data.tasks || [],
   }),
 
   setActivity: (activity, message) => {
@@ -202,7 +204,7 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
     }));
   },
   setTasks: (tasks: AgentTask[]) => set({ tasks }),
-  addTask: (task: AgentTask) => set(state => ({ tasks: [...state.tasks, task] })),
+  addTask: (task: AgentTask) => set(state => ({ tasks: [task, ...state.tasks] })),
   updateTask: async (taskId: string, updates: Partial<AgentTask>) => {
     const agentId = useAgent.getState().current.id;
     const updatedTask = await apiService.updateTask(agentId, taskId, updates);
@@ -214,10 +216,10 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
   },
   deleteTask: async (taskId: string) => {
     const agentId = useAgent.getState().current.id;
-    await apiService.deleteTask(agentId, taskId);
     set(state => ({
         tasks: state.tasks.filter(task => task.id !== taskId),
     }));
+    await apiService.deleteTask(agentId, taskId);
   },
   addActivityLog: (logEntry: ActivityLogEntry) => set(state => ({
     activityLog: [logEntry, ...state.activityLog].slice(0, 100), // Keep last 100 logs

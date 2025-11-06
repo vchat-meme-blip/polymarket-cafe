@@ -123,8 +123,7 @@ export default function DirectChatLog() {
                             {msg.markets && msg.markets.length > 0 && (
                                 <div className={styles.marketCardList}>
                                     {msg.markets.map(market => (
-                                        // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
-                                        <MarketCardInChat market={market} />
+                                        <MarketCardInChat key={market.id} market={market} />
                                     ))}
                                 </div>
                             )}

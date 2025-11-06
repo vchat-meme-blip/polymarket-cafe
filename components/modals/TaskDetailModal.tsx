@@ -5,12 +5,26 @@
 import React from 'react';
 import Modal from '../Modal';
 import { useUI } from '../../lib/state/index.js';
+import { useAutonomyStore } from '../../lib/state/autonomy';
 import { AgentTask } from '../../lib/types/index.js';
 import styles from './TaskDetailModal.module.css';
 import { format } from 'date-fns';
 
 export default function TaskDetailModal({ task }: { task: AgentTask }) {
     const { closeTaskDetailModal } = useUI();
+    const { deleteTask } = useAutonomyStore();
+
+    const handleDelete = async () => {
+        if (window.confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+            try {
+                await deleteTask(task.id);
+                closeTaskDetailModal();
+            } catch (error) {
+                console.error("Failed to delete task:", error);
+                alert('There was an error deleting the task.');
+            }
+        }
+    };
 
     return (
         <Modal onClose={closeTaskDetailModal}>
@@ -76,6 +90,15 @@ export default function TaskDetailModal({ task }: { task: AgentTask }) {
                             <p>No updates for this task yet.</p>
                         )}
                     </div>
+                </div>
+
+                <div className={styles.modalFooter}>
+                    <button className="button danger" onClick={handleDelete}>
+                        <span className="icon">delete</span> Delete Task
+                    </button>
+                    <button className="button" onClick={closeTaskDetailModal} style={{marginLeft: 'auto'}}>
+                        Close
+                    </button>
                 </div>
             </div>
         </Modal>

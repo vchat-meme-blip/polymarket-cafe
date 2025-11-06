@@ -25,7 +25,7 @@
 }
 
 /* FIX: Make modals containing a profile view (Dossier, Settings) larger for a better UX */
-.modal:has(.profileView), .modal:has(.intelDossierModal) {
+.modal:has(.profileView), .modal:has(.intelDossierModal), .modal:has(.taskDetailModal) {
     max-width: 900px;
     max-height: 90vh;
 }
@@ -67,6 +67,16 @@
     gap: 20px;
     overflow-y: auto;
     padding: 20px;
+}
+
+.modalFooter {
+    padding: 16px 24px;
+    border-top: 1px solid var(--Neutral-30);
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: auto;
+    background-color: var(--Neutral-10);
 }
 
 /* --- NEW: Create Room & Manage Room Modals --- */

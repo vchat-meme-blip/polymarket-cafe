@@ -100,12 +100,26 @@ router.get('/bootstrap/:handle', async (req, res) => {
 
     const agents = await agentsCollection.find({ ownerHandle: handle }).toArray();
     const presets = await agentsCollection.find({ ownerHandle: { $exists: false } }).toArray();
-    const agentIds = agents.map(a => a.id);
+    
+    // Fetch tasks for the user's agents
+    const agentIds = agents.map(a => a._id);
+    const agentsWithTasks = await agentsCollection.find({ _id: { $in: agentIds } }).toArray();
+    const tasksByAgent = agentsWithTasks.reduce((acc, agent) => {
+        acc[agent._id.toString()] = (agent as any).tasks || [];
+        return acc;
+    }, {} as Record<string, AgentTask[]>);
+    
+    agents.forEach(agent => {
+        (agent as any).tasks = tasksByAgent[agent._id.toString()] || [];
+    });
+
+    const agentStringIds = agents.map(a => a.id);
     
     const autonomy = { 
         bounties: await bountiesCollection.find({ ownerHandle: handle }).toArray(), 
         intel: await bettingIntelCollection.find({ ownerHandle: handle }).toArray(),
-        activityLog: await activityLogCollection.find({ agentId: { $in: agentIds } }).sort({ timestamp: -1 }).limit(100).toArray(),
+        activityLog: await activityLogCollection.find({ agentId: { $in: agentStringIds } }).sort({ timestamp: -1 }).limit(100).toArray(),
+        tasks: agents.flatMap(a => (a as any).tasks || [])
     };
     const wallet = { transactions: await transactionsCollection.find({ ownerHandle: handle }).toArray() };
 

@@ -241,23 +241,23 @@
     flex-grow: 1;
     overflow: hidden;
     position: relative;
-    padding: 16px;
+    padding: 8px; /* REDUCED */
 }
 .directChatLog {
     position: absolute;
-    inset: 16px;
+    inset: 8px; /* REDUCED */
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px; /* REDUCED */
 }
 
 .chatMessage {
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-    gap: 12px;
-    max-width: 85%;
+    gap: 8px; /* REDUCED */
+    max-width: 95%; /* ADJUSTED */
     animation: float-in 0.5s cubic-bezier(0.25, 1, 0.5, 1);
 }
 @keyframes float-in {
@@ -266,8 +266,8 @@
 }
 
 .messageAvatar {
-  width: 36px;
-  height: 36px;
+  width: 32px; /* REDUCED */
+  height: 32px; /* REDUCED */
   border-radius: 50%;
   background: var(--Neutral-20);
   display: flex;
@@ -276,7 +276,7 @@
   flex-shrink: 0;
 }
 .messageAvatar .material-symbols-outlined {
-  font-size: 20px;
+  font-size: 18px; /* REDUCED */
   color: var(--Neutral-80);
 }
 
@@ -823,13 +823,13 @@
         position: relative;
         -webkit-mask-image: none;
         mask-image: none;
-        padding: 16px;
+        padding: 8px; /* REDUCED */
         margin-bottom: 0;
     }
 
     .directChatLog {
         position: absolute;
-        inset: 16px;
+        inset: 8px; /* REDUCED */
     }
     
     .controlTray {
@@ -862,6 +862,10 @@
     }
     .tabContent {
         padding: 20px;
+    }
+
+    .chatMessage {
+        max-width: 85%;
     }
 }
 

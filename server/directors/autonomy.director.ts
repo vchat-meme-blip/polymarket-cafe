@@ -1,7 +1,8 @@
 
+
 import { agentsCollection, usersCollection, betsCollection, bettingIntelCollection } from '../db.js';
 import { ObjectId } from 'mongodb';
-import type { Agent, User, ActivityLogEntry, AgentTask } from '../../lib/types/shared.js';
+import type { Agent, User, ActivityLogEntry, AgentTask, MarketIntel } from '../../lib/types/shared.js';
 import type { BettingIntelDocument } from '../../lib/types/mongodb.js';
 import type { BettingIntel } from '../../lib/types/shared.js';
 import { alphaService } from '../services/alpha.service.js';
@@ -242,6 +243,7 @@ export class AutonomyDirector {
 
         let result: { summary: string; sources?: any[] } = { summary: 'Task failed to produce a result.', sources: [] };
         if (task.type === 'one_time_research') {
+            // FIX: Guard against missing topic parameter to prevent runtime errors.
             if (task.parameters.topic) {
                 const researchResult = await alphaService.researchTopic(agent, task.parameters.topic);
                 if (researchResult) {
@@ -317,24 +319,29 @@ export class AutonomyDirector {
         const message = await this.generateProactiveMessage(agent, prompt);
         if (message) {
             this._logActivity(agent, 'engagement', `Sent proactive message about trending market "${interestingMarket.title}".`);
-            this.sendProactiveMessage(user.handle!, agent, message);
+            this.sendProactiveMessage(user.handle!, agent, message, [interestingMarket]);
         }
     }
 
     private async reviewIntel(user: User, agent: Agent) {
-        const recentIntel = await bettingIntelCollection.find({ 
+        const recentIntelDocs = await bettingIntelCollection.find({ 
             ownerAgentId: new ObjectId(agent.id) 
         }).sort({ createdAt: -1 }).limit(1).toArray();
             
-        if (recentIntel.length === 0) return;
+        if (recentIntelDocs.length === 0) return;
         
-        const intel = recentIntel[0];
+        const intel = recentIntelDocs[0];
         const prompt = `As ${agent.name}, your personality is "${agent.personality}". You are reviewing some intel you recently found about the market "${intel.market}": "${intel.content}". Briefly, in one or two sentences, bring this up to your user, ${user.name}, in a natural and interesting way. What's a good follow-up question you could ask them about it?`;
 
         const message = await this.generateProactiveMessage(agent, prompt);
         if (message) {
             this._logActivity(agent, 'engagement', `Sent proactive message reviewing intel on "${intel.market}".`);
-            this.sendProactiveMessage(user.handle!, agent, message);
+            
+            // Try to find the associated market to send with the message
+            const { markets } = await polymarketService.searchMarkets(intel.market, undefined, 1, 1);
+            const market = markets[0];
+            
+            this.sendProactiveMessage(user.handle!, agent, message, market ? [market] : undefined);
         }
     }
 
@@ -377,7 +384,7 @@ export class AutonomyDirector {
         }
     }
 
-    private sendProactiveMessage(userHandle: string, agent: Agent, text: string) {
+    private sendProactiveMessage(userHandle: string, agent: Agent, text: string, markets?: MarketIntel[]) {
         this.emitToMain?.({
             type: 'socketEmit',
             event: 'proactiveMessage',
@@ -385,6 +392,7 @@ export class AutonomyDirector {
                 agentId: agent.id,
                 agentName: agent.name,
                 text,
+                markets,
             },
             room: userHandle
         });
