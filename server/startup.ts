@@ -136,7 +136,7 @@ export async function startServer() {
   app.use('/api', apiRouter);
   
   // Serve static files from the correct client build directory
-  const clientDistPath = path.join(projectRoot, '..', 'dist', 'client');
+  const clientDistPath = path.join(projectRoot, '..', '..', 'dist', 'client');
   console.log(`[Server] Serving static files from: ${clientDistPath}`);
   
   // Check if client files exist
