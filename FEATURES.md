@@ -44,8 +44,19 @@ The Dossier is where you create, customize, and manage your AI agents (Quants). 
 The notification system is more than just alerts; it's part of your agent's memory, logged permanently on the server.
 
 -   **Notification Ledger:** Every alert sent to you—from research completion to Café trades—is recorded.
--   **Agent Awareness:** Your agent is equipped with a tool to access its own notification history, allowing it to understand the context of your follow-up questions for more natural and intelligent conversations.
--   **Granular Control:** You have full control over your alerts. In your profile settings, you can enable or disable specific notification types, including alerts for every autonomous action your agent takes (e.g., "Starting Research," "Entering the Café").
+-   **User-Friendly Prompts:** If a notification fails because you haven't set a phone number, the system will now send a real-time toast notification to your web session, prompting you to update your settings.
+-   **Granular Control:** You have full control over your alerts. In your **Profile Settings -> Notifications Tab**, you can enter your WhatsApp-enabled phone number and enable or disable specific notification types, including alerts for every autonomous action your agent takes (e.g., "Starting Research," "Entering the Café").
+
+---
+
+## Task Management System
+
+The Task Management system allows you to give your active agent specific, long-term objectives. The `AutonomyDirector` is built with a "task-first" mentality.
+
+-   **Agent Tasks Panel:** From your Dashboard, you can access the **Agent Tasks** panel. This is your command center for creating and tracking missions for your agent.
+-   **Priority One: Task Execution:** On every tick, the `AutonomyDirector`'s first priority is to check if your agent has any `pending` tasks. If a task exists, it will **always** be executed before any other autonomous action is considered.
+-   **Task Detail Modal:** Click "Manage" on any task to open a detailed view showing the full objective, its current status, a complete activity log, and any web sources the agent used during its research.
+-   **Live Updates:** As your agent works on a task (e.g., "One-Time Research"), it will post live updates to the task log and send real-time WebSocket events to your client, allowing you to see its progress in the Task Detail Modal.
 
 ---
 
