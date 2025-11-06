@@ -29,9 +29,9 @@ import type {
   // Conversion functions
   toSharedUser,
   toSharedAgent
-} from '../lib/types/mongodb.js';
-import { PRESET_AGENTS } from '../lib/presets/agents.js';
-import { ActivityLogEntry } from '../lib/types/index.js';
+} from '../../lib/types/mongodb.js';
+import { PRESET_AGENTS } from '../../lib/presets/agents.js';
+import { ActivityLogEntry, Interaction } from '../../lib/types/index.js';
 
 // Load environment variables first
 import loadEnv from './load-env.js';
@@ -59,7 +59,7 @@ export let bettingIntelCollection: Collection<BettingIntelDocument>;
 export let marketWatchlistsCollection: Collection<Document>;
 export let dailySummariesCollection: Collection<DailySummaryDocument>;
 export let notificationsCollection: Collection<NotificationDocument>;
-export let agentInteractionsCollection: Collection<Document>;
+export let agentInteractionsCollection: Collection<Interaction>;
 
 
 // Helper function to convert MongoDB document to plain object
@@ -105,7 +105,7 @@ const connectDB = async () => {
     marketWatchlistsCollection = mongoose.connection.collection<Document>('marketWatchlists');
     dailySummariesCollection = mongoose.connection.collection<DailySummaryDocument>('dailySummaries');
     notificationsCollection = mongoose.connection.collection<NotificationDocument>('notifications');
-    agentInteractionsCollection = mongoose.connection.collection<Document>('agent_interactions');
+    agentInteractionsCollection = mongoose.connection.collection<Interaction>('agent_interactions');
 
 
     // Create indexes
@@ -113,7 +113,8 @@ const connectDB = async () => {
       usersCollection.createIndex({ handle: 1 }, { unique: true }),
       agentsCollection.createIndex({ id: 1 }, { unique: true }),
       agentsCollection.createIndex({ ownerHandle: 1 }),
-      roomsCollection.createIndex({ id: 1 }, { unique: true })
+      roomsCollection.createIndex({ id: 1 }, { unique: true }),
+      agentInteractionsCollection.createIndex({ roomId: 1, timestamp: -1 })
     ]);
 
     return mongoose.connection;

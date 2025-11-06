@@ -4,7 +4,7 @@ import './load-env.js';
 import http from 'http';
 // FIX: Changed express import to resolve type conflicts. `import express from 'express'` is the standard way to import express and resolves type issues.
 // FIX: Corrected express import to bring types `Request`, `Response`, and `NextFunction` into scope.
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -130,7 +130,7 @@ export async function startServer() {
     // FIX: Update types to use express namespace.
     // FIX: Replaced `express.Request` etc. with imported `Request` types to fix handler signature.
     // FIX: Use explicit express types to resolve conflicts with global DOM types for Request/Response.
-    app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    app.use((req: Request, res: Response, next: NextFunction) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
@@ -156,7 +156,7 @@ export async function startServer() {
   // Handle SPA routing - serve index.html for all other routes
   // FIX: Replaced `express.Request` and `express.Response` with imported types to fix handler signature and resolve property errors.
   // FIX: Use explicit express types to resolve conflicts with global DOM types for Request/Response.
-  app.get('*', (req: express.Request, res: express.Response) => {
+  app.get('*', (req: Request, res: Response) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);

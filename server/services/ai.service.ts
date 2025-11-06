@@ -1,5 +1,3 @@
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -115,10 +113,26 @@ class AiService {
         const role: 'assistant' | 'user' = turn.agentId === agent.id ? 'assistant' : 'user';
         
         if (role === 'assistant' && turn.tool_calls && turn.tool_calls.length > 0) {
+            // Reformat tool_calls for OpenAI API
+            const formattedToolCalls = turn.tool_calls.map(tc => ({
+                id: tc.id,
+                // FIX: Add `as const` to hardcoded 'function' type string to ensure it is inferred as a literal type, not a generic string. This resolves the type error when constructing tool call objects for the OpenAI API.
+                type: 'function' as const,
+                function: {
+                    name: tc.function.name,
+                    arguments: tc.function.arguments,
+                }
+            }));
             return {
                 role: 'assistant',
                 content: turn.text || null,
-                tool_calls: turn.tool_calls,
+                tool_calls: formattedToolCalls,
+            };
+        } else if (turn.agentId === 'tool') {
+             return {
+                role: 'tool',
+                tool_call_id: (turn as any).tool_call_id,
+                content: turn.text,
             };
         } else {
             return {
@@ -280,7 +294,6 @@ class AiService {
                             properties: {
                                 offer_id: { type: 'string', description: 'The ID of the intel being offered (e.g., the intelId from the offer).' }
                             },
-                            required: ['offer_id']
                         }
                     }
                 });
