@@ -15,7 +15,7 @@ import mongoose from 'mongoose';
 import { ObjectId } from 'mongodb';
 
 import connectDB, { seedDatabase } from './db.js';
-import apiRouter from './routes/api.js';
+import { router as apiRouter } from './routes/api.js';
 import { webSocketService } from './services/websocket.service.js';
 import { createWorker } from './worker-loader.js';
 import fs from 'fs';

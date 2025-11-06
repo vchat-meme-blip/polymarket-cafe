@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -94,7 +95,6 @@ class AiService {
       ...history.map((turn) => {
         const role: 'assistant' | 'user' = turn.agentId === agent.id ? 'assistant' : 'user';
         const content: any[] = [{ type: 'text', text: turn.text }];
-        // Add previous tool call results to history for context
         if (turn.tool_calls) {
             content.push(...(turn.tool_calls as any[]));
         }
@@ -115,7 +115,7 @@ class AiService {
       const toolCalls = responseMessage.tool_calls;
 
       if (toolCalls) {
-        messages.push(responseMessage); // Add assistant's tool call message to history
+        messages.push(responseMessage); 
 
         for (const toolCall of toolCalls) {
           if (toolCall.type !== 'function') continue;
@@ -125,13 +125,11 @@ class AiService {
 
           if (functionName === 'search_markets') {
             const { markets } = await polymarketService.searchMarkets(functionArgs.query, functionArgs.category);
-            functionResponse = { markets: markets.slice(0, 5) }; // Return top 5 results
+            functionResponse = { markets: markets.slice(0, 5) };
           } else if (functionName === 'calculate_payout') {
             const profit = (functionArgs.amount / functionArgs.price) - functionArgs.amount;
             functionResponse = { profit: profit.toFixed(2) };
           } else {
-             // For tools handled by the client (open_market_detail, bookmark_and_monitor_market)
-             // we just return the tool call in the message.
              return {
                 agentId: agent.id,
                 agentName: agent.name,
@@ -317,15 +315,14 @@ class AiService {
       return null;
     }
 
-    const apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
+    const apiKey = await apiKeyProvider.getKeyForAgent('system-research');
     if (!apiKey) {
-      console.error(`[AiService] No API key for agent ${agent.name} for research.`);
+      console.error(`[AiService] No system API key for autonomous research.`);
       return null;
     }
     const openai = new OpenAI({ apiKey });
 
     try {
-      // Step 1: Generate Search Query
       const queryGenPrompt = `You are an expert financial analyst. Generate a concise, effective search query to find the most relevant, recent information about the following prediction market. The query should be suitable for a web search engine.
 
 Market: "${market.title}"
@@ -344,7 +341,6 @@ Return ONLY the search query.`;
       }
       console.log(`[AiService] Generated search query for "${market.title}": "${searchQuery}"`);
 
-      // Step 2: Search and Scrape
       const searchResults = await firecrawlService.search(searchQuery);
       const scrapedData = searchResults.filter(r => r.markdown && r.url);
 
@@ -358,7 +354,6 @@ Return ONLY the search query.`;
 ${result.markdown}
       `).join('\n\n---\n\n');
 
-      // Step 3: Summarize Findings
       const summaryPrompt = `You are ${agent.name}, an expert prediction market analyst with this personality: "${agent.personality}".
 Analyze the provided research material from multiple web sources regarding the market: "${market.title}".
 
@@ -436,7 +431,6 @@ ${researchContext}
 
     const openai = new OpenAI({ apiKey });
     
-    // NEW: Firecrawl integration
     const firecrawlData = firecrawlService.isConfigured() ? await firecrawlService.search(market.title) : [];
     const researchContext = firecrawlData.length > 0
         ? `\n\nHere is some real-time web research on this topic:\n` + firecrawlData.map(r => `Source: ${r.title}\nContent: ${r.markdown.slice(0, 1500)}...`).join('\n\n')
@@ -537,7 +531,6 @@ ${researchContext}
 
       const parsedResponse = JSON.parse(responseContent);
       
-      // Pass the markets considered back to the client
       parsedResponse.markets = markets.slice(0, 5);
       
       return parsedResponse;

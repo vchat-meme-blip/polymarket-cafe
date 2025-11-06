@@ -181,7 +181,7 @@ export class DashboardAgentDirector {
 
     private async generateProactiveMessage(agent: Agent, prompt: string, userApiKey: string | null): Promise<string | null> {
         try {
-            const apiKey = userApiKey || (process.env.OPENAI_API_KEYS || '').split(',')[0];
+            const apiKey = userApiKey || (process.env.OPENAI_API_KEYS || '').split(',')[0] || process.env.GEMINI_API_KEY;
             if (!apiKey) return null;
 
             const openai = new OpenAI({ apiKey });

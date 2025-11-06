@@ -1,7 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
-*/
 import { Agent, MarketIntel, BettingIntel, AgentTask } from '../../lib/types/index.js';
 import { aiService } from '../services/ai.service.js';
 import { polymarketService } from '../services/polymarket.service.js';
@@ -20,20 +16,23 @@ class AlphaService {
     const market = trendingMarkets[Math.floor(Math.random() * trendingMarkets.length)];
     console.log(`[AlphaService] Agent ${agent.name} is researching market: "${market.title}"`);
 
-    const researchFindings = await aiService.conductResearchOnMarket(agent, market);
-    if (!researchFindings) {
-        console.log(`[AlphaService] AI failed to conduct research for market "${market.title}".`);
+    // Use the researchTopic method which is designed for system-level API key usage
+    const researchResult = await this.researchTopic(agent, market.title);
+    if (!researchResult || !researchResult.summary) {
+        console.log(`[AlphaService] Research failed for market "${market.title}".`);
         return null;
     }
 
     const newIntel: Partial<BettingIntel> = {
       ownerAgentId: agent.id,
       market: market.title,
+      content: researchResult.summary,
+      sourceUrls: researchResult.sources.map(s => s.url),
+      sourceDescription: 'Autonomous Web Research',
       isTradable: Math.random() > 0.5,
       createdAt: Date.now(),
       pnlGenerated: { amount: 0, currency: 'USD' },
       ownerHandle: agent.ownerHandle,
-      ...researchFindings,
     };
     
     return newIntel;
@@ -45,7 +44,7 @@ class AlphaService {
       return { summary: "Research could not be performed because the web scraping service is not configured on the server.", sources: [] };
     }
 
-    // Use a system key for automated research tasks, as requested.
+    // Use a system key for automated research tasks.
     const apiKey = await apiKeyProvider.getKeyForAgent('system-research');
     if (!apiKey) {
       console.error(`[AlphaService] No system API key available for research task on topic: "${topic}".`);
@@ -91,7 +90,6 @@ ${researchContext.slice(0, 15000)}
       if (error instanceof OpenAI.APIError && error.status === 429 && apiKey) {
            apiKeyProvider.reportRateLimit(apiKey, 60);
       }
-      // Return a user-facing error summary
       return { summary: `An error occurred during the research process: ${error instanceof Error ? error.message : 'Unknown error'}.`, sources: [] };
     }
   }

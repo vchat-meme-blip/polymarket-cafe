@@ -1,6 +1,6 @@
 import { agentsCollection, usersCollection, betsCollection, bettingIntelCollection } from '../db.js';
 import { ObjectId } from 'mongodb';
-import type { Agent, User, ActivityLogEntry } from '../../lib/types/shared.js';
+import type { Agent, User, ActivityLogEntry, AgentTask } from '../../lib/types/shared.js';
 import type { BettingIntelDocument } from '../../lib/types/mongodb.js';
 import type { BettingIntel } from '../../lib/types/shared.js';
 import { alphaService } from '../services/alpha.service.js';
@@ -57,7 +57,10 @@ export class AutonomyDirector {
         this.isTicking = true;
         
         try {
-            const activeUserQuery = { currentAgentId: { $exists: true, $ne: null as any } };
+            const activeUserQuery = { 
+              currentAgentId: { $exists: true, $ne: null as any },
+              isAutonomyEnabled: true // Correctly check the master switch on the user
+            };
             const totalUsers = await usersCollection.countDocuments(activeUserQuery);
 
             if (this.currentUserOffset >= totalUsers) {
@@ -83,7 +86,7 @@ export class AutonomyDirector {
                 const agentId = typeof user.currentAgentId === 'string' ? new ObjectId(user.currentAgentId) : user.currentAgentId;
                 const agentDoc = await agentsCollection.findOne({ _id: agentId });
                 
-                if (agentDoc && agentDoc.isProactive) {
+                if (agentDoc) { // No longer need isProactive check here
                     const agent: Agent = {
                         ...(agentDoc as any),
                         id: agentDoc._id.toString(),
@@ -133,10 +136,18 @@ export class AutonomyDirector {
         this.setAgentBusy(agent.id, true);
 
         try {
-            const actionRoll = Math.random();
             const ownerHandle = agent.ownerHandle;
             if (!ownerHandle) throw new Error("Agent has no owner handle.");
 
+            // --- TASK EXECUTION (PRIORITY 1) ---
+            const pendingTask = agent.tasks?.find(t => t.status === 'pending');
+            if (pendingTask) {
+                await this.executeTask(agent, pendingTask);
+                return; // End this tick after starting a task
+            }
+
+            // --- FALLBACK BEHAVIOR ---
+            const actionRoll = Math.random();
             if (actionRoll < 0.7) { // 70% Chance: Go to Café
                 const message = `Decided to head to the Café to look for intel opportunities.`;
                 this.emitToMain?.({
@@ -144,39 +155,22 @@ export class AutonomyDirector {
                     worker: 'arena',
                     message: { type: 'moveAgentToCafe', payload: { agentId: agent.id } }
                 });
-                // FIX: Corrected notification type to match the allowed types in the Notification definition.
                 const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyCafe', message: `${agent.name} is heading to the Café.` });
-                // FIX: The `_logActivity` function expects a boolean for `triggeredNotification`, but `notified` is a SendStatus object. Use `notified.sent` instead.
                 this._logActivity(agent, 'cafe', message, notified.sent);
+                this.handleNotificationFailure(notified, ownerHandle);
             } else if (actionRoll < 0.9) { // 20% chance: Proactive User Engagement
+                if (!agent.isProactive) return; // Respect the agent's specific proactive setting
                 const message = `Reviewing recent activity to find an insight for ${user.handle}.`;
-                // FIX: Corrected notification type to match the allowed types in the Notification definition.
                 const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyEngage', message: `${agent.name} is formulating a new suggestion for you.` });
-                // FIX: The `_logActivity` function expects a boolean for `triggeredNotification`, but `notified` is a SendStatus object. Use `notified.sent` instead.
                 this._logActivity(agent, 'engagement', message, notified.sent);
+                this.handleNotificationFailure(notified, ownerHandle);
                 await this.proactiveEngagement(user, agent);
             } else { // 10% chance: Deep Research
                 const message = `Starting autonomous deep research on a trending market.`;
-                // FIX: Corrected notification type to match the allowed types in the Notification definition.
                 const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyResearch', message: `${agent.name} is starting a new research task.` });
-                // FIX: The `_logActivity` function expects a boolean for `triggeredNotification`, but `notified` is a SendStatus object. Use `notified.sent` instead.
                 this._logActivity(agent, 'research', message, notified.sent);
-
-                const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
-                if (newIntel && agent.ownerHandle) {
-                    const savedIntel = await this.saveIntel(newIntel as BettingIntel);
-                    if (savedIntel) {
-                        const successMessage = `Research complete! Discovered new intel on "${savedIntel.market}".`;
-                        this._logActivity(agent, 'research', successMessage, true); // Always notify on success
-                        await notificationService.logAndSendNotification({
-                            userId: agent.ownerHandle,
-                            agentId: agent.id,
-                            type: 'agentResearch',
-                            message: `🔬 Your agent, ${agent.name}, has new intel on "${savedIntel.market}".`,
-                        });
-                        this.emitToMain?.({ type: 'socketEmit', event: 'newIntel', payload: { intel: savedIntel }, room: agent.ownerHandle });
-                    }
-                }
+                this.handleNotificationFailure(notified, ownerHandle);
+                await this.startResearch(agent.id); // Re-use the startResearch logic
             }
         } catch (error) {
             console.error(`[AutonomyDirector] Error during autonomy processing for agent ${agent.name}:`, error);
@@ -185,7 +179,6 @@ export class AutonomyDirector {
         }
     }
     
-    // FIX: Add missing startResearch method.
     public async startResearch(agentId: string) {
         const agentDoc = await agentsCollection.findOne({ id: agentId });
         if (!agentDoc) {
@@ -206,13 +199,14 @@ export class AutonomyDirector {
                 const savedIntel = await this.saveIntel(newIntel as BettingIntel);
                 if (savedIntel) {
                     const successMessage = `Research complete! Discovered new intel on "${savedIntel.market}".`;
-                    this._logActivity(agent, 'research', successMessage, true);
-                    await notificationService.logAndSendNotification({
+                    const notified = await notificationService.logAndSendNotification({
                         userId: agent.ownerHandle,
                         agentId: agent.id,
                         type: 'agentResearch',
                         message: `🔬 Your agent, ${agent.name}, has new intel on "${savedIntel.market}".`,
                     });
+                    this._logActivity(agent, 'research', successMessage, notified.sent);
+                    this.handleNotificationFailure(notified, ownerHandle);
                     this.emitToMain?.({ type: 'socketEmit', event: 'newIntel', payload: { intel: savedIntel }, room: agent.ownerHandle });
                 }
             }
@@ -220,6 +214,42 @@ export class AutonomyDirector {
             console.error(`[AutonomyDirector] Error during manual research for agent ${agent.name}:`, error);
         } finally {
             this.setAgentBusy(agent.id, false);
+        }
+    }
+
+    private async executeTask(agent: Agent, task: AgentTask) {
+        this._logActivity(agent, 'system', `Starting task: "${task.objective}"`);
+
+        const updatePayload = { status: 'in_progress', updatedAt: Date.now(), $push: { updates: { timestamp: Date.now(), message: 'Task started.' } } };
+        await agentsCollection.updateOne({ "tasks.id": task.id }, { $set: { "tasks.$[elem]": { ...task, ...updatePayload } } }, { arrayFilters: [{ "elem.id": task.id }] });
+        this.emitToMain?.({ type: 'socketEmit', event: 'taskUpdated', payload: { ...task, ...updatePayload }, room: agent.ownerHandle });
+
+        let result: { summary: string; sources?: any[] } = { summary: 'Task failed to produce a result.' };
+        if (task.type === 'one_time_research') {
+            const researchResult = await alphaService.researchTopic(agent, task.parameters.topic);
+            if (researchResult) {
+                result = researchResult;
+            }
+        }
+        
+        const finalUpdatePayload = { status: 'completed', updatedAt: Date.now(), result, sources: result.sources, $push: { updates: { timestamp: Date.now(), message: 'Task completed.' } } };
+        await agentsCollection.updateOne({ "tasks.id": task.id }, { $set: { "tasks.$[elem]": { ...task, ...finalUpdatePayload } } }, { arrayFilters: [{ "elem.id": task.id }] });
+        this.emitToMain?.({ type: 'socketEmit', event: 'taskUpdated', payload: { ...task, ...finalUpdatePayload }, room: agent.ownerHandle });
+
+        this._logActivity(agent, 'system', `Task completed: "${task.objective}"`);
+    }
+
+    private handleNotificationFailure(status: { sent: boolean, reason?: string }, userHandle: string) {
+        if (!status.sent && status.reason === 'NO_PHONE') {
+            this.emitToMain?.({
+                type: 'socketEmit',
+                event: 'systemMessage',
+                payload: {
+                    type: 'error',
+                    message: 'Your agent tried to send a notification, but you have no phone number configured. Please update your settings.'
+                },
+                room: userHandle,
+            });
         }
     }
 

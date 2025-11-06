@@ -190,31 +190,26 @@ router.put('/users/current-agent', async (req, res) => {
 });
 
 router.put('/users/settings/notifications', async (req, res) => {
-    const { userHandle } = res.locals;
-    const { phone, notificationSettings } = req.body;
-    if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
-
     try {
-        const updateDoc: any = { $set: {} };
-        if (phone !== undefined) {
-            updateDoc.$set.phone = phone;
-        }
-        if (notificationSettings !== undefined) {
-            updateDoc.$set.notificationSettings = notificationSettings;
-        }
-        updateDoc.$set.updatedAt = Date.now();
+        const { userHandle } = res.locals;
+        if (!userHandle) return res.status(401).json({ message: 'Unauthorized' });
+
+        const { phone, notificationSettings } = req.body;
         
-        const result = await usersCollection.updateOne(
-            { handle: userHandle },
-            updateDoc
-        );
-        if (result.modifiedCount === 0) {
-            return res.status(404).json({ message: "User not found or no changes made." });
+        const updateDoc: any = {};
+        if (phone !== undefined) updateDoc.phone = phone;
+        if (notificationSettings) updateDoc.notificationSettings = notificationSettings;
+
+        const result = await usersCollection.updateOne({ handle: userHandle }, { $set: updateDoc });
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ message: 'User not found' });
         }
+
         res.status(200).json({ message: 'Notification settings updated.' });
     } catch (error) {
         console.error('[API] Error updating notification settings:', error);
-        res.status(500).json({ message: 'Failed to update settings.' });
+        res.status(500).json({ message: 'Failed to update notification settings.' });
     }
 });
 
