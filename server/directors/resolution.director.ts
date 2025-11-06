@@ -15,7 +15,7 @@ export class ResolutionDirector {
         return;
     }
     this.isTicking = true;
-    console.log('[ResolutionDirector] Starting bet resolution tick...');
+    console.log('[ResolutionDirector] Tick processing...');
 
     try {
         const pendingBets = await betsCollection.find({ status: 'pending' }).toArray();

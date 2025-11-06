@@ -133,8 +133,8 @@ class PolymarketService {
         order: 'desc'
     };
 
-    // Use query if provided, otherwise use the category as the search term. 'All' becomes a wildcard.
-    params.q = query || (category && category !== 'All' ? category : '*');
+    // Use query if provided, otherwise use the category as the search term. 'All' becomes an empty query.
+    params.q = query || (category && category !== 'All' ? category : '');
     
     // CORRECTED PARAMETER: Use 'limit' instead of 'limit_per_type'
     params.limit = limit;
@@ -144,7 +144,7 @@ class PolymarketService {
         params.tag = category;
     }
     
-    if (params.q === '*') {
+    if (params.q === '') {
         params.sort = 'liquidity';
     }
 

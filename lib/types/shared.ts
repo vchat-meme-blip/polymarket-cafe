@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -98,7 +99,6 @@ export type Interaction = {
   timestamp: number;
   markets?: MarketIntel[];
   tool_calls?: any[];
-  // FIX: Add 'roomId' property to 'Interaction' type to resolve a type error when creating new conversation turns within a room.
   roomId?: string;
 };
 

@@ -101,7 +101,7 @@ export class ArenaDirector {
 
     private async processWanderingAgents(allAgents: any[], allRooms: any[]) {
         const agentLocations: Record<string, string | null> = {};
-        allAgents.forEach(agent => { agentLocations[agent.id] = null; });
+        allAgents.forEach(agent => { agentLocations[agent._id.toString()] = null; });
         allRooms.forEach(room => { room.agentIds.forEach((agentId: ObjectId) => { agentLocations[agentId.toString()] = room.id; }); });
         
         const wanderingAgents = shuffle(allAgents.filter(agent => !agentLocations[agent._id.toString()]));
@@ -138,7 +138,18 @@ export class ArenaDirector {
                 continue;
             }
 
-            const [agent1Doc, agent2Doc] = room.agentIds.map((id: ObjectId) => allAgents.find(a => a._id.equals(id)));
+            const agentIdsAsObjectIds = room.agentIds.map((id: string | ObjectId) => {
+                try {
+                    return typeof id === 'string' ? new ObjectId(id) : id;
+                } catch (e) {
+                    console.error(`[ArenaDirector] Invalid ObjectId string in room ${room.id}: ${id}`);
+                    return null;
+                }
+            }).filter((id): id is ObjectId => id !== null);
+
+            if (agentIdsAsObjectIds.length !== 2) continue;
+
+            const [agent1Doc, agent2Doc] = agentIdsAsObjectIds.map((id: ObjectId) => allAgents.find(a => a._id.equals(id)));
             if (!agent1Doc || !agent2Doc) continue;
             
             const history = await agentInteractionsCollection.find({ roomId: room.id }).sort({ timestamp: 1 }).toArray();
@@ -265,7 +276,17 @@ export class ArenaDirector {
             const agentIdStr = agent._id.toString();
             let foundRoom = false;
             for (const room of rooms) {
-                if (room.agentIds.some((id: ObjectId) => id.equals(agent._id))) {
+                if (room.agentIds && Array.isArray(room.agentIds) && room.agentIds.some((id: ObjectId | string) => {
+                    if (!id) return false;
+                    // Handle both ObjectId and string representations for robustness
+                    if (typeof id === 'string') {
+                        return id === agent._id.toString();
+                    }
+                    if (typeof id.equals === 'function') {
+                        return id.equals(agent._id);
+                    }
+                    return false;
+                })) {
                     agentLocations[agentIdStr] = room.id;
                     foundRoom = true;
                     break;
@@ -299,12 +320,18 @@ export class ArenaDirector {
     public async createAndHostRoom(agentId: string) {
         const agentDoc = await agentsCollection.findOne({ _id: new ObjectId(agentId) });
         if (!agentDoc) return;
-        const agent = { ...agentDoc, id: agentDoc._id.toString() };
 
         const newRoom: Omit<Room, 'id'> & { _id: ObjectId } = {
             _id: new ObjectId(),
-            agentIds: [], hostId: agent.id, topics: agent.topics, warnFlags: 0, rules: [],
-            activeOffer: null, vibe: 'General Chat ☕️', isOwned: false
+            agentIds: [], 
+            // FIX: Convert ObjectId to string to match the 'Room' type definition.
+            hostId: agentDoc._id.toString(),
+            topics: agentDoc.topics as string[],
+            warnFlags: 0, 
+            rules: [],
+            activeOffer: null, 
+            vibe: 'General Chat ☕️', 
+            isOwned: false
         };
         const { insertedId } = await roomsCollection.insertOne(newRoom as any);
         const savedRoom = await roomsCollection.findOne({ _id: insertedId });

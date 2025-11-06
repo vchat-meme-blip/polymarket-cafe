@@ -1,9 +1,8 @@
-
 /// <reference types="node" />
 
 import './load-env.js';
 import http from 'http';
-import express, { Request as ExpressRequest, Response as ExpressResponse, NextFunction, RequestHandler } from 'express';
+import express, { Request as ExpressRequest, Response as ExpressResponse, NextFunction } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -40,9 +39,9 @@ export async function startServer() {
 
   app.use(helmet({
     contentSecurityPolicy: false, 
-  }) as RequestHandler);
-  app.use(cors() as RequestHandler);
-  app.use(compression() as RequestHandler);
+  }));
+  app.use(cors());
+  app.use(compression());
   app.use(express.json({ limit: '10mb' }));
 
   const workers: { name: string; instance: Worker; tickInterval: number }[] = [];
@@ -122,7 +121,8 @@ export async function startServer() {
 
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
-    app.use((req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
+    // FIX: Removed explicit types from middleware handler to rely on type inference, resolving overload errors.
+    app.use((req, res, next) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
@@ -143,7 +143,8 @@ export async function startServer() {
   
   app.use(express.static(clientDistPath));
   
-  app.get('*', (req: ExpressRequest, res: ExpressResponse) => {
+  // FIX: Removed explicit types from route handler to rely on type inference, resolving method existence errors on `res`.
+  app.get('*', (req, res) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);

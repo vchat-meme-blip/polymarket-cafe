@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -30,7 +31,8 @@ export default function ArenaAgent({ agent, isSpeaking }: ArenaAgentProps) {
     }, [agent.id]);
     
     // Special idle animation for Mexican Trump
-    const idleAnimation = agent.id === 'mexican-trump'
+    const isTrumpTemplate = agent.templateId === 'mexican-trump' || agent.copiedFromId === 'mexican-trump';
+    const idleAnimation = isTrumpTemplate
         ? '/animations/idle_loop.vrma'
         : '/animations/idle2.vrma';
 

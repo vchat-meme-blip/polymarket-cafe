@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -14,6 +15,8 @@ type DashboardAgentProps = {
   agent: {
     id: string;
     modelUrl?: string; // Make modelUrl explicitly optional
+    templateId?: string;
+    copiedFromId?: string;
   };
   isSpeaking: boolean;
 };
@@ -24,8 +27,8 @@ type DashboardAgentProps = {
  */
 // Helper function to determine appropriate idle animation based on agent ID (like Cafe rooms)
 function getIdleAnimation(agent: Partial<Agent>): string {
-  // Special idle animation for Mexican Trump (matches ArenaAgent logic)
-  if (agent.id === 'mexican-trump') {
+  const isTrumpTemplate = agent.templateId === 'mexican-trump' || agent.copiedFromId === 'mexican-trump';
+  if (isTrumpTemplate) {
     return '/animations/idle_loop.vrma';
   }
   // Default for all other agents

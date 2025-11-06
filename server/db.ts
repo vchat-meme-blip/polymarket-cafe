@@ -1,3 +1,4 @@
+
 /// <reference types="node" />
 
 import mongoose, { Collection, Document } from 'mongoose';
@@ -160,11 +161,17 @@ export async function seedMcpAgents() {
   }
   
   console.log('[DB Seeder] Seeding MCP agents...');
-  const mcpDocuments = PRESET_AGENTS.map(agentTemplate => ({
-    ...agentTemplate, // This preserves the original string ID like 'tony-pump'
-    _id: new mongoose.Types.ObjectId(), // Let MongoDB generate its own internal ID
-    boxBalance: 500, // Genesis credit drop
-  }));
+  const mcpDocuments = PRESET_AGENTS.map(agentTemplate => {
+    const newId = new mongoose.Types.ObjectId();
+    return {
+      ...agentTemplate,
+      _id: newId,
+      id: newId.toHexString(), // This becomes the new unique ID
+      templateId: agentTemplate.id, // The original string ID is now the templateId
+      boxBalance: 500, // Genesis credit drop
+      ownerHandle: null, // Explicitly set ownerHandle to null for MCPs
+    };
+  });
   
   if (mcpDocuments.length > 0) {
     await agentsCollection.insertMany(mcpDocuments as any[]);

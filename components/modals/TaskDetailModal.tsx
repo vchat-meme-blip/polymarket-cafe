@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -63,7 +64,7 @@ export default function TaskDetailModal({ task }: { task: AgentTask }) {
                             <p>Live data visualization for monitoring tasks is coming soon. Data is being collected in the background.</p>
                             {task.dataSnapshots && task.dataSnapshots.length > 0 && 
                                 <pre style={{ marginTop: '12px', background: 'var(--Neutral-05)', padding: '8px', borderRadius: '4px', maxHeight: '100px', overflow: 'auto' }}>
-                                    {JSON.stringify(task.dataSnapshots.slice(0, 2), null, 2)}
+                                    {JSON.stringify(task.dataSnapshots.slice(-2), null, 2)}
                                 </pre>
                             }
                         </div>
