@@ -1,9 +1,30 @@
+
 /// <reference types="node" />
 
-import { startServer as main } from './startup.js';
+import { startServer } from './startup.js';
 
-const isMainModule = import.meta.url === `file://${process.argv[1]}`;
+let serverInstance: { stop: () => Promise<void> } | null = null;
 
-if (isMainModule) {
-  main().catch(console.error);
+async function main() {
+  try {
+    serverInstance = await startServer();
+    console.log('[Server] Main process started successfully.');
+  } catch (error) {
+    console.error('[Server] Fatal error during startup:', error);
+    process.exit(1);
+  }
 }
+
+async function gracefulShutdown() {
+  console.log('[Server] Received shutdown signal. Cleaning up...');
+  if (serverInstance) {
+    await serverInstance.stop();
+  }
+  process.exit(0);
+}
+
+// Handle shutdown signals
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
+
+main();
