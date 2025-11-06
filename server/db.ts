@@ -29,9 +29,9 @@ import type {
   // Conversion functions
   toSharedUser,
   toSharedAgent
-} from '../../lib/types/mongodb.js';
-import { PRESET_AGENTS } from '../../lib/presets/agents.js';
-import { ActivityLogEntry, Interaction } from '../../lib/types/index.js';
+} from '../lib/types/mongodb.js';
+import { PRESET_AGENTS } from '../lib/presets/agents.js';
+import { ActivityLogEntry, Interaction } from '../lib/types/index.js';
 
 // Load environment variables first
 import loadEnv from './load-env.js';

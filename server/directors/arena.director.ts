@@ -168,7 +168,7 @@ export class ArenaDirector {
 
                 const newTurn: Interaction = { agentId: speaker.id, agentName: speaker.name, text, timestamp: Date.now(), roomId: room.id };
                 await agentInteractionsCollection.insertOne(newTurn as any);
-                await roomsCollection.updateOne({ _id: room._id }, { $set: { lastMessageTimestamp: newTurn.timestamp } });
+                await roomsCollection.updateOne({ _id: room._id }, { $set: { lastMessageTimestamp: newTurn.timestamp } } as any);
 
                 this.emitToMain?.({ type: 'socketEmit', event: 'newConversationTurn', payload: { roomId: room.id, turn: newTurn, room } });
 
@@ -190,7 +190,7 @@ export class ArenaDirector {
 
         // Remove from old room
         if (fromRoom) {
-            await roomsCollection.updateOne({ _id: fromRoom._id }, { $pull: { agentIds: agentObjectId } });
+            await roomsCollection.updateOne({ _id: fromRoom._id }, { $pull: { agentIds: agentObjectId } } as any);
             if (fromRoom.agentIds.length - 1 === 0 && !fromRoom.isOwned) {
                 await roomsCollection.deleteOne({ _id: fromRoom._id });
                 await agentInteractionsCollection.deleteMany({ roomId: fromRoom.id });
@@ -200,7 +200,7 @@ export class ArenaDirector {
 
         // Add to new room
         if (toRoomId) {
-            await roomsCollection.updateOne({ id: toRoomId }, { $addToSet: { agentIds: agentObjectId } });
+            await roomsCollection.updateOne({ id: toRoomId }, { $addToSet: { agentIds: agentObjectId } } as any);
         }
         
         this.emitToMain?.({ type: 'socketEmit', event: 'agentMoved', payload: { agentId, toRoomId } });
@@ -228,13 +228,13 @@ export class ArenaDirector {
         if (!offer.type) {
             console.warn(`[ArenaDirector] Could not create offer, invalid arguments:`, args);
             // Clear any existing offer
-            await roomsCollection.updateOne({ _id: room._id }, { $set: { activeOffer: null } });
+            await roomsCollection.updateOne({ _id: room._id }, { $set: { activeOffer: null } } as any);
             this.emitToMain?.({ type: 'socketEmit', event: 'roomUpdated', payload: { room: { ...room, activeOffer: null } } });
             return;
         }
 
         // FIX: Cast the offer object to the full 'Offer' type to resolve the assignment error, after ensuring it's valid.
-        await roomsCollection.updateOne({ _id: room._id }, { $set: { activeOffer: offer as Offer } });
+        await roomsCollection.updateOne({ _id: room._id }, { $set: { activeOffer: offer as Offer } } as any);
         this.emitToMain?.({ type: 'socketEmit', event: 'roomUpdated', payload: { room: { ...room, activeOffer: offer } } });
     }
 
@@ -245,7 +245,7 @@ export class ArenaDirector {
         try {
             const { trade, newAsset } = await tradeService.executeTrade(offer);
             
-            await roomsCollection.updateOne({ _id: room._id }, { $set: { activeOffer: null } });
+            await roomsCollection.updateOne({ _id: room._id }, { $set: { activeOffer: null } } as any);
 
             this.emitToMain?.({ type: 'socketEmit', event: 'tradeExecuted', payload: { trade } });
             this.emitToMain?.({ type: 'socketEmit', event: 'roomUpdated', payload: { room: { ...room, activeOffer: null } } });

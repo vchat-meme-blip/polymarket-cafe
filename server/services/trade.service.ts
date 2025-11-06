@@ -85,7 +85,7 @@ class TradeService {
 
                 await agentsCollection.updateOne(
                     { _id: buyerId },
-                    { $push: { marketWatchlists: newWatchlistForBuyer as any } },
+                    { $push: { marketWatchlists: newWatchlistForBuyer as any } } as any,
                     { session }
                 );
 

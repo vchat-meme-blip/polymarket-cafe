@@ -133,7 +133,7 @@ export class MonitoringDirector {
                     }
                 },
                 $set: { "tasks.$.updatedAt": Date.now() }
-            }
+            } as any
         );
 
         if (updateResult.modifiedCount > 0) {

@@ -431,7 +431,7 @@ router.post('/agents/:agentId/watchlists', async (req, res) => {
 
         await agentsCollection.updateOne(
             { _id: agent._id },
-            { $push: { marketWatchlists: newWatchlist as any } }
+            { $push: { marketWatchlists: newWatchlist as any } } as any
         );
 
         res.status(201).json({ watchlist: newWatchlist });
@@ -448,7 +448,7 @@ router.delete('/agents/:agentId/watchlists/:watchlistId', async (req, res) => {
     try {
         const result = await agentsCollection.updateOne(
             { id: agentId, ownerHandle: userHandle },
-            { $pull: { marketWatchlists: { id: watchlistId } as any } }
+            { $pull: { marketWatchlists: { id: watchlistId } as any } } as any
         );
 
         if (result.modifiedCount === 0) {
@@ -502,7 +502,7 @@ router.post('/agents/:agentId/tasks', async (req, res) => {
 
       await agentsCollection.updateOne(
           { _id: agent._id },
-          { $push: { tasks: newTask as any } }
+          { $push: { tasks: newTask as any } } as any
       );
 
       res.status(201).json(newTask);
@@ -533,7 +533,7 @@ router.put('/agents/:agentId/tasks/:taskId', async (req, res) => {
 
         const result = await agentsCollection.updateOne(
             { _id: agent._id, 'tasks.id': taskId },
-            updateQuery
+            updateQuery as any
         );
 
         if (result.modifiedCount === 0) {
@@ -557,7 +557,7 @@ router.delete('/agents/:agentId/tasks/:taskId', async (req, res) => {
     try {
         const result = await agentsCollection.updateOne(
             { id: agentId, ownerHandle: userHandle },
-            { $pull: { tasks: { id: taskId } as any } }
+            { $pull: { tasks: { id: taskId } as any } } as any
         );
 
         if (result.modifiedCount === 0) {
@@ -705,7 +705,7 @@ router.post('/bets', async (req, res) => {
     status: 'pending'
   };
   await betsCollection.insertOne(newBet as any);
-  await agentsCollection.updateOne({ id: betData.agentId }, { $push: { bettingHistory: newBet as any }});
+  await agentsCollection.updateOne({ id: betData.agentId }, { $push: { bettingHistory: newBet as any }} as any);
   res.status(201).send();
 });
 

@@ -236,7 +236,7 @@ export class AutonomyDirector {
                 },
             },
         };
-        await agentsCollection.updateOne({ _id: new ObjectId(agent.id) }, initialUpdate, { arrayFilters: [{ 'elem.id': task.id }] });
+        await agentsCollection.updateOne({ _id: new ObjectId(agent.id) }, initialUpdate as any, { arrayFilters: [{ 'elem.id': task.id }] });
 
         const updatedTaskForEmit_Initial = { ...task, status: 'in_progress' as const, updatedAt: Date.now(), updates: [...task.updates, { timestamp: Date.now(), message: 'Task started.' }] };
         this.emitToMain?.({ type: 'socketEmit', event: 'taskUpdated', payload: updatedTaskForEmit_Initial, room: agent.ownerHandle });
@@ -269,7 +269,7 @@ export class AutonomyDirector {
                 },
             },
         };
-        await agentsCollection.updateOne({ _id: new ObjectId(agent.id) }, finalUpdate, { arrayFilters: [{ 'elem.id': task.id }] });
+        await agentsCollection.updateOne({ _id: new ObjectId(agent.id) }, finalUpdate as any, { arrayFilters: [{ 'elem.id': task.id }] });
         
         const finalTaskForEmit = { ...updatedTaskForEmit_Initial, status: 'completed' as const, updatedAt: Date.now(), result, sources: result.sources, updates: [...updatedTaskForEmit_Initial.updates, { timestamp: Date.now(), message: 'Task completed.' }] };
         this.emitToMain?.({ type: 'socketEmit', event: 'taskUpdated', payload: finalTaskForEmit, room: agent.ownerHandle });

@@ -4,7 +4,8 @@ import './load-env.js';
 import http from 'http';
 // FIX: Changed express import to resolve type conflicts. `import express from 'express'` is the standard way to import express and resolves type issues.
 // FIX: Corrected express import to bring types `Request`, `Response`, and `NextFunction` into scope.
-import express, { Request, Response, NextFunction } from 'express';
+// FIX: Aliased Request/Response and imported RequestHandler to fix type errors.
+import express, { Request as ExpressRequest, Response as ExpressResponse, NextFunction, RequestHandler } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -40,11 +41,14 @@ export async function startServer() {
   const server = http.createServer(app);
   const apiKeyManager = new ApiKeyManager();
 
+  // FIX: Cast middleware to RequestHandler to resolve overload ambiguity.
   app.use(helmet({
     contentSecurityPolicy: false, // In a real app, configure this properly
-  }));
-  app.use(cors());
-  app.use(compression());
+  }) as RequestHandler);
+  // FIX: Cast middleware to RequestHandler to resolve overload ambiguity.
+  app.use(cors() as RequestHandler);
+  // FIX: Cast middleware to RequestHandler to resolve overload ambiguity.
+  app.use(compression() as RequestHandler);
   app.use(express.json({ limit: '10mb' }));
 
   const workers: { name: string; instance: Worker; tickInterval: number }[] = [];
@@ -130,7 +134,7 @@ export async function startServer() {
     // FIX: Update types to use express namespace.
     // FIX: Replaced `express.Request` etc. with imported `Request` types to fix handler signature.
     // FIX: Use explicit express types to resolve conflicts with global DOM types for Request/Response.
-    app.use((req: Request, res: Response, next: NextFunction) => {
+    app.use((req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
@@ -156,7 +160,8 @@ export async function startServer() {
   // Handle SPA routing - serve index.html for all other routes
   // FIX: Replaced `express.Request` and `express.Response` with imported types to fix handler signature and resolve property errors.
   // FIX: Use explicit express types to resolve conflicts with global DOM types for Request/Response.
-  app.get('*', (req: Request, res: Response) => {
+  // FIX: Use aliased Express types to resolve ambiguity with global types.
+  app.get('*', (req: ExpressRequest, res: ExpressResponse) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);
