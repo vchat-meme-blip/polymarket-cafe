@@ -18,6 +18,7 @@ import connectDB, { seedDatabase } from './db.js';
 import apiRouter from './routes/api.js';
 import { webSocketService } from './services/websocket.service.js';
 import { createWorker } from './worker-loader.js';
+import fs from 'fs';
 import { ApiKeyManager } from './services/apiKey.service.js';
 import { usersCollection } from './db.js';
 
@@ -133,11 +134,26 @@ export async function startServer() {
   );
 
   app.use('/api', apiRouter);
-  const clientDistPath = path.join(projectRoot, 'dist', 'client');
+  
+  // Serve static files from the correct client build directory
+  const clientDistPath = path.join(projectRoot, '..', 'dist', 'client');
+  console.log(`[Server] Serving static files from: ${clientDistPath}`);
+  
+  // Check if client files exist
+  if (!fs.existsSync(path.join(clientDistPath, 'index.html'))) {
+    console.error(`[ERROR] Client build not found at ${clientDistPath}. Please run 'npm run build:client'`);
+  }
+  
   app.use(express.static(clientDistPath));
-  // FIX: Update types to use express namespace.
+  
+  // Handle SPA routing - serve index.html for all other routes
   app.get('*', (req: express.Request, res: express.Response) => {
-    res.sendFile(path.join(clientDistPath, 'index.html'));
+    res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
+      if (err) {
+        console.error(`[ERROR] Failed to serve index.html: ${err.message}`);
+        res.status(500).send('Error loading the application');
+      }
+    });
   });
 
   const PORT = process.env.PORT || 3001;
