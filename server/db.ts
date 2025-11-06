@@ -31,6 +31,7 @@ import type {
   toSharedAgent
 } from '../lib/types/mongodb.js';
 import { PRESET_AGENTS } from '../lib/presets/agents.js';
+import { ActivityLogEntry } from '../lib/types/index.js';
 
 // Load environment variables first
 import loadEnv from './load-env.js';
@@ -51,7 +52,7 @@ export let agentsCollection: Collection<AgentDocument>;
 export let roomsCollection: Collection<RoomDocument>;
 export let betsCollection: Collection<BetDocument>;
 export let bountiesCollection: Collection<BountyDocument>;
-export let activityLogCollection: Collection<Document>;
+export let activityLogCollection: Collection<ActivityLogEntry>;
 export let tradeHistoryCollection: Collection<TradeRecordDocument>;
 export let transactionsCollection: Collection<TransactionDocument>;
 export let bettingIntelCollection: Collection<BettingIntelDocument>;
@@ -97,7 +98,7 @@ const connectDB = async () => {
     roomsCollection = mongoose.connection.collection<RoomDocument>('rooms');
     betsCollection = mongoose.connection.collection<BetDocument>('bets');
     bountiesCollection = mongoose.connection.collection<BountyDocument>('bounties');
-    activityLogCollection = mongoose.connection.collection<Document>('activity_logs');
+    activityLogCollection = mongoose.connection.collection<ActivityLogEntry>('activity_logs');
     tradeHistoryCollection = mongoose.connection.collection<TradeRecordDocument>('trade_history');
     transactionsCollection = mongoose.connection.collection<TransactionDocument>('transactions');
     bettingIntelCollection = mongoose.connection.collection<BettingIntelDocument>('bettingIntel');

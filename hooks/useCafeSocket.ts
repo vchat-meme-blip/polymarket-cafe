@@ -3,7 +3,7 @@ import { useArenaStore, USER_ID } from '../lib/state/arena';
 import { useAgent, useUI, useUser, useSystemLogStore } from '../lib/state/index.js';
 import { socketService } from '../lib/services/socket.service';
 import { useAutonomyStore } from '../lib/state/autonomy';
-import type { TradeRecord, ActivityLogEntry, AgentTask } from '../lib/types/index.js';
+import type { TradeRecord, ActivityLogEntry, AgentTask, MarketIntel } from '../lib/types/index.js';
 
 export function useCafeSocket() {
     const { 
@@ -92,12 +92,13 @@ export function useCafeSocket() {
             useArenaStore.getState().moveAgentFromSocket(data.agentId, data.roomId);
         };
         
-        const handleProactiveMessage = (data: { agentId: string; agentName: string; text: string; }) => {
+        const handleProactiveMessage = (data: { agentId: string; agentName: string; text: string; markets?: MarketIntel[] }) => {
             addConversationTurn(data.agentId, USER_ID, {
                 agentId: data.agentId,
                 agentName: data.agentName,
                 text: data.text,
                 timestamp: Date.now(),
+                markets: data.markets,
             });
             setIsAgentResponding(true);
             const messageDuration = Math.max(1000, data.text.length * 50);

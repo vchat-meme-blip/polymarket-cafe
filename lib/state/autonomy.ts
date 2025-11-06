@@ -11,6 +11,7 @@ import { useAgent } from './index.js';
 interface ServerHydrationData {
     bounties: Bounty[];
     intel: BettingIntel[];
+    activityLog: ActivityLogEntry[];
 }
 
 export type AutonomyState = {
@@ -58,6 +59,7 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
   hydrate: (data) => set({
       bounties: data.bounties,
       intelBank: data.intel,
+      activityLog: data.activityLog || [],
   }),
 
   setActivity: (activity, message) => {

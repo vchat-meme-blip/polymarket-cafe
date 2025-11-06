@@ -12,6 +12,7 @@ import {
   roomsCollection,
   dailySummariesCollection,
   marketWatchlistsCollection,
+  activityLogCollection,
 } from '../db.js';
 import { PRESET_AGENTS } from '../../lib/presets/agents.js';
 import { aiService } from '../services/ai.service.js';
@@ -35,6 +36,11 @@ declare global {
     interface Request {
       arenaWorker?: import('worker_threads').Worker;
       autonomyWorker?: import('worker_threads').Worker;
+      // FIX: Added missing worker types to the Express Request interface for type safety.
+      dashboardWorker?: import('worker_threads').Worker;
+      marketWatcherWorker?: import('worker_threads').Worker;
+      resolutionWorker?: import('worker_threads').Worker;
+      monitoringWorker?: import('worker_threads').Worker;
     }
   }
 }
@@ -94,8 +100,13 @@ router.get('/bootstrap/:handle', async (req, res) => {
 
     const agents = await agentsCollection.find({ ownerHandle: handle }).toArray();
     const presets = await agentsCollection.find({ ownerHandle: { $exists: false } }).toArray();
+    const agentIds = agents.map(a => a.id);
     
-    const autonomy = { bounties: await bountiesCollection.find({ ownerHandle: handle }).toArray(), intel: await bettingIntelCollection.find({ ownerHandle: handle }).toArray() };
+    const autonomy = { 
+        bounties: await bountiesCollection.find({ ownerHandle: handle }).toArray(), 
+        intel: await bettingIntelCollection.find({ ownerHandle: handle }).toArray(),
+        activityLog: await activityLogCollection.find({ agentId: { $in: agentIds } }).sort({ timestamp: -1 }).limit(100).toArray(),
+    };
     const wallet = { transactions: await transactionsCollection.find({ ownerHandle: handle }).toArray() };
 
     const sanitize = (doc: any) => ({ ...doc, id: doc._id.toString(), _id: doc._id.toString() });

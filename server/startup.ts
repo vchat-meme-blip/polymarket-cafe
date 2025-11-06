@@ -1,10 +1,11 @@
 
+
 /// <reference types="node" />
 
 import './load-env.js';
 import http from 'http';
 // FIX: Changed express import to resolve type conflicts.
-import express from 'express';
+import * as express from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -35,7 +36,7 @@ export async function startServer() {
   await connectDB();
   await seedDatabase();
 
-  const app = express();
+  const app = express.default();
   const server = http.createServer(app);
   const apiKeyManager = new ApiKeyManager();
 
