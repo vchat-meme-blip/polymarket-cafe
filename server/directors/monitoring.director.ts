@@ -1,11 +1,8 @@
 
-
 import { agentsCollection } from '../db.js';
-// FIX: Added 'Agent' to the import from '../../lib/types/index.js'.
 import { Agent, AgentTask, ActivityLogEntry } from '../../lib/types/index.js';
 import { polymarketService } from '../services/polymarket.service.js';
 import { notificationService } from '../services/notification.service.js';
-// FIX: Imported 'ObjectId' from 'mongodb' to resolve the type error.
 import { ObjectId } from 'mongodb';
 
 type EmitToMainThread = (message: { type: string; event?: string; payload?: any; room?: string; worker?: string; message?: any; }) => void;
@@ -24,16 +21,25 @@ export class MonitoringDirector {
             return;
         }
         this.isTicking = true;
+        console.log('[MonitoringDirector] Tick processing...');
 
         try {
-            const monitoringTasks = await agentsCollection.aggregate([
-                { $unwind: "$tasks" },
-                { $match: { "tasks.type": "continuous_monitoring", "tasks.status": "in_progress" } },
-                { $replaceRoot: { newRoot: "$tasks" } }
-            ]).toArray() as AgentTask[];
+            // Find all agents that have at least one active continuous monitoring task
+            const agentsWithMonitoringTasks = await agentsCollection.find({
+                "tasks.type": "continuous_monitoring",
+                "tasks.status": "in_progress"
+            }).toArray();
 
-            for (const task of monitoringTasks) {
-                await this.executeTask(task);
+            for (const agentDoc of agentsWithMonitoringTasks) {
+                const agent = { ...agentDoc, id: agentDoc._id.toString() } as unknown as Agent;
+                const tasks = (agent as any).tasks || [];
+                const monitoringTasks = tasks.filter(
+                    (t: AgentTask) => t.type === 'continuous_monitoring' && t.status === 'in_progress'
+                );
+
+                for (const task of monitoringTasks) {
+                    await this.executeTask(agent, task);
+                }
             }
         } catch (error) {
             console.error('[MonitoringDirector] Error during tick:', error);
@@ -42,30 +48,31 @@ export class MonitoringDirector {
         }
     }
 
-    private async executeTask(task: AgentTask) {
+    private async executeTask(agent: Agent, task: AgentTask) {
         try {
-            const { monitoringTarget, targetIdentifier } = task.parameters;
+            const { monitoringTarget } = task.parameters;
             
             if (monitoringTarget === 'market_odds' || monitoringTarget === 'liquidity') {
-                await this.monitorMarket(task);
+                await this.monitorMarket(agent, task);
             } else if (monitoringTarget === 'whale_wallet') {
-                await this.monitorWhaleWallet(task);
-            } else if (monitoringTarget === 'breaking_markets') {
-                // This is now handled reactively by the MarketWatcherDirector creating intel.
-                // This director could be extended to check for that new intel.
+                await this.monitorWhaleWallet(agent, task);
             }
         } catch (error) {
-            console.error(`[MonitoringDirector] Failed to execute task ${task.id}:`, error);
+            console.error(`[MonitoringDirector] Failed to execute task ${task.id} for agent ${agent.id}:`, error);
+            await this.updateTaskWithError(task.id, `Failed to execute task: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
     
-    private async monitorMarket(task: AgentTask) {
+    private async monitorMarket(agent: Agent, task: AgentTask) {
         const marketSlug = task.parameters.targetIdentifier;
         if (!marketSlug) return;
 
-        const { markets } = await polymarketService.searchMarkets(marketSlug);
-        const market = markets.find(m => (m as any).slug === marketSlug);
-        if (!market) return;
+        const { markets } = await polymarketService.searchMarkets(marketSlug, undefined, 1, 1);
+        const market = markets[0];
+        if (!market || (market as any).slug !== marketSlug) {
+            await this.updateTaskWithError(task.id, `Market with slug "${marketSlug}" not found.`);
+            return;
+        }
         
         const newSnapshot = {
             timestamp: Date.now(),
@@ -78,7 +85,7 @@ export class MonitoringDirector {
         await this.updateTaskWithNewSnapshot(task, newSnapshot, `Snapshot captured for market ${marketSlug}.`);
     }
 
-    private async monitorWhaleWallet(task: AgentTask) {
+    private async monitorWhaleWallet(agent: Agent, task: AgentTask) {
         const walletAddress = task.parameters.targetIdentifier;
         if (!walletAddress) return;
         
@@ -95,12 +102,7 @@ export class MonitoringDirector {
             };
             const updateMessage = `Detected ${newTrades.length} new/changed position(s) for wallet ${walletAddress.slice(0, 6)}...`;
             await this.updateTaskWithNewSnapshot(task, newSnapshot, updateMessage);
-            
-            // Log activity for the agent
-            const agent = await agentsCollection.findOne({ "tasks.id": task.id });
-            if (agent && agent.ownerHandle) {
-                this._logActivity({ ...agent, id: agent._id.toString() } as any, 'trade', updateMessage);
-            }
+            this._logActivity(agent, 'trade', updateMessage);
         }
     }
     
@@ -122,24 +124,49 @@ export class MonitoringDirector {
     }
     
     private async updateTaskWithNewSnapshot(task: AgentTask, snapshot: any, updateMessage: string) {
+        const agent = await agentsCollection.findOne({ "tasks.id": task.id });
+        if (!agent) return;
+
         const updateResult = await agentsCollection.updateOne(
-            { "tasks.id": task.id },
+            { _id: agent._id, "tasks.id": task.id },
             {
                 $push: {
-                    "tasks.$.dataSnapshots": { $each: [snapshot], $slice: -100 }, // Keep last 100 snapshots
-                    "tasks.$.updates": {
-                        $each: [{ timestamp: Date.now(), message: updateMessage }],
-                        $slice: -50 // Keep last 50 updates
-                    }
+                    "tasks.$.dataSnapshots": { $each: [snapshot], $slice: -100 },
+                    "tasks.$.updates": { $each: [{ timestamp: Date.now(), message: updateMessage }], $slice: -50 }
                 },
                 $set: { "tasks.$.updatedAt": Date.now() }
             } as any
         );
 
-        if (updateResult.modifiedCount > 0) {
-            const agent = await agentsCollection.findOne({ "tasks.id": task.id });
-            const updatedTask = agent?.tasks?.find((t: any) => t.id === task.id);
-            if (agent && updatedTask) {
+        if (updateResult.modifiedCount > 0 && agent.ownerHandle) {
+            const updatedAgent = await agentsCollection.findOne({ _id: agent._id });
+            const updatedTask = (updatedAgent as any)?.tasks.find((t: AgentTask) => t.id === task.id);
+            if (updatedTask) {
+                this.emitToMain?.({ type: 'socketEmit', event: 'taskUpdated', payload: updatedTask, room: agent.ownerHandle });
+            }
+        }
+    }
+
+    private async updateTaskWithError(taskId: string, errorMessage: string) {
+        const agent = await agentsCollection.findOne({ "tasks.id": taskId });
+        if (!agent) return;
+
+        const updateResult = await agentsCollection.updateOne(
+            { _id: agent._id, "tasks.id": taskId },
+            {
+                $set: { 
+                    "tasks.$.status": 'completed', // Or a new 'error' status
+                    "tasks.$.updatedAt": Date.now() 
+                },
+                $push: {
+                    "tasks.$.updates": { $each: [{ timestamp: Date.now(), message: `Error: ${errorMessage}` }], $slice: -50 }
+                }
+            } as any
+        );
+         if (updateResult.modifiedCount > 0 && agent.ownerHandle) {
+            const updatedAgent = await agentsCollection.findOne({ _id: agent._id });
+            const updatedTask = (updatedAgent as any)?.tasks.find((t: AgentTask) => t.id === taskId);
+            if (updatedTask) {
                 this.emitToMain?.({ type: 'socketEmit', event: 'taskUpdated', payload: updatedTask, room: agent.ownerHandle });
             }
         }

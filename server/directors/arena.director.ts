@@ -82,6 +82,7 @@ export class ArenaDirector {
             return;
         }
         this.isTicking = true;
+        console.log('[ArenaDirector] Tick processing...');
         try {
             const allAgents = await agentsCollection.find({}).toArray();
             const allRooms = await roomsCollection.find({}).toArray();

@@ -1,10 +1,8 @@
+
 /// <reference types="node" />
 
 import './load-env.js';
 import http from 'http';
-// FIX: Changed express import to resolve type conflicts. `import express from 'express'` is the standard way to import express and resolves type issues.
-// FIX: Corrected express import to bring types `Request`, `Response`, and `NextFunction` into scope.
-// FIX: Aliased Request/Response and imported RequestHandler to fix type errors.
 import express, { Request as ExpressRequest, Response as ExpressResponse, NextFunction, RequestHandler } from 'express';
 import cors from 'cors';
 import compression from 'compression';
@@ -36,18 +34,14 @@ export async function startServer() {
   await connectDB();
   await seedDatabase();
 
-  // FIX: Changed app instantiation from `express.default()` to `express()` to match the corrected default import.
   const app = express();
   const server = http.createServer(app);
   const apiKeyManager = new ApiKeyManager();
 
-  // FIX: Cast middleware to RequestHandler to resolve overload ambiguity.
   app.use(helmet({
-    contentSecurityPolicy: false, // In a real app, configure this properly
+    contentSecurityPolicy: false, 
   }) as RequestHandler);
-  // FIX: Cast middleware to RequestHandler to resolve overload ambiguity.
   app.use(cors() as RequestHandler);
-  // FIX: Cast middleware to RequestHandler to resolve overload ambiguity.
   app.use(compression() as RequestHandler);
   app.use(express.json({ limit: '10mb' }));
 
@@ -82,16 +76,13 @@ export async function startServer() {
         const { agentId, requestId } = message.payload;
         let key: string | null = null;
 
-        // System requests get a key from the server pool
         if (agentId && agentId.startsWith('system-')) {
             key = apiKeyManager.getKey();
         } 
-        // Agent-specific requests try the user's key first
         else if (agentId) {
             const agent = await usersCollection.findOne({ currentAgentId: new ObjectId(agentId) });
             key = agent?.userApiKey || apiKeyManager.getKey();
         } 
-        // Generic requests get a key from the server pool
         else {
             key = apiKeyManager.getKey();
         }
@@ -131,9 +122,6 @@ export async function startServer() {
 
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
-    // FIX: Update types to use express namespace.
-    // FIX: Replaced `express.Request` etc. with imported `Request` types to fix handler signature.
-    // FIX: Use explicit express types to resolve conflicts with global DOM types for Request/Response.
     app.use((req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
@@ -146,21 +134,15 @@ export async function startServer() {
 
   app.use('/api', apiRouter);
   
-  // Serve static files from the correct client build directory
   const clientDistPath = path.join(projectRoot, '..', '..', 'dist', 'client');
   console.log(`[Server] Serving static files from: ${clientDistPath}`);
   
-  // Check if client files exist
   if (!fs.existsSync(path.join(clientDistPath, 'index.html'))) {
     console.error(`[ERROR] Client build not found at ${clientDistPath}. Please run 'npm run build:client'`);
   }
   
   app.use(express.static(clientDistPath));
   
-  // Handle SPA routing - serve index.html for all other routes
-  // FIX: Replaced `express.Request` and `express.Response` with imported types to fix handler signature and resolve property errors.
-  // FIX: Use explicit express types to resolve conflicts with global DOM types for Request/Response.
-  // FIX: Use aliased Express types to resolve ambiguity with global types.
   app.get('*', (req: ExpressRequest, res: ExpressResponse) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {

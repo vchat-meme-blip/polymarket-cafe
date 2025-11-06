@@ -1,4 +1,5 @@
 
+
 import { usersCollection, agentsCollection, betsCollection, bettingIntelCollection } from '../db.js';
 import mongoose from 'mongoose';
 import { User, Agent } from '../../lib/types/index.js';
@@ -46,6 +47,7 @@ export class DashboardAgentDirector {
             console.log('[DashboardDirector] Tick skipped due to system pause.');
             return;
         }
+        console.log('[DashboardDirector] Tick processing...');
         try {
             const userDocs = await usersCollection.find({ currentAgentId: { $exists: true, $ne: null as any } }).toArray();
             for (const userDoc of userDocs) {

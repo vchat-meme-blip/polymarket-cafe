@@ -58,6 +58,7 @@ export class AutonomyDirector {
              return;
         }
         this.isTicking = true;
+        console.log('[AutonomyDirector] Tick processing...');
         
         try {
             const activeUserQuery = { 
