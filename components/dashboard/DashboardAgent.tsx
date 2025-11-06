@@ -5,10 +5,10 @@
 import React, { Suspense, useState, useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-// FIX: The 'Agent' type is not exported from 'presets'. It is now imported from its correct source file 'lib/types/index.js'.
 import { Agent } from '../../lib/types/index.js';
 import { DEFAULT_VRM_URL } from '../../lib/presets/agents';
 import { VrmModel, VrmPlaceholder } from '../agents/VrmAvatar';
+import { useUI } from '../../lib/state/index.js';
 
 type DashboardAgentProps = {
   agent: {
@@ -33,17 +33,22 @@ function getIdleAnimation(agent: Partial<Agent>): string {
 }
 
 export default function DashboardAgent({ agent, isSpeaking }: DashboardAgentProps) {
+  const { gesture } = useUI();
   const urlToLoad = agent.modelUrl ?? DEFAULT_VRM_URL;
   const [animationTriggerKey, setAnimationTriggerKey] = useState(0);
   const agentIdRef = useRef<string | null>(null);
 
-  // Detect when a new agent enters this "slot" to play an animation (matches ArenaAgent)
+  // Detect when a new agent is selected to play an intro animation
   useEffect(() => {
     if (agent.id !== agentIdRef.current) {
       setAnimationTriggerKey(prev => prev + 1);
       agentIdRef.current = agent.id;
     }
   }, [agent.id]);
+  
+  // Use the gesture from UI state if available, otherwise use the agent change trigger
+  const animationUrlToUse = gesture?.animationUrl || "/animations/gesture_ready.vrma";
+  const triggerKeyToUse = gesture ? gesture.triggerKey : animationTriggerKey;
 
   return (
     <Suspense fallback={<VrmPlaceholder status="loading" />}>
@@ -63,9 +68,9 @@ export default function DashboardAgent({ agent, isSpeaking }: DashboardAgentProp
               disableAutoGrounding={true}
               verticalOffset={-0.2}
               idleUrl={getIdleAnimation(agent)}
-              triggerAnimationUrl="/animations/gesture_ready.vrma"
-              triggerKey={animationTriggerKey}
-              talkAnimationUrl="/animations/gesture_shoot.vrma"
+              triggerAnimationUrl={animationUrlToUse}
+              triggerKey={triggerKeyToUse}
+              talkAnimationUrl="/animations/talk.vrma"
             />
           </group>
           <OrbitControls

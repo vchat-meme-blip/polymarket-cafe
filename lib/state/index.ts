@@ -449,6 +449,8 @@ export const useUI = create<{
   taskDetailModalData: AgentTask | null;
   openTaskDetailModal: (task: AgentTask) => void;
   closeTaskDetailModal: () => void;
+  gesture: { animationUrl: string; triggerKey: number } | null;
+  triggerGesture: (animationName: string) => void;
 }>(set => ({
   isMobileNavOpen: true,
   toggleMobileNav: () => set(state => ({ isMobileNavOpen: !state.isMobileNavOpen })),
@@ -524,6 +526,20 @@ export const useUI = create<{
   taskDetailModalData: null,
   openTaskDetailModal: (task: AgentTask) => set({ taskDetailModalData: task }),
   closeTaskDetailModal: () => set({ taskDetailModalData: null }),
+  gesture: null,
+  triggerGesture: (animationName: string) => {
+    const validAnimations = ['cute', 'dance', 'elegant', 'greeting', 'peacesign', 'pose', 'shoot', 'spin', 'squat'];
+    if (validAnimations.includes(animationName)) {
+      set(state => ({
+        gesture: {
+          animationUrl: `/animations/gesture_${animationName}.vrma`,
+          triggerKey: (state.gesture?.triggerKey || 0) + 1,
+        }
+      }));
+    } else {
+      console.warn(`[triggerGesture] Invalid animation name: ${animationName}`);
+    }
+  },
 }));
 
 /**

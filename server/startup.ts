@@ -1,11 +1,10 @@
-
-
 /// <reference types="node" />
 
 import './load-env.js';
 import http from 'http';
-// FIX: Changed express import to resolve type conflicts.
-import * as express from 'express';
+// FIX: Changed express import to resolve type conflicts. `import express from 'express'` is the standard way to import express and resolves type issues.
+// FIX: Corrected express import to bring types `Request`, `Response`, and `NextFunction` into scope.
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -36,7 +35,8 @@ export async function startServer() {
   await connectDB();
   await seedDatabase();
 
-  const app = express.default();
+  // FIX: Changed app instantiation from `express.default()` to `express()` to match the corrected default import.
+  const app = express();
   const server = http.createServer(app);
   const apiKeyManager = new ApiKeyManager();
 
@@ -128,7 +128,8 @@ export async function startServer() {
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
     // FIX: Update types to use express namespace.
-    app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // FIX: Replaced `express.Request` etc. with imported `Request` types to fix handler signature.
+    app.use((req: Request, res: Response, next: NextFunction) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
@@ -152,7 +153,8 @@ export async function startServer() {
   app.use(express.static(clientDistPath));
   
   // Handle SPA routing - serve index.html for all other routes
-  app.get('*', (req: express.Request, res: express.Response) => {
+  // FIX: Replaced `express.Request` and `express.Response` with imported types to fix handler signature and resolve property errors.
+  app.get('*', (req: Request, res: Response) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);

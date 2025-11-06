@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -75,6 +76,24 @@ const agentTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
                 required: ['marketId', 'marketTitle'],
             },
         }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'gesture',
+            description: 'Perform a physical gesture or animation to add expression to your message. Use this sparingly to emphasize a point or show emotion.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    animation_name: { 
+                        type: 'string', 
+                        description: 'The name of the gesture to perform.',
+                        enum: ['cute', 'dance', 'elegant', 'greeting', 'peacesign', 'pose', 'shoot', 'spin', 'squat']
+                    },
+                },
+                required: ['animation_name'],
+            },
+        },
     }
 ];
 

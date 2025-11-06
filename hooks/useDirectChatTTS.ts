@@ -77,6 +77,10 @@ export function useDirectChatTTS() {
 
                 if (agentMessagesToSpeak.length > 0) {
                     agentMessagesToSpeak.forEach(msg => {
+                        if (!currentAgent.voice) {
+                            console.warn(`Agent ${currentAgent.name} has no voice configured. Skipping TTS.`);
+                            return;
+                        }
                         const cleanedText = cleanTextForTTS(msg.text);
                         if (cleanedText) {
                             audioQueue.current.push(cleanedText);
@@ -97,5 +101,5 @@ export function useDirectChatTTS() {
             // Optional: stop any ongoing playback when component unmounts or agent changes
             // ttsService.stop(null) could be implemented if needed.
         };
-    }, [currentAgent.id, playNextAudio]);
+    }, [currentAgent.id, currentAgent.name, currentAgent.voice, playNextAudio]);
 }
