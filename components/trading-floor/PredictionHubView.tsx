@@ -8,6 +8,7 @@ import DirectChatLog from '../dashboard/DirectChatLog.js';
 import c from 'classnames';
 import MarketCard from './MarketCard.js';
 import LiquidityPanel from './LiquidityPanel.js';
+import { WHALE_WALLETS } from '../../lib/presets/agents.js';
 
 type HubTab = 'Markets' | 'Arbitrage' | 'Liquidity' | 'Bookmarks';
 
@@ -27,14 +28,6 @@ const MARKET_CATEGORIES = [
     'War',
     'Weather',
     'Trump', // Kept for specific interest
-];
-
-const MAG7_WALLETS = [
-    { name: 'ExhaustedBoyBilly', address: '0x44c1dfe43260c94ed4f1d00de2e1f80fb113ebc1' },
-    { name: 'Theo5', address: '0xdd225a03cd7ed89e3931906c67c75ab31cf89ef1' },
-    { name: 'aenews2', address: '0x75e765216a57942d738d880ffcda854d9f869080' },
-    { name: 'Dillius', address: '0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b' },
-    { name: 'Car', address: '0x6bab41a0dc40d6dd4c1a915b8c01969479fd1292' },
 ];
 
 /**
@@ -133,7 +126,7 @@ export default function PredictionHubView() {
                         ))}
                         <div className={styles.filterDivider}></div>
                         <h4 className={styles.filterHeader}>Top Traders (Mag7)</h4>
-                        {MAG7_WALLETS.map(wallet => (
+                        {WHALE_WALLETS.map(wallet => (
                             <a 
                                 key={wallet.address} 
                                 href={`https://polymarket.com/profile/${wallet.address}?via=polymarketcafe`} 

@@ -15,15 +15,11 @@ export default function TaskDetailModal({ task }: { task: AgentTask }) {
     return (
         <Modal onClose={closeTaskDetailModal}>
             <div className={`${styles.modalContentPane} ${styles.taskDetailModal}`}>
-                <h2>Task: {task.objective}</h2>
+                <h2>Task Details</h2>
+                <p>{task.objective}</p>
                 <span className={`${styles.status} ${styles[task.status]}`}>
                     {task.status.replace('_', ' ')}
                 </span>
-
-                <div className={styles.detailSection}>
-                    <h4>Objective</h4>
-                    <p className={styles.objectiveText}>{task.objective}</p>
-                </div>
 
                 {task.result && (
                     <div className={styles.detailSection}>
@@ -45,6 +41,20 @@ export default function TaskDetailModal({ task }: { task: AgentTask }) {
                         </div>
                     </div>
                 )}
+                
+                {task.type === 'continuous_monitoring' && (
+                    <div className={styles.detailSection}>
+                        <h4>Live Data</h4>
+                        <div className={styles.objectiveText}> 
+                            <p>Live data visualization for monitoring tasks is coming soon. Data is being collected in the background.</p>
+                            {task.dataSnapshots && task.dataSnapshots.length > 0 && 
+                                <pre style={{ marginTop: '12px', background: 'var(--Neutral-05)', padding: '8px', borderRadius: '4px', maxHeight: '100px', overflow: 'auto' }}>
+                                    {JSON.stringify(task.dataSnapshots.slice(0, 2), null, 2)}
+                                </pre>
+                            }
+                        </div>
+                    </div>
+                )}
 
                 <div className={styles.detailSection}>
                     <h4>Activity Log</h4>
@@ -56,7 +66,7 @@ export default function TaskDetailModal({ task }: { task: AgentTask }) {
                                         <span className={styles.timestamp}>
                                             {typeof update.timestamp === 'number' && !isNaN(update.timestamp)
                                                 ? format(update.timestamp, 'MMM d, HH:mm:ss') + ':'
-                                                : 'Invalid Date:'}
+                                                : 'A moment ago:'}
                                         </span>
                                         <span className={styles.message}>{update.message}</span>
                                     </li>

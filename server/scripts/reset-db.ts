@@ -1,3 +1,4 @@
+/// <reference types="node" />
 // Load environment variables first
 import { config } from 'dotenv';
 import path from 'path';

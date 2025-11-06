@@ -1,3 +1,4 @@
+
 import { agentsCollection, usersCollection, betsCollection, bettingIntelCollection } from '../db.js';
 import { ObjectId } from 'mongodb';
 import type { Agent, User, ActivityLogEntry, AgentTask } from '../../lib/types/shared.js';
@@ -43,7 +44,8 @@ export class AutonomyDirector {
             console.error(`[AutonomyDirector] Retryable function failed. Retries left: ${retries - 1}. Error:`, error);
             if (retries > 1) {
                 await new Promise(res => setTimeout(res, delay));
-                return this.retry(fn, retries - 1, delay * 2);
+                // FIX: Explicitly pass generic type in recursive call to preserve type information.
+                return this.retry<T>(fn, retries - 1, delay * 2);
             }
             throw error;
         }
@@ -136,41 +138,42 @@ export class AutonomyDirector {
         this.setAgentBusy(agent.id, true);
 
         try {
-            const ownerHandle = agent.ownerHandle;
+            const agentDoc = await agentsCollection.findOne({ _id: new ObjectId(agent.id) });
+            const fullAgent = { ...agent, tasks: (agentDoc as any).tasks || [] };
+
+            const ownerHandle = fullAgent.ownerHandle;
             if (!ownerHandle) throw new Error("Agent has no owner handle.");
 
-            // --- TASK EXECUTION (PRIORITY 1) ---
-            const pendingTask = agent.tasks?.find(t => t.status === 'pending');
+            const pendingTask = fullAgent.tasks?.find((t: AgentTask) => t.status === 'in_progress' || t.status === 'pending');
             if (pendingTask) {
-                await this.executeTask(agent, pendingTask);
-                return; // End this tick after starting a task
+                await this.executeTask(fullAgent, pendingTask);
+                return; 
             }
 
-            // --- FALLBACK BEHAVIOR ---
             const actionRoll = Math.random();
-            if (actionRoll < 0.7) { // 70% Chance: Go to Café
+            if (actionRoll < 0.7) { 
                 const message = `Decided to head to the Café to look for intel opportunities.`;
                 this.emitToMain?.({
                     type: 'forwardToWorker',
                     worker: 'arena',
-                    message: { type: 'moveAgentToCafe', payload: { agentId: agent.id } }
+                    message: { type: 'moveAgentToCafe', payload: { agentId: fullAgent.id } }
                 });
-                const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyCafe', message: `${agent.name} is heading to the Café.` });
-                this._logActivity(agent, 'cafe', message, notified.sent);
+                const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyCafe', message: `${fullAgent.name} is heading to the Café.` });
+                this._logActivity(fullAgent, 'cafe', message, notified.sent);
                 this.handleNotificationFailure(notified, ownerHandle);
-            } else if (actionRoll < 0.9) { // 20% chance: Proactive User Engagement
-                if (!agent.isProactive) return; // Respect the agent's specific proactive setting
+            } else if (actionRoll < 0.9) { 
+                if (!fullAgent.isProactive) return; 
                 const message = `Reviewing recent activity to find an insight for ${user.handle}.`;
-                const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyEngage', message: `${agent.name} is formulating a new suggestion for you.` });
-                this._logActivity(agent, 'engagement', message, notified.sent);
+                const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyEngage', message: `${fullAgent.name} is formulating a new suggestion for you.` });
+                this._logActivity(fullAgent, 'engagement', message, notified.sent);
                 this.handleNotificationFailure(notified, ownerHandle);
-                await this.proactiveEngagement(user, agent);
-            } else { // 10% chance: Deep Research
+                await this.proactiveEngagement(user, fullAgent);
+            } else { 
                 const message = `Starting autonomous deep research on a trending market.`;
-                const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyResearch', message: `${agent.name} is starting a new research task.` });
-                this._logActivity(agent, 'research', message, notified.sent);
+                const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyResearch', message: `${fullAgent.name} is starting a new research task.` });
+                this._logActivity(fullAgent, 'research', message, notified.sent);
                 this.handleNotificationFailure(notified, ownerHandle);
-                await this.startResearch(agent.id); // Re-use the startResearch logic
+                await this.startResearch(fullAgent.id); 
             }
         } catch (error) {
             console.error(`[AutonomyDirector] Error during autonomy processing for agent ${agent.name}:`, error);
@@ -180,7 +183,7 @@ export class AutonomyDirector {
     }
     
     public async startResearch(agentId: string) {
-        const agentDoc = await agentsCollection.findOne({ id: agentId });
+        const agentDoc = await agentsCollection.findOne({ _id: new ObjectId(agentId) });
         if (!agentDoc) {
             console.error(`[AutonomyDirector] startResearch called for non-existent agent ${agentId}`);
             return;
@@ -220,21 +223,54 @@ export class AutonomyDirector {
     private async executeTask(agent: Agent, task: AgentTask) {
         this._logActivity(agent, 'system', `Starting task: "${task.objective}"`);
 
-        const updatePayload = { status: 'in_progress', updatedAt: Date.now(), $push: { updates: { timestamp: Date.now(), message: 'Task started.' } } };
-        await agentsCollection.updateOne({ "tasks.id": task.id }, { $set: { "tasks.$[elem]": { ...task, ...updatePayload } } }, { arrayFilters: [{ "elem.id": task.id }] });
-        this.emitToMain?.({ type: 'socketEmit', event: 'taskUpdated', payload: { ...task, ...updatePayload }, room: agent.ownerHandle });
+        const initialUpdate = {
+            $set: {
+                'tasks.$[elem].status': 'in_progress' as const,
+                'tasks.$[elem].updatedAt': Date.now(),
+            },
+            $push: {
+                'tasks.$[elem].updates': {
+                    $each: [{ timestamp: Date.now(), message: 'Task started.' }],
+                    $slice: -50,
+                },
+            },
+        };
+        await agentsCollection.updateOne({ _id: new ObjectId(agent.id) }, initialUpdate, { arrayFilters: [{ 'elem.id': task.id }] });
 
-        let result: { summary: string; sources?: any[] } = { summary: 'Task failed to produce a result.' };
+        const updatedTaskForEmit_Initial = { ...task, status: 'in_progress' as const, updatedAt: Date.now(), updates: [...task.updates, { timestamp: Date.now(), message: 'Task started.' }] };
+        this.emitToMain?.({ type: 'socketEmit', event: 'taskUpdated', payload: updatedTaskForEmit_Initial, room: agent.ownerHandle });
+
+        let result: { summary: string; sources?: any[] } = { summary: 'Task failed to produce a result.', sources: [] };
         if (task.type === 'one_time_research') {
-            const researchResult = await alphaService.researchTopic(agent, task.parameters.topic);
-            if (researchResult) {
-                result = researchResult;
+            if (task.parameters.topic) {
+                const researchResult = await alphaService.researchTopic(agent, task.parameters.topic);
+                if (researchResult) {
+                    result = researchResult;
+                }
+            } else {
+                result.summary = "Task failed: Research topic was missing.";
+                console.error(`[AutonomyDirector] Task ${task.id} of type 'one_time_research' is missing a 'topic' parameter.`);
             }
         }
         
-        const finalUpdatePayload = { status: 'completed', updatedAt: Date.now(), result, sources: result.sources, $push: { updates: { timestamp: Date.now(), message: 'Task completed.' } } };
-        await agentsCollection.updateOne({ "tasks.id": task.id }, { $set: { "tasks.$[elem]": { ...task, ...finalUpdatePayload } } }, { arrayFilters: [{ "elem.id": task.id }] });
-        this.emitToMain?.({ type: 'socketEmit', event: 'taskUpdated', payload: { ...task, ...finalUpdatePayload }, room: agent.ownerHandle });
+        const finalUpdate = {
+            $set: {
+                'tasks.$[elem].status': 'completed' as const,
+                'tasks.$[elem].updatedAt': Date.now(),
+                'tasks.$[elem].result': result,
+                'tasks.$[elem].sources': result.sources || [],
+            },
+            $push: {
+                'tasks.$[elem].updates': {
+                    $each: [{ timestamp: Date.now(), message: 'Task completed.' }],
+                    $slice: -50,
+                },
+            },
+        };
+        await agentsCollection.updateOne({ _id: new ObjectId(agent.id) }, finalUpdate, { arrayFilters: [{ 'elem.id': task.id }] });
+        
+        const finalTaskForEmit = { ...updatedTaskForEmit_Initial, status: 'completed' as const, updatedAt: Date.now(), result, sources: result.sources, updates: [...updatedTaskForEmit_Initial.updates, { timestamp: Date.now(), message: 'Task completed.' }] };
+        this.emitToMain?.({ type: 'socketEmit', event: 'taskUpdated', payload: finalTaskForEmit, room: agent.ownerHandle });
 
         this._logActivity(agent, 'system', `Task completed: "${task.objective}"`);
     }
@@ -330,7 +366,7 @@ export class AutonomyDirector {
         });
 
         try {
-            const completion = await this.retry(createCompletion);
+            const completion = await this.retry<OpenAI.Chat.Completions.ChatCompletion>(createCompletion);
             return completion.choices[0].message.content?.trim() ?? null;
         } catch (error) {
             console.error(`[AutonomyDirector] Failed to generate proactive message for ${agent.name} after retries:`, error);

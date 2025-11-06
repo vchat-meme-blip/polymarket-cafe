@@ -275,7 +275,9 @@ export type AgentTask = {
   objective: string; // User-facing description
   type: 'one_time_research' | 'continuous_monitoring';
   parameters: {
-    topic: string; // The subject of the research or monitoring
+    topic?: string;
+    monitoringTarget?: 'market_odds' | 'liquidity' | 'whale_wallet' | 'breaking_markets';
+    targetIdentifier?: string;
   };
   status: 'pending' | 'in_progress' | 'completed';
   createdAt: number;
@@ -288,6 +290,7 @@ export type AgentTask = {
     title: string;
     url: string;
   }[];
+  dataSnapshots?: any[];
 };
 
 export type ActivityLogEntry = {

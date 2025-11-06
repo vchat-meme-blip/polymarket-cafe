@@ -4,7 +4,8 @@ import { parentPort } from 'worker_threads';
 
 class ApiKeyProvider {
   private pendingRequests = new Map<string, (key: string | null) => void>();
-  private requestTimeouts = new Map<string, NodeJS.Timeout>();
+  // FIX: Changed NodeJS.Timeout to ReturnType<typeof setTimeout> for browser/node compatibility.
+  private requestTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
   private MAX_WAIT_TIME = 60000; // 60 seconds max wait time
 
   public handleMessage(message: { type: string; payload: any }) {
@@ -45,13 +46,13 @@ class ApiKeyProvider {
     return new Promise((resolve) => {
       // Set a timeout to prevent indefinite waiting
       // FIX: Cast timeout to `any` to resolve type conflict between Node and DOM types.
-      const timeout = global.setTimeout(() => {
+      const timeout = setTimeout(() => {
         console.warn(`[ApiKeyProvider] Request for API key timed out after ${this.MAX_WAIT_TIME/1000}s`);
         if (this.pendingRequests.has(requestId)) {
           this.pendingRequests.delete(requestId);
           resolve(null); // Resolve with null after timeout
         }
-      }, this.MAX_WAIT_TIME) as any;
+      }, this.MAX_WAIT_TIME);
       
       this.requestTimeouts.set(requestId, timeout);
       this.pendingRequests.set(requestId, resolve);
@@ -101,7 +102,7 @@ class ApiKeyProvider {
       parentPort.on('message', responseHandler);
       
       // Set a timeout to avoid hanging indefinitely
-      global.setTimeout(() => {
+      setTimeout(() => {
         parentPort?.removeListener('message', responseHandler);
         console.log(`[ApiKeyProvider] Timeout waiting for cooldown check response. Assuming not all keys are on cooldown.`);
         resolve(false);

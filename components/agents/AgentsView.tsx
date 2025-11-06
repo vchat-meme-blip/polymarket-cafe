@@ -2,6 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
+// FIX: Add '@react-three/fiber' import to provide JSX namespace for 3D components.
+import '@react-three/fiber';
 import { useAgent, useUI, createNewAgent } from '../../lib/state/index.js';
 import c from 'classnames';
 import { Canvas } from '@react-three/fiber';

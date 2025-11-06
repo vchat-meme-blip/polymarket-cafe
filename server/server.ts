@@ -24,7 +24,7 @@ async function main() {
     console.log('[Startup] Database connection successful. Checking for initial data...');
     await seedDatabase();
     console.log('[Startup] Database seeding check complete. Starting server...');
-    await (global as any).startServer(); // Assuming startServer is globally available or defined elsewhere in the actual server file
+    await (globalThis as any).startServer(); // Assuming startServer is globally available or defined elsewhere in the actual server file
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

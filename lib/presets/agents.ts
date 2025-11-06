@@ -58,6 +58,16 @@ export const AgentOfChaos: Agent = { id: 'agent-of-chaos', ...agentTemplateDefau
 
 export const PRESET_AGENTS: Agent[] = [TonyPump, TheStranger, TrenchBoudica, OracleBoudica, ChillinBoudica, MexicanTrump, Web3Wendy, SuperJeet, AgentOfChaos];
 
+// --- NEW WHALE WALLETS LIST ---
+export const WHALE_WALLETS = [
+    { name: 'Dillius (Top PNL)', address: '0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b' },
+    { name: 'setsukoworldchampion2027 (Top PNL)', address: '0x1ff26f9f8a048d4f6fb2e4283f32f6ca64d2dbbd' },
+    { name: 'Erasmus (Politics)', address: '0x093519505a75b31139636d10b8f9e612f0851167' },
+    { name: 'HyperLiquid0xb (Sports)', address: '0xb23157f1f9a03c3132e4d0399d42f53443135154' },
+    { name: 'Joe-Biden (Sports)', address: '0x13c793b3323c60490073b6495267786ac0896a2f' },
+    { name: 'WindWalk3 (Politics)', address: '0x3563914a27a5b3a32f6b3b27a7837059a4428b48' },
+    { name: 'Bama124 (Politics)', address: '0x535da3c233a055d5812e56847de1b125b2a0989b' },
+];
 
 // --- NEW TOP TRADERS LIST ---
 export const TOP_TRADERS = [

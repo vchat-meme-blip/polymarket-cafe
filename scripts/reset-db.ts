@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import '../server/load-env.js';
 // FIX: Corrected import to use `db` which is the exported mongoose instance.
 import connectDB, { seedDatabase, db } from '../server/db.js';

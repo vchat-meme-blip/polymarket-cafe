@@ -62,6 +62,10 @@ export async function startServer() {
 
   const resolutionWorker = createWorker('./workers/resolution.worker.js');
   workers.push({ name: 'Resolution', instance: resolutionWorker, tickInterval: 5 * 60000 });
+  
+  const monitoringWorker = createWorker('./workers/monitoring.worker.js');
+  workers.push({ name: 'Monitoring', instance: monitoringWorker, tickInterval: 5 * 60000 });
+
 
   const workerMessageHandler = (worker: Worker, workerName: string) => async (message: any) => {
     switch (message.type) {

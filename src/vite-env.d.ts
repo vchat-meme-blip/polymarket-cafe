@@ -29,14 +29,10 @@ interface ImportMetaEnv {
 
   // Environment
   readonly NODE_ENV: 'development' | 'production' | 'test'
-  readonly MODE: string
+  // FIX: Removed readonly modifier from MODE to resolve conflict with other type declarations.
+  MODE: string
 }
 
 interface ImportMeta {
   readonly env: ImportMetaEnv
-}
-
-declare module '*.module.css' {
-  const classes: { [key: string]: string }
-  export default classes
 }
