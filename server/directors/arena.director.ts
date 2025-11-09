@@ -186,6 +186,8 @@ export class ArenaDirector {
                 if (toolCalls?.some(tc => tc.type === 'function' && tc.function.name === 'end_conversation')) {
                     await this.moveAgent(speaker.id, null);
                 }
+            } catch (error) {
+                console.error(`[ArenaDirector] Error processing conversation turn for ${speaker.name}:`, error);
             } finally {
                 this.setThinking(speaker.id, false);
             }

@@ -12,7 +12,6 @@ export class WebSocketService {
   private maxRetryDelay = 30000; // Max 30 seconds
   private connectionUrl: string;
   private isConnected = false;
-  // FIX: Changed NodeJS.Timeout to ReturnType<typeof setTimeout> for browser compatibility.
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -32,7 +31,7 @@ export class WebSocketService {
       transports: ['websocket', 'polling'],
       autoConnect: true,
       withCredentials: true,
-    });
+    } as any);
 
     socket.on('connect', () => {
       console.log('[WebSocket] Connected');

@@ -162,8 +162,6 @@ class ElevenLabsTextToSpeechService {
           return this.fetchAndDecodeAudio(cacheKey, context, options, retryCount + 1);
         }
         
-        // FIX: The `Error` constructor with two arguments (message and options object) is a newer feature.
-        // To ensure compatibility, combine the error information into a single string message.
         throw new Error(`TTS request failed with ${errorDetails}${errorJson ? ` | Details: ${JSON.stringify(errorJson)}` : ''}`);
       }
 
@@ -172,6 +170,8 @@ class ElevenLabsTextToSpeechService {
         throw new Error('Empty audio response received');
       }
 
+      // The AudioContext's `decodeAudioData` method expects only one argument: the ArrayBuffer.
+      // The second argument for a callback is for older syntax and should not be used with `await`.
       const audioBuffer = await context.decodeAudioData(arrayBuffer);
       this.audioCache.set(cacheKey, audioBuffer);
       return audioBuffer;

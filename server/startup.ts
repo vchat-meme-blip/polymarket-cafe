@@ -2,7 +2,7 @@
 
 import './load-env.js';
 import http from 'http';
-// FIX: Removed aliased imports and will use `express.Request`, `express.Response`, etc., directly to prevent type conflicts.
+// FIX: Changed express import from named to default to resolve type conflicts with middleware handlers.
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
@@ -46,7 +46,6 @@ export async function startServer() {
   app.use(express.json({ limit: '10mb' }));
 
   const workers: { name: string; instance: Worker; tickInterval: number }[] = [];
-  // FIX: Use ReturnType<typeof setInterval> for cross-environment compatibility.
   const tickIntervals: ReturnType<typeof setInterval>[] = [];
   
   const arenaWorker = createWorker('./workers/arena.worker.js');
@@ -129,14 +128,14 @@ export async function startServer() {
 
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
-    // FIX: Explicitly typed middleware handler to resolve incorrect type inference from http module.
-    // FIX: Replaced aliased types with direct express types to resolve type conflicts.
+    // FIX: Replaced explicit Request/Response types with express.Request/Response to resolve type conflicts.
     app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
   });
 
+  // FIX: apiRouter is a valid RequestHandler, this now resolves correctly with the express namespace change.
   app.use('/api', apiRouter);
   
   const clientDistPath = path.join(projectRoot, '..', '..', 'dist', 'client');
@@ -146,9 +145,10 @@ export async function startServer() {
     console.error(`[ERROR] Client build not found at ${clientDistPath}. Please run 'npm run build:client'`);
   }
   
+  // FIX: express.static returns a valid RequestHandler, this now resolves correctly.
   app.use(express.static(clientDistPath));
   
-  // FIX: Added explicit types to route handler to resolve 'PathParams' error and incorrect 'res' type.
+  // FIX: Replaced explicit Request/Response types with express.Request/Response to resolve type conflicts and correctly type 'res'.
   app.get('*', (req: express.Request, res: express.Response) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
