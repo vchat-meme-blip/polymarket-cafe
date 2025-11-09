@@ -45,7 +45,6 @@ export async function startServer() {
   app.use(express.json({ limit: '10mb' }));
 
   const workers: { name: string; instance: Worker; tickInterval: number }[] = [];
-  const tickIntervals: NodeJS.Timeout[] = [];
   
   const arenaWorker = createWorker('./workers/arena.worker.js');
   workers.push({ name: 'Arena', instance: arenaWorker, tickInterval: 10000 });
@@ -65,11 +64,6 @@ export async function startServer() {
   const monitoringWorker = createWorker('./workers/monitoring.worker.js');
   workers.push({ name: 'Monitoring', instance: monitoringWorker, tickInterval: 5 * 60000 });
 
-  workers.forEach(({ instance, tickInterval }) => {
-    tickIntervals.push(setInterval(() => {
-        instance.postMessage({ type: 'tick' });
-    }, tickInterval));
-  });
 
   const workerMessageHandler = (worker: Worker, workerName: string) => async (message: any) => {
     switch (message.type) {
@@ -127,16 +121,20 @@ export async function startServer() {
 
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
-    // FIX: Explicitly typed middleware handler to resolve incorrect type inference from http module.
-    app.use((req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
+    // FIX: Removed explicit types from middleware handler to rely on type inference, resolving overload errors.
+    app.use((req, res, next) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
   });
 
+  const tickIntervals = workers.map(({ instance, tickInterval }) => 
+    setInterval(() => instance.postMessage({ type: 'tick' }), tickInterval)
+  );
+
   app.use('/api', apiRouter);
   
-  const clientDistPath = path.join(projectRoot, 'dist', 'client');
+  const clientDistPath = path.join(projectRoot, '..', '..', 'dist', 'client');
   console.log(`[Server] Serving static files from: ${clientDistPath}`);
   
   if (!fs.existsSync(path.join(clientDistPath, 'index.html'))) {
@@ -145,8 +143,8 @@ export async function startServer() {
   
   app.use(express.static(clientDistPath));
   
-  // FIX: Explicitly typed route handler to ensure `res` object has express methods like `sendFile`.
-  app.get('*', (req: ExpressRequest, res: ExpressResponse) => {
+  // FIX: Removed explicit types from route handler to rely on type inference, resolving method existence errors on `res`.
+  app.get('*', (req, res) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);
