@@ -145,7 +145,7 @@ export class ArenaDirector {
                     console.error(`[ArenaDirector] Invalid ObjectId string in room ${room.id}: ${id}`);
                     return null;
                 }
-            }).filter((id): id is ObjectId => id !== null);
+            }).filter((id: ObjectId | null): id is ObjectId => id !== null);
 
             if (agentIdsAsObjectIds.length !== 2) continue;
 
