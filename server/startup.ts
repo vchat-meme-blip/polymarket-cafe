@@ -37,39 +37,108 @@ export async function startServer() {
   const server = http.createServer(app);
   const apiKeyManager = new ApiKeyManager();
 
+  // Configure express middleware
   app.use(helmet({
     contentSecurityPolicy: false, 
   }));
-  app.use(cors());
+  app.use(cors({
+    origin: process.env.NODE_ENV === 'production' 
+      ? ['https://polycafe.life', 'https://www.polycafe.life']
+      : '*',
+    credentials: true
+  }));
   app.use(compression());
   app.use(express.json({ limit: '10mb' }));
 
-  const workers: { name: string; instance: Worker; tickInterval: number }[] = [];
+  // Initialize WebSocket server
+  webSocketService.init(server);
+  const io = webSocketService.getIO();
+  if (!io) {
+    console.error('[Startup] Failed to initialize WebSocket server');
+    process.exit(1);
+  }
+
+  // Worker management
+  const workers: Array<{
+    name: string;
+    instance: Worker;
+    tickInterval: NodeJS.Timeout | null;
+  }> = [];
+  
   const tickIntervals: NodeJS.Timeout[] = [];
   
-  const arenaWorker = createWorker('./workers/arena.worker.js');
-  workers.push({ name: 'Arena', instance: arenaWorker, tickInterval: 10000 });
+  const workerConfigs = [
+    { name: 'arena', path: './workers/arena.worker.js', interval: 10000 },
+    { name: 'autonomy', path: './workers/autonomy.worker.js', interval: 15000 },
+    { name: 'dashboard', path: './workers/dashboard.worker.js', interval: 30000 },
+    { name: 'market-watcher', path: './workers/market-watcher.worker.js', interval: 60000 },
+    { name: 'monitoring', path: './workers/monitoring.worker.js', interval: 30000 },
+    { name: 'resolution', path: './workers/resolution.worker.js', interval: 60000 }
+  ];
 
-  const autonomyWorker = createWorker('./workers/autonomy.worker.js');
-  workers.push({ name: 'Autonomy', instance: autonomyWorker, tickInterval: 60000 });
-  
-  const dashboardWorker = createWorker('./workers/dashboard.worker.js');
-  workers.push({ name: 'Dashboard', instance: dashboardWorker, tickInterval: 30000 });
+  // Initialize workers
+  for (const config of workerConfigs) {
+    try {
+      console.log(`[Startup] Starting ${config.name} worker...`);
+      
+      const worker = createWorker(config.path, {
+        workerData: {
+          workerName: config.name,
+          nodeEnv: process.env.NODE_ENV || 'development'
+        }
+      });
 
-  const marketWatcherWorker = createWorker('./workers/market-watcher.worker.js');
-  workers.push({ name: 'MarketWatcher', instance: marketWatcherWorker, tickInterval: 60000 });
+      // Handle worker messages
+      worker.on('message', (message: any) => {
+        if (message?.type === 'log') {
+          console.log(`[Worker ${config.name}]`, message.data);
+        }
+      });
 
-  const resolutionWorker = createWorker('./workers/resolution.worker.js');
-  workers.push({ name: 'Resolution', instance: resolutionWorker, tickInterval: 5 * 60000 });
-  
-  const monitoringWorker = createWorker('./workers/monitoring.worker.js');
-  workers.push({ name: 'Monitoring', instance: monitoringWorker, tickInterval: 5 * 60000 });
+      // Handle worker errors
+      worker.on('error', (error: Error) => {
+        console.error(`[Worker ${config.name}] Error:`, error);
+      });
 
-  workers.forEach(({ instance, tickInterval }) => {
-    tickIntervals.push(setInterval(() => {
-        instance.postMessage({ type: 'tick' });
-    }, tickInterval));
-  });
+      // Handle worker exit
+      worker.on('exit', (code: number) => {
+        console.log(`[Worker ${config.name}] Exited with code ${code}`);
+        if (code !== 0) {
+          console.error(`[Worker ${config.name}] Unexpected exit, attempting to restart...`);
+          // TODO: Implement proper worker restart logic
+        }
+      });
+
+      // Set up tick interval for the worker
+      const tickInterval = setInterval(() => {
+        if (!worker.threadId) {
+          console.warn(`[Worker ${config.name}] Worker thread ID not available, skipping tick`);
+          return;
+        }
+        worker.postMessage({ 
+          type: 'tick', 
+          timestamp: Date.now() 
+        });
+      }, config.interval);
+
+      // Store worker and its interval
+      const workerInfo = {
+        name: config.name,
+        instance: worker,
+        tickInterval
+      };
+      
+      workers.push(workerInfo);
+      tickIntervals.push(tickInterval);
+      
+      console.log(`[Startup] Started ${config.name} worker (Thread ID: ${worker.threadId})`);
+      
+    } catch (error) {
+      console.error(`[Startup] Failed to start ${config.name} worker:`, error);
+      // Don't crash the server if a worker fails to start
+      // The application might still be able to function without some workers
+    }
+  }
 
   const workerMessageHandler = (worker: Worker, workerName: string) => async (message: any) => {
     switch (message.type) {
@@ -125,13 +194,19 @@ export async function startServer() {
     }
   };
 
+  // Set up message handlers for each worker
   workers.forEach(({ instance, name }) => {
-    instance.on('message', workerMessageHandler(instance, name));
-    // FIX: Explicitly typed middleware handler to resolve incorrect type inference from http module.
-    app.use((req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
-      (req as any)[`${name.toLowerCase()}Worker`] = instance;
-      next();
-    });
+    if (instance) {
+      instance.on('message', workerMessageHandler(instance, name));
+      
+      // Add worker instance to request object for API routes
+      app.use((req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
+        (req as any)[`${name.toLowerCase()}Worker`] = instance;
+        next();
+      });
+    } else {
+      console.warn(`[Startup] Worker ${name} instance is not available`);
+    }
   });
 
   app.use('/api', apiRouter);
@@ -155,10 +230,85 @@ export async function startServer() {
     });
   });
 
-  const PORT = process.env.PORT || 3001;
-  webSocketService.init(server);
-  server.listen(PORT, () => {
-    console.log(`[Server] HTTP and WebSocket server running on http://localhost:${PORT}`);
+  const port = parseInt(process.env.PORT || '3001', 10);
+  const host = process.env.HOST || '0.0.0.0';
+  
+  // Handle server errors
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.syscall !== 'listen') {
+      throw error;
+    }
+
+    const bind = typeof port === 'string' ? 'Pipe ' + port : 'Port ' + port;
+
+    // Handle specific listen errors with friendly messages
+    switch (error.code) {
+      case 'EACCES':
+        console.error(bind + ' requires elevated privileges');
+        process.exit(1);
+        break;
+      case 'EADDRINUSE':
+        console.error(bind + ' is already in use');
+        process.exit(1);
+        break;
+      default:
+        throw error;
+    }
+  });
+
+  // Start listening
+  server.listen(port, host, () => {
+    console.log(`[Server] HTTP and WebSocket server running on http://${host}:${port}`);
+    console.log(`[Server] Node.js ${process.version}`);
+    console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`[Server] WebSocket path: ${io.path()}`);
+  });
+
+  // Graceful shutdown
+  const shutdown = async () => {
+    console.log('[Server] Received shutdown signal. Cleaning up...');
+    
+    // Clear all intervals
+    workers.forEach(worker => {
+      if (worker.tickInterval) {
+        clearInterval(worker.tickInterval);
+      }
+      worker.instance.postMessage({ type: 'shutdown' });
+      worker.instance.terminate();
+    });
+
+    // Close WebSocket connections
+    if (io) {
+      io.close(() => {
+        console.log('[WebSocket] All connections closed');
+      });
+    }
+
+    // Close MongoDB connection
+    try {
+      await mongoose.connection.close();
+      console.log('MongoDB connection closed');
+    } catch (error) {
+      console.error('Error closing MongoDB connection:', error);
+    }
+
+    // Exit the process
+    process.exit(0);
+  };
+
+  // Handle signals
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
+
+  // Handle uncaught exceptions
+  process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    // Don't exit immediately to allow for cleanup
+  });
+
+  // Handle unhandled promise rejections
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   });
   
   const stop = async () => {

@@ -1,9 +1,40 @@
 /// <reference types="node" />
 
-import { parentPort } from 'worker_threads';
+import { parentPort, workerData } from 'worker_threads';
 import connectDB from '../db.js';
 import { ArenaDirector } from '../directors/arena.director.js';
 import { apiKeyProvider } from '../services/apiKey.provider.js';
+
+// Set worker name for logging
+const WORKER_NAME = process.env.WORKER_NAME || 'arena.worker';
+
+// Global error handler
+process.on('uncaughtException', (error) => {
+  console.error(`[${WORKER_NAME}] Uncaught Exception:`, error);
+  // Don't exit on uncaught exceptions to allow for cleanup
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error(`[${WORKER_NAME}] Unhandled Rejection at:`, promise, 'reason:', reason);
+});
+
+// Helper function to send logs to parent
+function log(message: string, data?: any) {
+  if (parentPort) {
+    parentPort.postMessage({ 
+      type: 'log', 
+      data: `[${WORKER_NAME}] ${message}`,
+      timestamp: new Date().toISOString(),
+      ...(data && { details: data })
+    });
+  }
+  console.log(`[${WORKER_NAME}] ${message}`, data || '');
+}
+
+log('Worker starting...', { 
+  nodeEnv: process.env.NODE_ENV,
+  workerData: workerData 
+});
 
 // System pause state
 let systemPaused = false;
@@ -16,7 +47,14 @@ if (!parentPort) {
 const arenaDirector = new ArenaDirector();
 
 async function main() {
-  await connectDB();
+  log('Connecting to database...');
+  try {
+    await connectDB();
+    log('Database connected successfully');
+  } catch (error) {
+    log('Failed to connect to database:', error);
+    process.exit(1);
+  }
   
   const emitToMain = (message: any) => {
     parentPort?.postMessage(message);
@@ -99,6 +137,21 @@ async function main() {
   console.log('[ArenaWorker] Worker started and listening for messages.');
 }
 
-main().catch(err => {
-  console.error('[ArenaWorker] Failed to start:', err);
+// Start the worker
+main().catch(error => {
+  log('Fatal error in worker:', error);
+  process.exit(1);
 });
+
+// Handle termination signals
+process.on('SIGTERM', () => {
+  log('Received SIGTERM. Cleaning up...');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  log('Received SIGINT. Cleaning up...');
+  process.exit(0);
+});
+
+log('Worker initialization complete');
