@@ -250,55 +250,61 @@ class AiService {
         systemPrompt += ` The room rules are: ${room.rules.join(', ')}.`;
     }
 
-    if (room.isOwned && room.hostId) {
-        const isHost = room.hostId === currentAgent.id;
-        const host = isHost ? currentAgent : otherAgent;
-        const guest = isHost ? otherAgent : currentAgent;
-        
-        if (isHost) {
-            const hostTradableIntel = await bettingIntelCollection.find({ 
-                ownerAgentId: new Types.ObjectId(host.id), 
-                isTradable: true 
-            }).toArray();
-            if (hostTradableIntel.length > 0) {
-                systemPrompt += ` This is your owned intel storefront. Your primary goal is to monetize your betting intel by selling it to ${guest.name}. You have the following intel to sell: ${hostTradableIntel.map(i => `(ID: ${i._id}) on ${i.market}`).join(', ')}. Use the 'create_intel_offer' tool to make a formal offer.`;
-                tools.push({
-                    type: 'function',
-                    function: {
-                        name: 'create_intel_offer',
-                        description: "Create a formal, tradable offer for a piece of your intel.",
-                        parameters: {
-                            type: 'object',
-                            properties: {
-                                intel_id: { type: 'string', description: 'The ID of the intel you want to sell.' },
-                                price: { type: 'number', description: 'The price you are asking for in BOX tokens.' },
-                            },
-                            required: ['intel_id', 'price'],
+    try {
+        if (room.isOwned && room.hostId) {
+            const isHost = room.hostId === currentAgent.id;
+            const host = isHost ? currentAgent : otherAgent;
+            const guest = isHost ? otherAgent : currentAgent;
+            
+            if (isHost) {
+                const hostTradableIntel = await bettingIntelCollection.find({ 
+                    ownerAgentId: new Types.ObjectId(host.id), 
+                    isTradable: true 
+                }).toArray();
+                if (hostTradableIntel.length > 0) {
+                    systemPrompt += ` This is your owned intel storefront. Your primary goal is to monetize your betting intel by selling it to ${guest.name}. You have the following intel to sell: ${hostTradableIntel.map(i => `(ID: ${i._id}) on ${i.market}`).join(', ')}. Use the 'create_intel_offer' tool to make a formal offer.`;
+                    tools.push({
+                        type: 'function',
+                        function: {
+                            name: 'create_intel_offer',
+                            description: "Create a formal, tradable offer for a piece of your intel.",
+                            parameters: {
+                                type: 'object',
+                                properties: {
+                                    intel_id: { type: 'string', description: 'The ID of the intel you want to sell.' },
+                                    price: { type: 'number', description: 'The price you are asking for in BOX tokens.' },
+                                },
+                                required: ['intel_id', 'price'],
+                            }
                         }
-                    }
-                });
-            } else {
-                systemPrompt += ` This is your owned intel storefront, but you currently have no tradable intel. Your goal is to engage ${guest.name} in conversation to learn what they're looking for.`;
-            }
-        } else { // Is Guest
-            systemPrompt += ` You are in an intel storefront hosted by ${host.name}. Their purpose is to sell betting intel.`;
-            if (room.activeOffer) {
-                systemPrompt += ` There is an active offer on the table for intel on "${room.activeOffer.market}" for ${room.activeOffer.price} BOX. You can choose to accept it using the 'accept_offer' tool, or continue negotiating.`;
-                tools.push({
-                    type: 'function',
-                    function: {
-                        name: 'accept_offer',
-                        description: 'Accept the currently active intel offer in the room.',
-                        parameters: {
-                            type: 'object',
-                            properties: {
-                                offer_id: { type: 'string', description: 'The ID of the intel being offered (e.g., the intelId from the offer).' }
-                            },
+                    });
+                } else {
+                    systemPrompt += ` This is your owned intel storefront, but you currently have no tradable intel. Your goal is to engage ${guest.name} in conversation to learn what they're looking for.`;
+                }
+            } else { // Is Guest
+                systemPrompt += ` You are in an intel storefront hosted by ${host.name}. Their purpose is to sell betting intel.`;
+                if (room.activeOffer) {
+                    systemPrompt += ` There is an active offer on the table for intel on "${room.activeOffer.market}" for ${room.activeOffer.price} BOX. You can choose to accept it using the 'accept_offer' tool, or continue negotiating.`;
+                    tools.push({
+                        type: 'function',
+                        function: {
+                            name: 'accept_offer',
+                            description: 'Accept the currently active intel offer in the room.',
+                            parameters: {
+                                type: 'object',
+                                properties: {
+                                    offer_id: { type: 'string', description: 'The ID of the intel being offered (e.g., the intelId from the offer).' }
+                                },
+                            }
                         }
-                    }
-                });
+                    });
+                }
             }
         }
+    } catch (dbError) {
+        console.error('[AiService] Database error during prompt construction:', dbError);
+        // Fallback to a simpler prompt if DB fails
+        systemPrompt = `You are ${currentAgent.name}. Your personality: "${currentAgent.personality}". You are talking to ${otherAgent.name}. Their personality: "${otherAgent.personality}". Keep your responses concise and in character. A database error occurred, so you cannot access your intel right now.`;
     }
 
 
