@@ -162,7 +162,9 @@ class ElevenLabsTextToSpeechService {
           return this.fetchAndDecodeAudio(cacheKey, context, options, retryCount + 1);
         }
         
-        throw new Error(`TTS request failed with ${errorDetails}`, { cause: errorJson });
+        // FIX: The `Error` constructor with two arguments (message and options object) is a newer feature.
+        // To ensure compatibility, combine the error information into a single string message.
+        throw new Error(`TTS request failed with ${errorDetails}${errorJson ? ` | Details: ${JSON.stringify(errorJson)}` : ''}`);
       }
 
       const arrayBuffer = await response.arrayBuffer();
@@ -170,7 +172,6 @@ class ElevenLabsTextToSpeechService {
         throw new Error('Empty audio response received');
       }
 
-      // FIX: Changed arrayBuffer.slice(0) to arrayBuffer to resolve incorrect argument count error.
       const audioBuffer = await context.decodeAudioData(arrayBuffer);
       this.audioCache.set(cacheKey, audioBuffer);
       return audioBuffer;

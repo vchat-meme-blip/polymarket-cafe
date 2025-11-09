@@ -282,7 +282,6 @@ export class GenAILiveClient {
         base64s.forEach(b64 => {
           if (b64) {
             const data = base64ToArrayBuffer(b64);
-            // FIX: Cast ArrayBufferLike to ArrayBuffer to satisfy emitter type.
             this.emitter.emit('audio', data as ArrayBuffer);
             this.log(`server.audio`, `buffer (${data.byteLength})`);
           }

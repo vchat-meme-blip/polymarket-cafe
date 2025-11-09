@@ -5,7 +5,6 @@ import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'path';
 
-// FIX: Define __dirname in an ES module context using the cross-platform compatible `fileURLToPath`.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

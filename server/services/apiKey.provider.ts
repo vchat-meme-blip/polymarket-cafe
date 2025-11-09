@@ -4,7 +4,6 @@ import { parentPort } from 'worker_threads';
 
 class ApiKeyProvider {
   private pendingRequests = new Map<string, (key: string | null) => void>();
-  // FIX: Changed NodeJS.Timeout to ReturnType<typeof setTimeout> for browser/node compatibility.
   private requestTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
   private MAX_WAIT_TIME = 60000; // 60 seconds max wait time
 
@@ -45,7 +44,6 @@ class ApiKeyProvider {
     
     return new Promise((resolve) => {
       // Set a timeout to prevent indefinite waiting
-      // FIX: Cast timeout to `any` to resolve type conflict between Node and DOM types.
       const timeout = setTimeout(() => {
         console.warn(`[ApiKeyProvider] Request for API key timed out after ${this.MAX_WAIT_TIME/1000}s`);
         if (this.pendingRequests.has(requestId)) {

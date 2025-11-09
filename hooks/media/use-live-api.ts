@@ -30,8 +30,6 @@ import { useAgent, useUI, useUser } from '../../lib/state/index.js';
 import { USER_ID, useArenaStore } from '../../lib/state/arena';
 import { createSystemInstructions } from '../../lib/prompts';
 import { Agent } from '../../lib/types/index.js';
-// FIX: Added 'LiveConnectConfig' import to resolve 'Cannot find name' error.
-// FIX: Changed from a type-only import to a value import to resolve the 'Cannot find name' error.
 import { LiveConnectConfig } from '@google/genai';
 
 export type UseLiveApiResults = {
@@ -85,7 +83,7 @@ export function useLiveApi({
   apiKey: string;
   model?: string;
 }): UseLiveApiResults {
-  const client = useMemo(() => new GenAILiveClient(apiKey, model), [apiKey]);
+  const client = useMemo(() => new GenAILiveClient(apiKey, model), [apiKey, model]);
   const textChatRef = useRef<{ openai: OpenAI; messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] } | null>(null);
 
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
@@ -110,7 +108,6 @@ export function useLiveApi({
         apiKey: user.userApiKey || process.env.GEMINI_API_KEY || '', // Fallback for server key
         dangerouslyAllowBrowser: true 
     });
-    // FIX: Pass the complete user object, which satisfies the 'User' type, instead of manually creating an incomplete object. This resolves the type error and makes the code more robust.
     const systemInstruction = createSystemInstructions(currentAgent, user, true);
 
     textChatRef.current = {
@@ -169,7 +166,6 @@ export function useLiveApi({
         while (responseMessage.tool_calls) {
             textChatRef.current.messages.push(responseMessage);
             for (const toolCall of responseMessage.tool_calls) {
-                // FIX: Add type guard to ensure toolCall is of type 'function' before accessing 'function' property.
                 if (toolCall.type !== 'function') continue;
                 const functionName = toolCall.function.name;
                 const functionArgs = JSON.parse(toolCall.function.arguments);
@@ -183,13 +179,10 @@ export function useLiveApi({
                         const history = partner ? agentConversations[currentAgent.id]?.[partner.id] : undefined;
                         toolContent = history ? `Conversation with ${partnerName}:\n${history.map(h => `${h.agentName}: ${h.text}`).join('\n')}` : `I haven't talked to ${partnerName} yet.`;
                     } else {
-                        // FIX: Use 'market' and 'content' properties from BettingIntel type instead of 'token' and 'summary'.
                         toolContent = intelBank.length > 0 ? `General Intel:\n${intelBank.map(item => `- ${item.market}: ${item.content || 'Research pending.'}`).join('\n')}` : 'My intel bank is currently empty.';
                     }
                 }
                 
-                // FIX: The 'name' property is not part of ChatCompletionToolMessageParam in OpenAI SDK v4+.
-                // It is not needed as the tool_call_id links the response to the call.
                 textChatRef.current.messages.push({
                     tool_call_id: toolCall.id,
                     role: 'tool',
@@ -217,7 +210,6 @@ export function useLiveApi({
             });
 
             const mentionedToken = intelBank.find(
-                // FIX: Use 'market' property from BettingIntel type instead of 'token'.
                 intel => intel.market && agentResponseText.toLowerCase().includes(intel.market.toLowerCase()),
             );
             if (mentionedToken) {

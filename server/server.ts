@@ -2,7 +2,6 @@
 
 import './env.js';
 import connectDB, { seedDatabase } from './db.js';
-// FIX: Removed erroneous self-import of 'startServer'
 import { usersCollection, agentsCollection } from './db.js';
 import { ObjectId } from 'mongodb';
 

@@ -48,7 +48,6 @@ export class ArenaDirector {
         console.log('[ArenaDirector] Initialized.');
     }
     
-    // FIX: Add missing methods to 'ArenaDirector' to resolve worker thread errors.
     public handleSystemPause(until: number) {
         this.systemPaused = true;
         this.pauseUntil = until;
@@ -157,8 +156,8 @@ export class ArenaDirector {
             const lastSpeakerId = history.length > 0 ? history[history.length - 1].agentId : null;
             const [speakerDoc, listenerDoc] = (lastSpeakerId === agent1Doc.id) ? [agent2Doc, agent1Doc] : [agent1Doc, agent2Doc];
 
-            const speaker = { ...speakerDoc, id: speakerDoc._id.toString() };
-            const listener = { ...listenerDoc, id: listenerDoc._id.toString() };
+            const speaker = { ...speakerDoc, id: speakerDoc._id.toString() } as Agent;
+            const listener = { ...listenerDoc, id: listenerDoc._id.toString() } as Agent;
 
             const initialPrompt = history.length === 0 ? `You meet ${listener.name}. Start a conversation.` : undefined;
 
@@ -239,13 +238,11 @@ export class ArenaDirector {
 
         if (!offer.type) {
             console.warn(`[ArenaDirector] Could not create offer, invalid arguments:`, args);
-            // Clear any existing offer
             await roomsCollection.updateOne({ _id: room._id }, { $set: { activeOffer: null } } as any);
             this.emitToMain?.({ type: 'socketEmit', event: 'roomUpdated', payload: { room: { ...room, activeOffer: null } } });
             return;
         }
 
-        // FIX: Cast the offer object to the full 'Offer' type to resolve the assignment error, after ensuring it's valid.
         await roomsCollection.updateOne({ _id: room._id }, { $set: { activeOffer: offer as Offer } } as any);
         this.emitToMain?.({ type: 'socketEmit', event: 'roomUpdated', payload: { room: { ...room, activeOffer: offer } } });
     }
@@ -278,7 +275,6 @@ export class ArenaDirector {
             for (const room of rooms) {
                 if (room.agentIds && Array.isArray(room.agentIds) && room.agentIds.some((id: ObjectId | string) => {
                     if (!id) return false;
-                    // Handle both ObjectId and string representations for robustness
                     if (typeof id === 'string') {
                         return id === agent._id.toString();
                     }
@@ -324,7 +320,6 @@ export class ArenaDirector {
         const newRoom: Omit<Room, 'id'> & { _id: ObjectId } = {
             _id: new ObjectId(),
             agentIds: [], 
-            // FIX: Convert ObjectId to string to match the 'Room' type definition.
             hostId: agentDoc._id.toString(),
             topics: agentDoc.topics as string[],
             warnFlags: 0, 
