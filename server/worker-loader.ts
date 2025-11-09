@@ -35,6 +35,7 @@ function validateEnvironment() {
 }
 
 export function createWorker(workerPath: string, options: WorkerOptions = {}): Worker {
+  console.log(`[Worker Loader] Creating worker from path: ${workerPath}`);
   if (!validateEnvironment()) {
     throw new Error('Missing required environment variables for worker');
   }
@@ -52,8 +53,20 @@ export function createWorker(workerPath: string, options: WorkerOptions = {}): W
     }
   }
   
-  // Add worker name
+  // Add worker name and type information
   envVars.WORKER_NAME = workerName;
+  envVars.WORKER_TYPE = workerName.toUpperCase();
+  envVars.NODE_ENV = process.env.NODE_ENV || 'production';
+  
+  // Debug log environment variables
+  console.log(`[Worker Loader] Environment for ${workerName}:`, {
+    NODE_ENV: envVars.NODE_ENV,
+    WORKER_NAME: envVars.WORKER_NAME,
+    WORKER_TYPE: envVars.WORKER_TYPE,
+    MONGODB_URI: envVars.MONGODB_URI ? '***REDACTED***' : 'NOT SET',
+    NEXTAUTH_SECRET: envVars.NEXTAUTH_SECRET ? '***REDACTED***' : 'NOT SET',
+    NEXTAUTH_URL: envVars.NEXTAUTH_URL || 'NOT SET'
+  });
   
   // Merge with any custom env vars from options
   if (options.env) {
@@ -74,26 +87,61 @@ export function createWorker(workerPath: string, options: WorkerOptions = {}): W
   let finalPath = '';
   const possibleExtensions = isDev ? ['.ts', '.js'] : ['.js', '.ts'];
   
-  for (const ext of possibleExtensions) {
-    const testPath = path.resolve(__dirname, workerPath.replace(/\.(js|ts)$/, ext));
-    try {
+  // First try the exact path
+  const exactPath = path.resolve(__dirname, workerPath);
+  if (existsSync(exactPath)) {
+    finalPath = exactPath;
+    console.log(`[Worker Loader] Found worker at exact path: ${exactPath}`);
+  } else {
+    // Try with different extensions
+    for (const ext of possibleExtensions) {
+      const testPath = path.resolve(__dirname, workerPath.replace(/\.(js|ts)$/, ext));
       if (existsSync(testPath)) {
         finalPath = testPath;
+        console.log(`[Worker Loader] Found worker with extension ${ext}: ${testPath}`);
         break;
       }
-    } catch (e) {
-      console.error(`[Worker Loader] Error checking path ${testPath}:`, e);
     }
   }
 
   if (!finalPath) {
-    throw new Error(`Worker file not found: ${workerPath}`);
+    const errorMsg = `Worker file not found: ${workerPath}. Tried paths: ${[exactPath, ...possibleExtensions.map(ext => 
+      path.resolve(__dirname, workerPath.replace(/\.(js|ts)$/, ext))
+    )].join(', ')}`;
+    console.error('[Worker Loader]', errorMsg);
+    throw new Error(errorMsg);
   }
+
+  console.log(`[Worker Loader] Using worker file: ${finalPath}`);
 
   console.log(`[Worker Loader] Starting ${workerName} worker from: ${finalPath}`);
   
   try {
+    // Log worker options with sensitive data redacted
+    const loggableOptions = {
+      ...(workerOptions as Record<string, unknown>),
+      env: {
+        ...(workerOptions.env as Record<string, unknown>),
+        MONGODB_URI: '***REDACTED***',
+        NEXTAUTH_SECRET: '***REDACTED'
+      }
+    };
+    console.log(`[Worker Loader] Creating worker instance for ${workerName} with options:`, loggableOptions);
+    
     const worker = new Worker(finalPath, workerOptions) as WorkerWithPort;
+    
+    // Add error handling for worker thread creation
+    worker.on('error', (error) => {
+      console.error(`[Worker ${workerName}] Thread error:`, error);
+    });
+    
+    worker.on('online', () => {
+      console.log(`[Worker ${workerName}] Thread is now online`);
+    });
+    
+    worker.on('messageerror', (error) => {
+      console.error(`[Worker ${workerName}] Message error:`, error);
+    });
     
     worker.on('error', (error) => {
       console.error(`[Worker ${worker.threadId}] Error in ${workerName}:`, error);
