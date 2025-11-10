@@ -1,3 +1,5 @@
+
+
 /// <reference types="node" />
 
 import { parentPort } from 'worker_threads';
@@ -59,15 +61,12 @@ async function main() {
         case 'getWorldState':
           arenaDirector.getWorldState();
           break;
-        case 'moveAgentToCafe':
-          arenaDirector.moveAgentToCafe(message.payload.agentId);
+        case 'visitRandomStorefront':
+          arenaDirector.visitRandomStorefront(message.payload.agentId);
           break;
         case 'recallAgent':
             arenaDirector.recallAgent(message.payload.agentId);
             break;
-        case 'createAndHostRoom':
-          arenaDirector.createAndHostRoom(message.payload.agentId);
-          break;
         case 'registerNewAgent':
           arenaDirector.registerNewAgent(message.payload.agent);
           break;
@@ -79,6 +78,12 @@ async function main() {
           break;
         case 'kickAgent':
             arenaDirector.kickAgent(message.payload);
+            break;
+        case 'moveAgent':
+            arenaDirector.moveAgent(message.payload.agentId, message.payload.toRoomId);
+            break;
+        case 'manualAcceptOffer':
+            arenaDirector.manualAcceptOffer(message.payload.roomId, message.payload.buyerAgentId);
             break;
         default:
           console.warn('[ArenaWorker] Received unknown message type for director:', message.type);

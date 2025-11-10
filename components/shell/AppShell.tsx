@@ -2,15 +2,12 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-// FIX: Fix import for `useUI` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
 import { useUI } from '../../lib/state/index.js';
 import IntelExchangeView from '../arena/ArenaView';
-// FIX: Added .js extension to import to fix module resolution error.
 import Dashboard from '../dashboard/Dashboard.js';
 import Sidebar from './Sidebar';
 import ListenInModal from '../arena/ListenInModal';
 import MailView from '../mail/MailView';
-import BountyBoardView from '../bounty/BountyBoardView';
 import AgentsView from '../agents/AgentsView';
 import RoomDetailModal from '../arena/RoomDetailModal';
 import AgentDossierModal from '../modals/AgentDossierModal';
@@ -37,7 +34,6 @@ export default function AppShell() {
         {view === 'prediction-hub' && <PredictionHubView />}
         {view === 'leaderboard' && <LeaderboardView />}
         {view === 'intel-exchange' && <IntelExchangeView />}
-        {view === 'bounty' && <BountyBoardView />}
         {view === 'mail' && <MailView />}
       </div>
       {listeningOnRoomId && <ListenInModal />}

@@ -57,6 +57,7 @@ export default function WelcomeBackModal({
             <span className="icon" style={{color: 'var(--brand-cyan)'}}>redeem</span>
             <span>
               <strong>
+                {/* FIX: Use `boxChange` which is now returned from the simulation. */}
                 {summary.boxChange > 0
                   ? `+${summary.boxChange.toLocaleString()}`
                   : summary.boxChange}{' '}

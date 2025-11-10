@@ -2,8 +2,8 @@
 
 import './load-env.js';
 import http from 'http';
-// FIX: Changed express import from named to default to resolve type conflicts with middleware handlers.
-import express from 'express';
+// FIX: Changed express import to include named types for Request, Response, and NextFunction to resolve type conflicts.
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -129,7 +129,9 @@ export async function startServer() {
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
     // FIX: Replaced explicit Request/Response types with express.Request/Response to resolve type conflicts.
-    app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // FIX: Use imported Request, Response, NextFunction types.
+    // FIX: Remove explicit types to allow TypeScript to infer them from Express, fixing overload issues.
+    app.use((req, res, next) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
@@ -149,7 +151,9 @@ export async function startServer() {
   app.use(express.static(clientDistPath));
   
   // FIX: Replaced explicit Request/Response types with express.Request/Response to resolve type conflicts and correctly type 'res'.
-  app.get('*', (req: express.Request, res: express.Response) => {
+  // FIX: Use imported Request, Response types.
+  // FIX: Remove explicit types to allow TypeScript to infer them from Express, fixing overload issues.
+  app.get('*', (req, res) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);

@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -17,20 +18,6 @@ export default function CreateRoomModal() {
     const { setState: setUserState } = useUser;
     const [roomName, setRoomName] = useState(`${userAgent.name}'s Storefront`);
     const [isCreating, setIsCreating] = useState(false);
-
-    const handleCreatePublic = async () => {
-        setIsCreating(true);
-        try {
-            await apiService.createAndHostRoom(userAgent.id);
-            addToast({ type: 'system', message: 'Public room created successfully!' });
-            closeCreateRoomModal();
-        } catch (error) {
-            addToast({ type: 'error', message: 'Failed to create public room.' });
-            console.error(error);
-        } finally {
-            setIsCreating(false);
-        }
-    };
 
     const handlePurchase = async () => {
         setIsCreating(true);
@@ -55,32 +42,24 @@ export default function CreateRoomModal() {
     return (
         <Modal onClose={closeCreateRoomModal}>
             <div className={`${styles.modalContentPane} ${styles.createRoomModal}`}>
-                <h2>Create a Room</h2>
-                <p>Choose the type of room you want to create in the Intel Exchange.</p>
-                <div className={styles.roomOptions}>
-                    <button onClick={handleCreatePublic} className={styles.roomOptionCard} disabled={isCreating}>
-                        <h4><span className="icon">groups</span>Create Public Room</h4>
-                        <p>A free, temporary room for quick chats. It will be deleted when empty.</p>
+                <h2>Purchase a Storefront</h2>
+                <p>Create a persistent, ownable room in the Intel Exchange that acts as your personal intel shop. Cost: {ROOM_COST} ETH (Simulated).</p>
+                <form onSubmit={(e) => { e.preventDefault(); handlePurchase(); }} className={styles.manageRoomForm} style={{width: '100%'}}>
+                    <label>
+                        <span>Storefront Name</span>
+                        <input
+                            type="text"
+                            value={roomName}
+                            onChange={(e) => setRoomName(e.target.value)}
+                            placeholder="Your Storefront Name"
+                            required
+                            disabled={isCreating}
+                        />
+                    </label>
+                    <button type="submit" className="button primary" style={{width: '100%', justifyContent: 'center', marginTop: '12px'}} disabled={isCreating || !roomName.trim()}>
+                        {isCreating ? 'Purchasing...' : `Purchase for ${ROOM_COST} ETH`}
                     </button>
-                    <div className={`${styles.roomOptionCard} ${isCreating ? styles.disabled : ''}`}>
-                        <h4><span className="icon">storefront</span>Purchase Intel Storefront</h4>
-                        <p>A persistent, ownable room that acts as your intel shop. Cost: {ROOM_COST} ETH (Simulated).</p>
-                        <form onSubmit={(e) => { e.preventDefault(); handlePurchase(); }} style={{marginTop: '16px'}}>
-                            <input
-                                type="text"
-                                value={roomName}
-                                onChange={(e) => setRoomName(e.target.value)}
-                                placeholder="Your Storefront Name"
-                                required
-                                disabled={isCreating}
-                                onClick={(e) => e.stopPropagation()}
-                            />
-                            <button type="submit" className="button primary" style={{width: '100%', justifyContent: 'center', marginTop: '12px'}} disabled={isCreating || !roomName.trim()}>
-                                {isCreating ? 'Purchasing...' : 'Purchase'}
-                            </button>
-                        </form>
-                    </div>
-                </div>
+                </form>
             </div>
         </Modal>
     );

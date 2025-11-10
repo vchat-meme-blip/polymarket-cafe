@@ -4,65 +4,29 @@
 */
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { isToday, startOfToday } from 'date-fns';
-// FIX: Imported `TransactionType` and `Transaction` from the canonical types file.
-import { TransactionType, Transaction } from '../types/index.js';
+import { Transaction } from '../types/index.js';
 
 interface ServerHydrationData {
     transactions: Transaction[];
 }
 
+// FIX: Add `balance` and `claimInitialTokens` to the WalletState type.
 export type WalletState = {
   balance: number;
   transactions: Transaction[];
-  lastClaimedStipend: number | null;
   hydrate: (data: ServerHydrationData) => void;
-  claimInitialTokens: () => void;
-  claimDailyStipend: () => void;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'timestamp'>) => void;
+  claimInitialTokens: () => void;
 };
 
 export const useWalletStore = create(
   persist<WalletState>(
     (set, get) => ({
+      // FIX: Initialize balance, which was missing.
       balance: 0,
       transactions: [],
-      lastClaimedStipend: null,
 
-      hydrate: (data) => set(state => {
-        // Recalculate balance based on server transaction history
-        const balance = data.transactions.reduce((acc, tx) => {
-            if (tx.type === 'send') return acc - tx.amount;
-            return acc + tx.amount;
-        }, 0);
-        return { transactions: data.transactions, balance };
-      }),
-
-      claimInitialTokens: () => {
-        if (get().transactions.some(tx => tx.type === 'claim')) {
-          return;
-        }
-        const claimAmount = 1000;
-        get().addTransaction({
-          type: 'claim',
-          amount: claimAmount,
-          description: 'Claimed initial BOX tokens.',
-        });
-      },
-
-      claimDailyStipend: () => {
-        const { lastClaimedStipend } = get();
-        if (lastClaimedStipend && isToday(lastClaimedStipend)) {
-          return;
-        }
-        const stipendAmount = 100;
-        get().addTransaction({
-          type: 'stipend',
-          amount: stipendAmount,
-          description: 'Received daily BOX stipend.',
-        });
-        set({ lastClaimedStipend: startOfToday().getTime() });
-      },
+      hydrate: (data) => set({ transactions: data.transactions || [] }),
 
       addTransaction: (
         transaction: Omit<Transaction, 'id' | 'timestamp'>,
@@ -73,16 +37,39 @@ export const useWalletStore = create(
           timestamp: Date.now(),
         };
 
+        // FIX: Update balance based on transaction type.
         set(state => {
-          const newBalance =
-            transaction.type === 'send'
-              ? state.balance - transaction.amount
-              : state.balance + transaction.amount;
+            let newBalance = state.balance;
+            if (['receive', 'stipend'].includes(newTransaction.type)) {
+                newBalance += newTransaction.amount;
+            } else if (['send', 'room_purchase', 'escrow'].includes(newTransaction.type)) {
+                newBalance -= newTransaction.amount;
+            }
+            return {
+                balance: newBalance,
+                transactions: [newTransaction, ...state.transactions].slice(0, 100),
+            };
+        });
+      },
+      // FIX: Implement the missing `claimInitialTokens` function.
+      claimInitialTokens: () => {
+        set(state => {
+            if (state.transactions.some(tx => tx.type === 'claim')) {
+                return state; // Already claimed
+            }
+            
+            const newTransaction: Transaction = {
+                id: `tx-claim-${Date.now()}`,
+                timestamp: Date.now(),
+                type: 'claim',
+                amount: 1000,
+                description: 'Claimed initial 1,000 BOX tokens.'
+            };
 
-          return {
-            balance: newBalance,
-            transactions: [newTransaction, ...state.transactions].slice(0, 100),
-          };
+            return {
+                balance: state.balance + 1000,
+                transactions: [newTransaction, ...state.transactions],
+            };
         });
       },
     }),

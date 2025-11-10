@@ -11,7 +11,8 @@ import styles from './Bounty.module.css';
 export default function CreateBountyPanel() {
   const [objective, setObjective] = useState('');
   const [reward, setReward] = useState(100);
-  const { addBounty } = useAutonomyStore();
+  // FIX: `addBounty` is deprecated and removed from the store.
+  // const { addBounty } = useAutonomyStore();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -5,7 +5,8 @@ import {
   usersCollection, 
   agentsCollection,
   betsCollection,
-  bountiesCollection,
+  // FIX: `bountiesCollection` is not exported from db.js and appears to be deprecated.
+  // bountiesCollection,
   tradeHistoryCollection,
   transactionsCollection,
   bettingIntelCollection,
@@ -116,7 +117,8 @@ router.get('/bootstrap/:handle', async (req, res) => {
     const agentStringIds = agents.map(a => a.id);
     
     const autonomy = { 
-        bounties: await bountiesCollection.find({ ownerHandle: handle }).toArray(), 
+        // FIX: Return an empty array for bounties as the collection is deprecated.
+        bounties: [], 
         intel: await bettingIntelCollection.find({ ownerHandle: handle }).toArray(),
         activityLog: await activityLogCollection.find({ agentId: { $in: agentStringIds } }).sort({ timestamp: -1 }).limit(100).toArray(),
         tasks: agents.flatMap(a => (a as any).tasks || [])
@@ -386,7 +388,7 @@ router.get('/agents/:agentId/activity', async (req, res) => {
         id: doc._id.toString(),
         ownerAgentId: doc.ownerAgentId.toString(),
         sourceAgentId: doc.sourceAgentId?.toString(),
-        bountyId: doc.bountyId?.toString(),
+        bountyId: (doc as any).bountyId?.toString(),
         createdAt: new Date(doc.createdAt).getTime(),
     } as any));
     
@@ -750,7 +752,7 @@ router.get('/leaderboard/intel', async (req, res) => {
 
 // Arena Actions
 router.post('/arena/send-to-cafe', (req, res) => {
-    req.arenaWorker?.postMessage({ type: 'moveAgentToCafe', payload: req.body });
+    req.arenaWorker?.postMessage({ type: 'visitRandomStorefront', payload: req.body });
     res.status(202).send();
 });
 
@@ -759,16 +761,11 @@ router.post('/arena/recall-agent', (req, res) => {
     res.status(202).send();
 });
 
-router.post('/arena/create-room', (req, res) => {
-    req.arenaWorker?.postMessage({ type: 'createAndHostRoom', payload: req.body });
-    res.status(202).send();
-});
-
 router.post('/rooms/purchase', async (req, res) => {
     const { name } = req.body;
     const { userHandle } = res.locals;
     try {
-        const newRoom = {
+        const newRoom: Partial<Room> = {
             _id: new ObjectId(),
             id: '',
             name,
@@ -781,8 +778,9 @@ router.post('/rooms/purchase', async (req, res) => {
             vibe: 'General Chat ☕️',
             isOwned: true,
             ownerHandle: userHandle,
+            volumeSold: 0,
         };
-        newRoom.id = newRoom._id.toHexString();
+        newRoom.id = (newRoom._id as ObjectId).toHexString();
         const result = await roomsCollection.insertOne(newRoom as any);
         const userDoc = await usersCollection.findOneAndUpdate(
             { handle: userHandle },
@@ -837,6 +835,12 @@ router.delete('/rooms/:roomId', async (req, res) => {
     }
 });
 
+router.post('/rooms/:roomId/accept-offer', (req, res) => {
+    const { roomId } = req.params;
+    const { buyerAgentId } = req.body;
+    req.arenaWorker?.postMessage({ type: 'manualAcceptOffer', payload: { roomId, buyerAgentId } });
+    res.status(202).send();
+});
 
 router.post('/arena/kick', (req, res) => {
     req.arenaWorker?.postMessage({ type: 'kickAgent', payload: req.body });

@@ -40,6 +40,8 @@ import MarketDetailModal from './components/modals/MarketDetailModal';
 import VisitStorefrontModal from './components/modals/VisitStorefrontModal.js';
 import CreateTaskModal from './components/modals/CreateTaskModal';
 import TaskDetailModal from './components/modals/TaskDetailModal';
+import { WalletContextProvider } from './components/providers/WalletContextProvider.js';
+import PaywallModal from './components/modals/PaywallModal.js';
 
 /**
  * Main application component.
@@ -118,7 +120,7 @@ function App() {
   }
 
   return (
-    <>
+    <WalletContextProvider>
       <div className="App">{renderContent()}</div>
       {showOnboarding && <Onboarding />}
       {showServerHealthModal && <ServerHealthModal />}
@@ -132,8 +134,9 @@ function App() {
       {showVisitStorefrontModal && <VisitStorefrontModal />}
       {showShareRoomModal && shareModalData && <ShareRoomModal data={shareModalData} />}
       {marketDetailModalData && <MarketDetailModal market={marketDetailModalData} />}
+      <PaywallModal />
       <ToastContainer />
-    </>
+    </WalletContextProvider>
   );
 }
 

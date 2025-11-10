@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -206,8 +207,8 @@ const OperationsTab = ({ agent, onUpdate }: { agent: Partial<Agent>, onUpdate: (
                         <label htmlFor={`proactive-toggle-${agent.id}`}></label>
                     </div>
                 </div>
-                <label title="If filled, this agent will only visit these specific rooms to buy intel. Leave blank to allow random roaming in the Intel Exchange.">
-                    <span>Trusted Intel Sources (Room IDs)</span>
+                <label title="If filled, this agent will only visit these specific storefronts to buy intel. Leave blank to allow it to visit random storefronts.">
+                    <span>Trusted Intel Storefronts (Room IDs)</span>
                     <textarea 
                         rows={3} 
                         placeholder="e.g., room-abc12, room-xyz34"

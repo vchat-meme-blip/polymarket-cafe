@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -64,7 +65,6 @@ export type ArenaState = {
   setRoomVibe: (roomId: string, vibe: string) => void;
   updateReputation: (agentId: string, change: number) => void;
   setThinkingAgent: (agentId: string, isThinking: boolean) => void;
-  createAndJoinRoom: (agentId: string) => void;
   _ensureRoomExists: (roomId: string) => void;
 };
 
@@ -345,21 +345,6 @@ export const useArenaStore = create(
           }
           return { thinkingAgents: newThinkingAgents };
         }),
-        createAndJoinRoom: (agentId: string) => {
-          const newRoomId = `room-${Math.random().toString(36).substring(2, 7)}`;
-          const newRoom: Room = {
-            id: newRoomId,
-            agentIds: [],
-            hostId: null,
-            topics: [],
-            warnFlags: 0,
-            rules: DEFAULT_ROOM_RULES,
-            activeOffer: null,
-            vibe: 'General Chat ☕️'
-          };
-          set(state => ({ rooms: [...state.rooms, newRoom] }));
-          get().moveAgentToRoom(agentId, newRoomId);
-        },
         _ensureRoomExists: (roomId) => {
           if (!get().rooms.some(r => r.id === roomId)) {
             const newRoom: Room = {

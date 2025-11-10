@@ -2,6 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
+// FIX: Destructure `balance` and `claimInitialTokens` which are now available on the store.
 import { useWalletStore } from '../../lib/state/wallet';
 import TransactionHistory from './TransactionHistory';
 import styles from './Profile.module.css';

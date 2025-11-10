@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import mongoose from 'mongoose';
-import { agentsCollection, bettingIntelCollection, tradeHistoryCollection } from '../db.js';
+import { agentsCollection, bettingIntelCollection, tradeHistoryCollection, roomsCollection } from '../db.js';
 import { Agent, TradeRecord, BettingIntel, MarketWatchlist, Offer } from '../../lib/types/index.js';
 import { ObjectId } from 'mongodb';
 
@@ -100,7 +100,8 @@ class TradeService {
             await Promise.all([
                 agentsCollection.updateOne({ _id: sellerId }, { $inc: { boxBalance: price, intelPnl: price } }, { session }),
                 agentsCollection.updateOne({ _id: buyerId }, { $inc: { boxBalance: -price, intelPnl: -price } }, { session }),
-                tradeHistoryCollection.insertOne(trade as any, { session })
+                tradeHistoryCollection.insertOne(trade as any, { session }),
+                roomsCollection.updateOne({ id: roomId }, { $inc: { volumeSold: price } }, { session }),
             ]);
 
             await session.commitTransaction();

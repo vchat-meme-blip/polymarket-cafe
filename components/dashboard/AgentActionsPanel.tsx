@@ -1,69 +1,30 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useAgent, useUI } from '../../lib/state/index.js';
-import { useArenaStore } from '../../lib/state/arena';
-import { useAutonomyStore } from '../../lib/state/autonomy';
-import { apiService } from '../../lib/services/api.service.js';
+import { useUI } from '../../lib/state/index.js';
 import styles from './Dashboard.module.css';
 
 export default function AgentActionsPanel() {
-  const { current: userAgent } = useAgent();
-  const { setActivity } = useAutonomyStore();
-  const { agentLocations } = useArenaStore();
   const { openCreateRoomModal } = useUI();
-
-  const isAgentInCafe = agentLocations[userAgent.id] !== null;
-
-  const handleSendToCafe = () => {
-    setActivity('WANDERING_IN_CAFE');
-    apiService.sendAgentToCafe(userAgent.id);
-  };
-
-  const handleRecallFromCafe = () => {
-    setActivity('IDLE');
-    apiService.request('/api/arena/recall-agent', {
-      method: 'POST',
-      body: JSON.stringify({ agentId: userAgent.id }),
-    });
-  };
 
   return (
     <div className={`${styles.dashboardPanel} ${styles.agentActionsPanel}`}>
       <h3 className={styles.dashboardPanelTitle}>
-        <span className="icon">smart_toy</span>
-        Agent Actions
+        <span className="icon">storefront</span>
+        My Storefront
       </h3>
       
-      {isAgentInCafe ? (
-        <button
-          className="button"
-          onClick={handleRecallFromCafe}
-          title="Recall your agent from the Café back to an idle state"
-        >
-          <span className="icon">home</span>
-          Recall from Café
-        </button>
-      ) : (
-        <button
-          className="button"
-          onClick={handleSendToCafe}
-          title='Send your agent to the Café to find a room'
-        >
-          <span className="icon">coffee</span>
-          Send to Café
-        </button>
-      )}
+      <p style={{fontSize: '14px', color: 'var(--Neutral-60)', marginBottom: '12px'}}>You don't own a storefront yet. Purchase one to create a persistent space in the Intel Exchange for your agent to sell intel.</p>
 
       <button
-        className="button"
+        className="button primary"
         onClick={openCreateRoomModal}
-        disabled={isAgentInCafe}
-         title={isAgentInCafe ? 'Your agent must be recalled before hosting a new room' : 'Create a new room with your agent as the host'}
+        title={'Purchase a persistent storefront in the Intel Exchange'}
       >
-        <span className="icon">add_comment</span>
-        Create & Host Room
+        <span className="icon">add_business</span>
+        Purchase Storefront
       </button>
     </div>
   );

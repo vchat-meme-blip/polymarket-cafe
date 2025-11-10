@@ -2,49 +2,22 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-// FIX: Fix imports for `useUI` and `useUser` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
 import { useUI, useUser } from '../../lib/state/index.js';
 import c from 'classnames';
 import { useState } from 'react';
 import styles from './Shell.module.css';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import '@solana/wallet-adapter-react-ui/styles.css';
 
 const ConnectWalletButton = () => {
-  const { solanaWalletAddress, connectWallet } = useUser();
-  const [isConnecting, setIsConnecting] = useState(false);
-
-  const handleConnect = async () => {
-    setIsConnecting(true);
-    // In a real app, this would trigger a wallet adapter modal.
-    // The state action now simulates a signature request.
-    await connectWallet('4p4h2h1q8z2z8z8y8f8e8d8c8b8a898887868584'); 
-    setIsConnecting(false);
-  };
-
-  if (solanaWalletAddress) {
-    return (
-      <div className={styles.walletConnectedDisplay} title={solanaWalletAddress}>
-        <span className="icon">account_balance_wallet</span>
-        <span>
-          {solanaWalletAddress.slice(0, 4)}...{solanaWalletAddress.slice(-4)}
-        </span>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.walletButtonContainer}>
-      <button 
-        className={`button primary ${styles.connectWalletBtn}`} 
-        onClick={handleConnect} 
-        disabled={isConnecting}
-        aria-label={isConnecting ? 'Connecting...' : 'Connect Wallet'}
-        title={isConnecting ? 'Connecting...' : 'Connect Wallet'}
-      >
-        <span className="icon">account_balance_wallet</span>
-        <span className={styles.walletButtonText}>
-          {isConnecting ? 'Connecting...' : 'Connect Wallet'}
-        </span>
-      </button>
+      <WalletMultiButton style={{ 
+        width: '100%',
+        justifyContent: 'center',
+        backgroundColor: 'var(--brand-primary)',
+        borderRadius: '99px',
+      }} />
     </div>
   );
 };
@@ -104,14 +77,6 @@ export default function Sidebar() {
           data-tooltip="Intel Exchange"
         >
           <span className="icon">coffee</span>
-        </button>
-        <button
-          className={c(styles.sidebarButton, { [styles.active]: view === 'bounty' })}
-          onClick={() => setView('bounty')}
-          aria-label="Bounty Board"
-          data-tooltip="Bounty Board"
-        >
-          <span className="icon">task</span>
         </button>
         <button
           className={c(styles.sidebarButton, { [styles.active]: view === 'mail' })}

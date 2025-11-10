@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -65,11 +64,12 @@ export type Agent = {
   trustedRoomIds?: string[];
   operatingHours?: string;
   mode?: AgentMode;
-  boxBalance: number;
   portfolio: Record<string, number>;
   templateId?: string;
   copiedFromId?: string;
   tasks?: AgentTask[];
+  // FIX: Add missing `boxBalance` property.
+  boxBalance: number;
 };
 
 // Arena types
@@ -90,6 +90,7 @@ export type Room = {
   twitterUrl?: string;
   isRevenuePublic?: boolean;
   bannedAgentIds?: string[];
+  volumeSold?: number;
 };
 
 export type Interaction = {
@@ -136,14 +137,6 @@ export type AgentActivity =
   | 'GATHERING_INTEL' 
   | 'RESEARCHING_INTEL'
   | 'CHATTING_WITH_USER';
-
-export type Bounty = {
-  id: string;
-  objective: string;
-  reward: number;
-  status: 'active' | 'completed';
-  ownerHandle?: string;
-};
 
 export type DailySummary = {
     agentId: string;
@@ -200,21 +193,24 @@ export type BettingIntel = {
     id: string;
     ownerAgentId: string;
     market: string;
-    content: string;
+    content: string; // This is now the protected resource
     sourceDescription: string;
     isTradable: boolean;
-    price?: number;
+    price: number; // Price in USDC
+    sellerWalletAddress: string;
+    network: 'Solana' | 'Base';
     createdAt: number;
     pnlGenerated: {
         amount: number;
         currency: string;
         };
     sourceAgentId?: string;
-    pricePaid?: number;
-    bountyId?: string;
+    pricePaid?: number; // The price the current owner paid
     ownerHandle?: string;
     sourceUrls?: string[];
     rawResearchData?: { url: string; markdown: string; }[];
+    // FIX: Add missing optional `bountyId` property.
+    bountyId?: string;
 }
 
 export type MarketWatchlist = {

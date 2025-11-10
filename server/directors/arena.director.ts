@@ -1,3 +1,6 @@
+
+
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -9,6 +12,9 @@ import pkg from 'lodash';
 const { shuffle } = pkg;
 import { agentsCollection, bettingIntelCollection, roomsCollection, agentInteractionsCollection } from '../db.js';
 import { ObjectId } from 'mongodb';
+// FIX: Add imports for toSharedAgent and AgentDocument to correctly convert DB documents to shared types.
+import { toSharedAgent } from '../../lib/types/index.js';
+import { AgentDocument } from '../../lib/types/mongodb.js';
 
 // Type for the callback function to emit messages to the main thread
 type EmitToMainThread = (message: { type: string; event?: string; payload?: any; room?: string; worker?: string; message?: any; }) => void;
@@ -86,7 +92,6 @@ export class ArenaDirector {
             const allAgents = await agentsCollection.find({}).toArray();
             const allRooms = await roomsCollection.find({}).toArray();
 
-            await this.processWanderingAgents(allAgents, allRooms);
             await this.processConversations(allAgents, allRooms);
             
             this.emitWorldState(await roomsCollection.find({}).toArray(), allAgents);
@@ -95,34 +100,6 @@ export class ArenaDirector {
             console.error('[ArenaDirector] Error during tick:', error);
         } finally {
             this.isTicking = false;
-        }
-    }
-
-    private async processWanderingAgents(allAgents: any[], allRooms: any[]) {
-        const agentLocations: Record<string, string | null> = {};
-        allAgents.forEach(agent => { agentLocations[agent._id.toString()] = null; });
-        allRooms.forEach(room => { room.agentIds.forEach((agentId: ObjectId) => { agentLocations[agentId.toString()] = room.id; }); });
-        
-        const wanderingAgents = shuffle(allAgents.filter(agent => !agentLocations[agent._id.toString()]));
-
-        if (wanderingAgents.length < 2) return;
-
-        let availableWanderers = [...wanderingAgents];
-        
-        const singleOccupantRooms = allRooms.filter(room => !room.isOwned && room.agentIds.length === 1);
-        for (const room of singleOccupantRooms) {
-            if (availableWanderers.length === 0) break;
-            const joiner = availableWanderers.pop()!;
-            await this.moveAgent(joiner._id.toString(), room.id);
-        }
-
-        let emptyPublicRooms = allRooms.filter(room => !room.isOwned && room.agentIds.length === 0);
-        while (availableWanderers.length >= 2 && emptyPublicRooms.length > 0) {
-            const agent1 = availableWanderers.pop()!;
-            const agent2 = availableWanderers.pop()!;
-            const targetRoom = emptyPublicRooms.pop()!;
-            await this.moveAgent(agent1._id.toString(), targetRoom.id);
-            await this.moveAgent(agent2._id.toString(), targetRoom.id);
         }
     }
     
@@ -156,8 +133,9 @@ export class ArenaDirector {
             const lastSpeakerId = history.length > 0 ? history[history.length - 1].agentId : null;
             const [speakerDoc, listenerDoc] = (lastSpeakerId === agent1Doc.id) ? [agent2Doc, agent1Doc] : [agent1Doc, agent2Doc];
 
-            const speaker = { ...speakerDoc, id: speakerDoc._id.toString() } as Agent;
-            const listener = { ...listenerDoc, id: listenerDoc._id.toString() } as Agent;
+            // FIX: Convert raw DB document to shared Agent type to prevent type mismatches.
+            const speaker = toSharedAgent(speakerDoc as AgentDocument);
+            const listener = toSharedAgent(listenerDoc as AgentDocument);
 
             const initialPrompt = history.length === 0 ? `You meet ${listener.name}. Start a conversation.` : undefined;
 
@@ -183,8 +161,9 @@ export class ArenaDirector {
 
                 this.emitToMain?.({ type: 'socketEmit', event: 'newConversationTurn', payload: { roomId: room.id, turn: newTurn, room } });
 
-                if (toolCalls?.some(tc => tc.type === 'function' && tc.function.name === 'end_conversation')) {
+                if (endConversation || toolCalls?.some(tc => tc.type === 'function' && tc.function.name === 'end_conversation')) {
                     await this.moveAgent(speaker.id, null);
+                    await this.moveAgent(listener.id, null);
                 }
             } catch (error) {
                 console.error(`[ArenaDirector] Error processing conversation turn for ${speaker.name}:`, error);
@@ -194,7 +173,7 @@ export class ArenaDirector {
         }
     }
 
-    private async moveAgent(agentId: string, toRoomId: string | null) {
+    public async moveAgent(agentId: string, toRoomId: string | null) {
         const agentObjectId = new ObjectId(agentId);
         const agent = await agentsCollection.findOne({ _id: agentObjectId });
         if (!agent) return;
@@ -204,16 +183,17 @@ export class ArenaDirector {
         // Remove from old room
         if (fromRoom) {
             await roomsCollection.updateOne({ _id: fromRoom._id }, { $pull: { agentIds: agentObjectId } } as any);
-            if (fromRoom.agentIds.length - 1 === 0 && !fromRoom.isOwned) {
-                await roomsCollection.deleteOne({ _id: fromRoom._id });
-                await agentInteractionsCollection.deleteMany({ roomId: fromRoom.id });
-                this.emitToMain?.({ type: 'socketEmit', event: 'roomDestroyed', payload: { roomId: fromRoom.id } });
-            }
         }
 
         // Add to new room
         if (toRoomId) {
-            await roomsCollection.updateOne({ id: toRoomId }, { $addToSet: { agentIds: agentObjectId } } as any);
+            const toRoom = await roomsCollection.findOne({ id: toRoomId });
+            if (toRoom && toRoom.agentIds.length < 2) {
+                await roomsCollection.updateOne({ id: toRoomId }, { $addToSet: { agentIds: agentObjectId } } as any);
+            } else {
+                console.warn(`[ArenaDirector] Agent ${agentId} could not join full or non-existent room ${toRoomId}.`);
+                toRoomId = null; // Agent effectively leaves
+            }
         }
         
         this.emitToMain?.({ type: 'socketEmit', event: 'agentMoved', payload: { agentId, toRoomId } });
@@ -269,6 +249,26 @@ export class ArenaDirector {
         }
     }
     
+    public async manualAcceptOffer(roomId: string, buyerAgentId: string) {
+        const room = await roomsCollection.findOne({ id: roomId });
+        if (!room || !room.activeOffer || room.activeOffer.toId !== buyerAgentId) {
+            console.warn(`[ArenaDirector] Invalid manualAcceptOffer for room ${roomId} by agent ${buyerAgentId}`);
+            const buyer = await agentsCollection.findOne({ _id: new ObjectId(buyerAgentId) });
+            if (buyer && buyer.ownerHandle) {
+                this.emitToMain?.({ type: 'socketEmit', event: 'systemMessage', payload: { type: 'error', message: 'Offer is invalid or not for you.' }, room: buyer.ownerHandle });
+            }
+            return;
+        }
+
+        const buyer = await agentsCollection.findOne({ _id: new ObjectId(buyerAgentId) });
+        const seller = await agentsCollection.findOne({ _id: new ObjectId(room.activeOffer.fromId) });
+        if (!buyer || !seller) return;
+
+        // Reuse existing logic to ensure consistency
+        // FIX: The `buyer` and `seller` objects are raw MongoDB documents. They must be converted to the shared `Agent` type before being passed to `handleAcceptOffer`.
+        await this.handleAcceptOffer(toSharedAgent(buyer), toSharedAgent(seller), room);
+    }
+    
     private emitWorldState(rooms: any[], agents: any[]) {
         const agentLocations: Record<string, string | null> = {};
         agents.forEach(agent => {
@@ -312,30 +312,23 @@ export class ArenaDirector {
         this.emitToMain?.({ type: 'socketEmit', event: 'agentThinking', payload: { agentId, isThinking } });
     }
 
-    public async moveAgentToCafe(agentId: string) { await this.moveAgent(agentId, null); }
-    public async recallAgent(agentId: string) { await this.moveAgent(agentId, null); }
-    public async kickAgent({ agentId, roomId }: { agentId: string, roomId: string }) { await this.moveAgent(agentId, null); }
-    public async createAndHostRoom(agentId: string) {
-        const agentDoc = await agentsCollection.findOne({ _id: new ObjectId(agentId) });
-        if (!agentDoc) return;
+    public async visitRandomStorefront(agentId: string) {
+        const agentObjectId = new ObjectId(agentId);
+        const storefronts = await roomsCollection.find({ isOwned: true }).toArray();
+        const availableStorefronts = storefronts.filter(room => 
+            room.agentIds.length < 2 &&
+            !room.agentIds.some((id: ObjectId) => id.equals(agentObjectId)) // Not already in the room
+        );
 
-        const newRoom: Omit<Room, 'id'> & { _id: ObjectId } = {
-            _id: new ObjectId(),
-            agentIds: [], 
-            hostId: agentDoc._id.toString(),
-            topics: agentDoc.topics as string[],
-            warnFlags: 0, 
-            rules: [],
-            activeOffer: null, 
-            vibe: 'General Chat ☕️', 
-            isOwned: false
-        };
-        const { insertedId } = await roomsCollection.insertOne(newRoom as any);
-        const savedRoom = await roomsCollection.findOne({ _id: insertedId });
-        if (savedRoom) {
-            const finalRoom = { ...savedRoom, id: savedRoom._id.toString() };
-            this.emitToMain?.({ type: 'socketEmit', event: 'roomUpdated', payload: { room: finalRoom } });
-            await this.moveAgent(agentId, finalRoom.id);
+        if (availableStorefronts.length > 0) {
+            const randomRoom = shuffle(availableStorefronts)[0];
+            await this.moveAgent(agentId, randomRoom.id);
+        } else {
+            console.log(`[ArenaDirector] No available storefronts for ${agentId} to visit.`);
+            // If no rooms are available, we can just leave the agent where they are.
         }
     }
+
+    public async recallAgent(agentId: string) { await this.moveAgent(agentId, null); }
+    public async kickAgent({ agentId, roomId }: { agentId: string, roomId: string }) { await this.moveAgent(agentId, null); }
 }

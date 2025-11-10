@@ -8,7 +8,6 @@ import type {
   Room,
   User,
   Bet,
-  Bounty,
   TradeRecord,
   Transaction,
   BettingIntel,
@@ -19,7 +18,6 @@ import type {
   RoomDocument,
   UserDocument,
   BetDocument,
-  BountyDocument,
   TradeRecordDocument,
   TransactionDocument,
   BettingIntelDocument,
@@ -52,7 +50,6 @@ export let usersCollection: Collection<UserDocument>;
 export let agentsCollection: Collection<AgentDocument>;
 export let roomsCollection: Collection<RoomDocument>;
 export let betsCollection: Collection<BetDocument>;
-export let bountiesCollection: Collection<BountyDocument>;
 export let activityLogCollection: Collection<ActivityLogEntry>;
 export let tradeHistoryCollection: Collection<TradeRecordDocument>;
 export let transactionsCollection: Collection<TransactionDocument>;
@@ -98,7 +95,6 @@ const connectDB = async () => {
     agentsCollection = mongoose.connection.collection<AgentDocument>('agents');
     roomsCollection = mongoose.connection.collection<RoomDocument>('rooms');
     betsCollection = mongoose.connection.collection<BetDocument>('bets');
-    bountiesCollection = mongoose.connection.collection<BountyDocument>('bounties');
     activityLogCollection = mongoose.connection.collection<ActivityLogEntry>('activity_logs');
     tradeHistoryCollection = mongoose.connection.collection<TradeRecordDocument>('trade_history');
     transactionsCollection = mongoose.connection.collection<TransactionDocument>('transactions');
@@ -168,7 +164,6 @@ export async function seedMcpAgents() {
       _id: newId,
       id: newId.toHexString(), // This becomes the new unique ID
       templateId: agentTemplate.id, // The original string ID is now the templateId
-      boxBalance: 500, // Genesis credit drop
       ownerHandle: null, // Explicitly set ownerHandle to null for MCPs
     };
   });
@@ -179,42 +174,6 @@ export async function seedMcpAgents() {
   }
 }
 
-export async function seedPublicRooms() {
-  if (!roomsCollection) {
-    console.warn('[DB Seeder] roomsCollection is not initialized, skipping public room seed.');
-    return;
-  }
-  const roomCount = await roomsCollection.countDocuments({ isOwned: { $ne: true } });
-  if (roomCount > 0) {
-    console.log('[DB Seeder] Public rooms already exist. Skipping seed.');
-    return;
-  }
-  
-  console.log('[DB Seeder] Seeding public rooms...');
-  const publicRooms = Array.from({ length: 5 }).map((_, i) => {
-    const newId = new mongoose.Types.ObjectId();
-    return {
-      _id: newId,
-      id: `public-${i + 1}`,
-      name: `Public Room ${i + 1}`,
-      agentIds: [],
-      hostId: null,
-      topics: [],
-      warnFlags: 0,
-      rules: ['All intel trades are final.', 'No spamming.', 'Be respectful.'],
-      activeOffer: null,
-      vibe: 'General Chat ☕️',
-      isOwned: false,
-    };
-  });
-  
-  if (publicRooms.length > 0) {
-    await roomsCollection.insertMany(publicRooms as any[]);
-    console.log(`[DB Seeder] Inserted ${publicRooms.length} public rooms.`);
-  }
-}
-
 export async function seedDatabase() {
     await seedMcpAgents();
-    await seedPublicRooms();
 }

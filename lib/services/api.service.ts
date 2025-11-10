@@ -1,3 +1,5 @@
+
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -171,13 +173,6 @@ class ApiService {
       });
   }
 
-  async createAndHostRoom(agentId: string): Promise<void> {
-      await this.request<void>('/api/arena/create-room', {
-          method: 'POST',
-          body: JSON.stringify({ agentId }),
-      });
-  }
-
   async purchaseRoom(details: { name: string }): Promise<{ room: Room }> {
     return this.request<{ room: Room }>('/api/rooms/purchase', {
       method: 'POST',
@@ -195,6 +190,14 @@ class ApiService {
   async deleteRoom(roomId: string): Promise<void> {
     await this.request<void>(`/api/rooms/${roomId}`, {
       method: 'DELETE',
+    });
+  }
+  
+  async acceptOffer(roomId: string): Promise<void> {
+    const buyerAgentId = useAgent.getState().current.id;
+    await this.request<void>(`/api/rooms/${roomId}/accept-offer`, {
+        method: 'POST',
+        body: JSON.stringify({ buyerAgentId }),
     });
   }
   

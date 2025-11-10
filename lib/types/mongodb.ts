@@ -3,7 +3,6 @@ import type {
   User as SharedUser,
   Agent as SharedAgent,
   Room as SharedRoom,
-  Bounty as SharedBounty,
   Bet as SharedBet,
   BettingIntel as SharedBettingIntel,
   MarketWatchlist as SharedMarketWatchlist,
@@ -65,11 +64,6 @@ export interface RoomDocument extends Omit<SharedRoom, 'agentIds' | 'hostId' | '
   toShared(): SharedRoom;
 }
 
-export interface BountyDocument extends WithObjectId<Omit<SharedBounty, 'id'>> {
-  // Convert MongoDB document to shared type
-  toShared(): SharedBounty;
-}
-
 export interface BetDocument extends Omit<SharedBet, 'id' | 'agentId' | 'sourceIntelId' | 'timestamp'> {
   _id: ObjectId;
   agentId: ObjectId;
@@ -79,8 +73,9 @@ export interface BetDocument extends Omit<SharedBet, 'id' | 'agentId' | 'sourceI
   toShared(): SharedBet;
 }
 
+// FIX: Add `bountyId` to the document definition to align with application logic.
 export interface BettingIntelDocument extends Omit<SharedBettingIntel, 
-  'id' | 'ownerAgentId' | 'sourceAgentId' | 'bountyId' | 'createdAt'
+  'id' | 'ownerAgentId' | 'sourceAgentId' | 'createdAt' | 'bountyId'
 > {
   _id: ObjectId;
   ownerAgentId: ObjectId;
@@ -177,7 +172,6 @@ export type {
   SharedUser as User,
   SharedAgent as Agent,
   SharedRoom as Room,
-  SharedBounty as Bounty,
   SharedBet as Bet,
   SharedBettingIntel as BettingIntel,
   SharedMarketWatchlist as MarketWatchlist,

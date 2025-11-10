@@ -6,6 +6,7 @@ import { useWalletStore } from '../../lib/state/wallet';
 import styles from './Shell.module.css';
 
 export default function WalletBalance() {
+  // FIX: `balance` is now available on the wallet store.
   const { balance } = useWalletStore();
 
   return (
