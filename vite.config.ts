@@ -83,10 +83,7 @@ export default defineConfig(({ mode }) => {
                     '@solana/spl-token',
                 ],
                 output: {
-                    manualChunks: {
-                        vendor: ['react', 'react-dom', 'three']
-                        // Add other large dependencies here
-                    },
+                    manualChunks: {},
                     // Ensure consistent chunk names
                     chunkFileNames: 'assets/js/[name]-[hash].js',
                     entryFileNames: 'assets/js/[name]-[hash].js',
