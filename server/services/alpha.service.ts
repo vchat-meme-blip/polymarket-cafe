@@ -4,9 +4,10 @@ import { polymarketService } from '../services/polymarket.service.js';
 import { firecrawlService } from './firecrawl.service.js';
 import { apiKeyProvider } from './apiKey.provider.js';
 import OpenAI from 'openai';
+import { usersCollection } from '../db.js';
 
 class AlphaService {
-  public async discoverAndAnalyzeMarkets(agent: Agent): Promise<Partial<BettingIntel> | null> {
+  public async discoverAndAnalyzeMarkets(agent: Agent): Promise<BettingIntel | null> {
     const { markets: trendingMarkets } = await polymarketService.getLiveMarkets(10);
     if (trendingMarkets.length === 0) {
         console.log(`[AlphaService] No trending markets found for ${agent.name} to analyze.`);
@@ -23,13 +24,25 @@ class AlphaService {
         return null;
     }
 
-    const newIntel: Partial<BettingIntel> = {
+    let sellerWalletAddress = '';
+    if (agent.ownerHandle) {
+        const owner = await usersCollection.findOne({ handle: agent.ownerHandle });
+        sellerWalletAddress = owner?.receivingWalletAddress || owner?.solanaWalletAddress || '';
+    }
+
+    const isTradable = Math.random() > 0.5;
+
+    const newIntel: BettingIntel = {
+      id: '', // placeholder, will be overwritten
       ownerAgentId: agent.id,
       market: market.title,
       content: researchResult.summary,
       sourceUrls: researchResult.sources.map(s => s.url),
       sourceDescription: 'Autonomous Web Research',
-      isTradable: Math.random() > 0.5,
+      isTradable: isTradable,
+      price: isTradable ? Math.floor(Math.random() * 91) + 10 : 0, // Price from 10 to 100
+      sellerWalletAddress: sellerWalletAddress,
+      network: 'Solana', // Default network
       createdAt: Date.now(),
       pnlGenerated: { amount: 0, currency: 'USD' },
       ownerHandle: agent.ownerHandle,

@@ -1,6 +1,7 @@
 
 
 
+
 import { agentsCollection, usersCollection, betsCollection, bettingIntelCollection } from '../db.js';
 import { ObjectId } from 'mongodb';
 import type { Agent, User, ActivityLogEntry, AgentTask, MarketIntel } from '../../lib/types/shared.js';
@@ -202,7 +203,7 @@ export class AutonomyDirector {
 
             const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
             if (newIntel && agent.ownerHandle) {
-                const savedIntel = await this.saveIntel(newIntel as BettingIntel);
+                const savedIntel = await this.saveIntel(newIntel);
                 if (savedIntel) {
                     const successMessage = `Research complete! Discovered new intel on "${savedIntel.market}".`;
                     const notified = await notificationService.logAndSendNotification({
@@ -424,6 +425,7 @@ export class AutonomyDirector {
             rawResearchData: intel.rawResearchData || [],
             pnlGenerated: intel.pnlGenerated || { amount: 0, currency: 'USD' },
             toShared(): BettingIntel {
+// FIX: Add missing properties `price`, `sellerWalletAddress`, and `network` to the returned object to conform to the `BettingIntel` type.
                 return {
                     id: this._id.toHexString(),
                     ownerAgentId: this.ownerAgentId.toHexString(),
@@ -431,6 +433,9 @@ export class AutonomyDirector {
                     content: this.content,
                     sourceDescription: this.sourceDescription,
                     isTradable: this.isTradable,
+                    price: this.price,
+                    sellerWalletAddress: this.sellerWalletAddress,
+                    network: this.network,
                     createdAt: this.createdAt.getTime(),
                     pnlGenerated: this.pnlGenerated,
                     sourceAgentId: this.sourceAgentId?.toHexString(),

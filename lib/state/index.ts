@@ -13,7 +13,6 @@ export * from './wallet.js';
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { ObjectId } from 'mongodb';
 import { PRESET_AGENTS, DEFAULT_VRM_URL, AVAILABLE_VOICES } from '../presets/agents.js';
 import type { BettingIntel, Agent, User, Bet, MarketIntel, Room, AgentMode, NotificationSettings, AgentTask } from '../types/index.js';
 import { apiService } from '../services/api.service.js';

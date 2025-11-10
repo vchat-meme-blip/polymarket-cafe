@@ -37,7 +37,7 @@ export { toSharedUser, toSharedAgent } from './mongodb.js';
 
 // Export document type for MongoDB collections
 export type MongoDocument<T> = T & {
-  _id: string | import('mongodb').ObjectId;
+  _id: string | any;
   toJSON?: () => any;
   toObject?: (options?: any) => any;
 };

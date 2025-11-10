@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb';
+import type { ObjectId } from 'mongodb';
 import type {
   User as SharedUser,
   Agent as SharedAgent,
@@ -11,8 +11,6 @@ import type {
   Transaction as SharedTransaction,
   TradeRecord as SharedTradeRecord
 } from './shared.js';
-
-export type { ObjectId };
 
 // Helper type to convert string IDs to ObjectId in a type
 type WithObjectId<T> = Omit<T, '_id'> & { _id: ObjectId };
