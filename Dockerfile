@@ -4,7 +4,17 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    gcc \
+    python3-dev \
+    py3-pip \
+    alpine-sdk \
+    vips-dev \
+    vips-tools \
+    vips
 
 # Copy package files and install all dependencies
 COPY package*.json ./
@@ -12,7 +22,11 @@ COPY tsconfig*.json ./
 
 # Install dependencies and development tools
 RUN npm install -g typescript@5.3.3 && \
-    npm install --save-dev @types/node@22.14.0 && \
+    npm install --save-dev @types/node@22.14.0
+    
+# Install npm packages with legacy peer deps
+RUN npm config set python /usr/bin/python3 && \
+    npm config set python3 /usr/bin/python3 && \
     npm ci --legacy-peer-deps
 # Copy the rest of the application
 COPY . .
@@ -30,7 +44,13 @@ RUN echo "Building server..." && \
 FROM node:22-alpine
 
 # Install runtime dependencies
-RUN apk add --no-cache libusb udev curl
+RUN apk add --no-cache \
+    libusb \
+    udev \
+    curl \
+    vips-dev \
+    vips-tools \
+    vips
 
 WORKDIR /app
 
@@ -43,7 +63,9 @@ ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
-RUN npm ci --only=production --legacy-peer-deps
+RUN npm config set python /usr/bin/python3 && \
+    npm config set python3 /usr/bin/python3 && \
+    npm ci --only=production --legacy-peer-deps
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
