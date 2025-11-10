@@ -24,11 +24,8 @@ COPY tsconfig*.json ./
 RUN npm install -g typescript@5.3.3 && \
     npm install --save-dev @types/node@22.14.0
     
-# Set Python environment variables for node-gyp
-ENV PYTHON=/usr/bin/python3
-ENV PYTHONPATH=/usr/bin/python3
-# Install npm packages with legacy peer deps
-RUN npm ci --legacy-peer-deps
+# Install npm packages with legacy peer deps and skip optional dependencies
+RUN npm ci --legacy-peer-deps --omit=optional
 # Copy the rest of the application
 COPY . .
 
@@ -46,8 +43,6 @@ FROM node:22-alpine
 
 # Install runtime dependencies
 RUN apk add --no-cache \
-    libusb \
-    udev \
     curl \
     vips-dev \
     vips-tools \
@@ -64,11 +59,8 @@ ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
-# Set Python environment variables for node-gyp
-ENV PYTHON=/usr/bin/python3
-ENV PYTHONPATH=/usr/bin/python3
-# Install production dependencies
-RUN npm ci --only=production --legacy-peer-deps
+# Install production dependencies and skip optional ones
+RUN npm ci --only=production --legacy-peer-deps --omit=optional
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
