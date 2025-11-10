@@ -1,3 +1,4 @@
+
 import type { ObjectId } from 'mongodb';
 import type {
   User as SharedUser,
@@ -146,10 +147,10 @@ export function toSharedAgent(doc: AgentDocument): SharedAgent {
     agent.currentRoomId = doc.currentRoomId.toString();
   }
   
-  // Convert dates to timestamps
-  agent.lastActiveAt = doc.lastActiveAt.getTime();
-  agent.createdAt = doc.createdAt.getTime();
-  agent.updatedAt = doc.updatedAt.getTime();
+  // Convert dates to timestamps, guarding against undefined values
+  agent.lastActiveAt = doc.lastActiveAt ? doc.lastActiveAt.getTime() : Date.now();
+  agent.createdAt = doc.createdAt ? doc.createdAt.getTime() : Date.now();
+  agent.updatedAt = doc.updatedAt ? doc.updatedAt.getTime() : Date.now();
   
   // Initialize arrays that will be populated by the database layer
   agent.bettingHistory = [];
