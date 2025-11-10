@@ -4,17 +4,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    gcc \
-    python3-dev \
-    py3-pip \
-    alpine-sdk \
-    vips-dev \
-    vips-tools \
-    vips
+RUN apk add --no-cache python3 make g++
 
 # Copy package files and install all dependencies
 COPY package*.json ./
@@ -22,25 +12,8 @@ COPY tsconfig*.json ./
 
 # Install dependencies and development tools
 RUN npm install -g typescript@5.3.3 && \
-    npm install --save-dev @types/node@22.14.0
-
-# Create .npmrc with strict settings
-RUN echo "optional=false" > .npmrc && \
-    echo "noproxy=*" >> .npmrc && \
-    echo "prefer-offline=true" >> .npmrc && \
-    echo "package-lock=false" >> .npmrc && \
-    echo "save=false" >> .npmrc && \
-    echo "save-exact=true" >> .npmrc && \
-    echo "engine-strict=true" >> .npmrc && \
-    echo "fund=false" >> .npmrc && \
-    echo "audit=false" >> .npmrc
-
-# Install npm packages with strict flags to prevent usb installation
-RUN npm ci --legacy-peer-deps --no-optional --no-package-lock --no-audit --no-fund && \
-    # Explicitly remove any usb-related packages
-    npm uninstall usb @solana/wallet-adapter-trezor @trezor/connect-web @trezor/connect || true && \
-    # Clean npm cache
-    npm cache clean --force
+    npm install --save-dev @types/node@22.14.0 && \
+    npm ci --legacy-peer-deps
 # Copy the rest of the application
 COPY . .
 
@@ -57,11 +30,7 @@ RUN echo "Building server..." && \
 FROM node:22-alpine
 
 # Install runtime dependencies
-RUN apk add --no-cache \
-    curl \
-    vips-dev \
-    vips-tools \
-    vips
+RUN apk add --no-cache libusb udev curl
 
 WORKDIR /app
 
@@ -74,15 +43,7 @@ ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
-# Copy .npmrc from builder stage
-COPY --from=builder /app/.npmrc .
-
-# Install production dependencies with strict flags
-RUN npm ci --only=production --legacy-peer-deps --no-optional --no-package-lock --no-audit --no-fund && \
-    # Explicitly remove any usb-related packages
-    npm uninstall usb @solana/wallet-adapter-trezor @trezor/connect-web @trezor/connect || true && \
-    # Clean npm cache
-    npm cache clean --force
+RUN npm ci --only=production --legacy-peer-deps
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client

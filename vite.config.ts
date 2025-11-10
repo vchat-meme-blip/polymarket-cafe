@@ -4,7 +4,6 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'path';
-import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,12 +30,6 @@ export default defineConfig(({ mode }) => {
                         ['@babel/plugin-transform-react-jsx', { runtime: 'automatic' }]
                     ]
                 }
-            }),
-            nodePolyfills({
-                // To exclude specific polyfills, add them to this list
-                exclude: [],
-                // Whether to polyfill `node:` protocol imports
-                protocolImports: true,
             })
         ],
         define: {
@@ -80,18 +73,19 @@ export default defineConfig(({ mode }) => {
             // Don't inline any files, keep them as separate files
             assetsInlineLimit: 0,
             rollupOptions: {
+                external: [
+                    '@solana/wallet-adapter-base',
+                    '@solana/wallet-adapter-react',
+                    '@solana/wallet-adapter-react-ui',
+                    '@solana/wallet-adapter-phantom',
+                    '@solana/wallet-adapter-solflare',
+                    '@solana/web3.js',
+                    '@solana/spl-token',
+                ],
                 output: {
                     manualChunks: {
-                        vendor: [
-                            'react', 
-                            'react-dom', 
-                            'three',
-                            '@solana/web3.js',
-                            '@solana/wallet-adapter-react',
-                            '@solana/wallet-adapter-react-ui',
-                            '@solana/wallet-adapter-base',
-                            '@solana/wallet-adapter-wallets'
-                        ]
+                        vendor: ['react', 'react-dom', 'three']
+                        // Add other large dependencies here
                     },
                     // Ensure consistent chunk names
                     chunkFileNames: 'assets/js/[name]-[hash].js',
@@ -140,34 +134,7 @@ export default defineConfig(({ mode }) => {
             alias: {
                 '@': path.resolve(__dirname, './src'),
                 mongoose: 'mongoose',
-                // Add any other aliases here
             }
-        },
-        // Handle Node.js built-ins
-        define: {
-            'process.env': {},
-            'process.browser': true,
-            global: 'window'
-        },
-        // Optimize dependencies
-        optimizeDeps: {
-            esbuildOptions: {
-                // Node.js global to browser globalThis
-                define: {
-                    global: 'globalThis'
-                },
-                // Enable esbuild polyfill plugins
-                plugins: []
-            },
-            include: [
-                '@solana/web3.js',
-                '@solana/wallet-adapter-react',
-                '@solana/wallet-adapter-react-ui',
-                '@solana/wallet-adapter-base',
-                '@solana/wallet-adapter-wallets',
-                'buffer',
-                'process/browser'
-            ]
         },
     };
 });
