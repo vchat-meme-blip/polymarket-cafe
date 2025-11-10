@@ -23,9 +23,14 @@ COPY tsconfig*.json ./
 # Install dependencies and development tools
 RUN npm install -g typescript@5.3.3 && \
     npm install --save-dev @types/node@22.14.0
-    
+
+# Copy .npmrc to prevent optional dependencies
+COPY .npmrc .
+
 # Install npm packages with legacy peer deps and skip optional dependencies
-RUN npm ci --legacy-peer-deps --omit=optional
+RUN npm ci --legacy-peer-deps --omit=optional && \
+    # Remove Trezor wallet adapter to avoid USB dependencies
+    npm uninstall @solana/wallet-adapter-trezor @trezor/connect-web @trezor/connect
 # Copy the rest of the application
 COPY . .
 
@@ -59,8 +64,13 @@ ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
+# Copy .npmrc to prevent optional dependencies
+COPY .npmrc .
+
 # Install production dependencies and skip optional ones
-RUN npm ci --only=production --legacy-peer-deps --omit=optional
+RUN npm ci --only=production --legacy-peer-deps --omit=optional && \
+    # Remove Trezor wallet adapter to avoid USB dependencies
+    npm uninstall @solana/wallet-adapter-trezor @trezor/connect-web @trezor/connect
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
