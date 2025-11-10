@@ -24,10 +24,11 @@ COPY tsconfig*.json ./
 RUN npm install -g typescript@5.3.3 && \
     npm install --save-dev @types/node@22.14.0
     
+# Set Python environment variables for node-gyp
+ENV PYTHON=/usr/bin/python3
+ENV PYTHONPATH=/usr/bin/python3
 # Install npm packages with legacy peer deps
-RUN npm config set python /usr/bin/python3 && \
-    npm config set python3 /usr/bin/python3 && \
-    npm ci --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 # Copy the rest of the application
 COPY . .
 
@@ -63,9 +64,11 @@ ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
-RUN npm config set python /usr/bin/python3 && \
-    npm config set python3 /usr/bin/python3 && \
-    npm ci --only=production --legacy-peer-deps
+# Set Python environment variables for node-gyp
+ENV PYTHON=/usr/bin/python3
+ENV PYTHONPATH=/usr/bin/python3
+# Install production dependencies
+RUN npm ci --only=production --legacy-peer-deps
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
