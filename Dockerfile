@@ -52,8 +52,11 @@ RUN if [ -d "/app/dist/server/server" ]; then \
 # Set the entry point to use server.js which is the compiled version of server.ts
 CMD ["node", "dist/server/server.js"]
 
-# Health check
+# Set default port if not specified
+ENV PORT=${PORT:-3000}
+
+# Health check with the correct port
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/api/health || exit 1
+    CMD curl -f http://localhost:${PORT:-3000}/api/health || exit 1
 
 EXPOSE ${PORT}
