@@ -48,8 +48,9 @@ RUN npm ci --only=production --legacy-peer-deps
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
 
-# Copy built files from builder
-COPY --from=builder /app/dist/server/ /app/dist/server/
+# Copy built files from builder with correct directory structure
+RUN mkdir -p /app/dist/server/server
+COPY --from=builder /app/dist/server/ /app/dist/server/server/
 
 # Copy and rename worker files from .js to .mjs
 RUN echo "Copying and renaming worker files..." && \

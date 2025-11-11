@@ -16,7 +16,7 @@
     "build": "npm run clean && npm run build:client && npm run build:server",
     "build:client": "vite build",
     "build:server": "tsc -p tsconfig.server.json && npm run postbuild:server",
-    "postbuild:server": "node scripts/fix-imports.js && node scripts/copy-files.js",
+    "postbuild:server": "node --experimental-json-modules --no-warnings scripts/fix-imports.js && npx tsx scripts/copy-server-files.ts",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx --fix",
@@ -24,7 +24,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "start": "node dist/server/index.js"
+    "start": "node dist/server/server/index.js"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.16.0",
