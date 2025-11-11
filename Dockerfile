@@ -214,5 +214,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose the port your application will run on
 EXPOSE ${PORT}
 
-# Start the application using the TypeScript startup file
-CMD ["node", "--loader", "ts-node/esm", "--no-warnings", "/app/server/startup.ts"]
+# Start the application using the compiled server file
+CMD ["node", "/app/dist/server/server/index.js"]
