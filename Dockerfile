@@ -1,19 +1,20 @@
 # ---- Build Stage ----
-FROM node:22-alpine AS builder
+FROM node:18.20.2-alpine AS builder
 
 WORKDIR /app
 
 # Install build dependencies (no python3 needed as we're skipping USB module)
-RUN apk add --no-cache make g++
+RUN apk add --no-cache libc6-compat python3 make g++ gcc
 
 # Copy package files and install all dependencies
 COPY package*.json ./
 COPY tsconfig*.json ./
 
 # Install dependencies and development tools
-RUN npm install -g typescript@5.3.3 && \
-    npm install --save-dev @types/node@22.14.0 && \
-    npm ci --legacy-peer-deps
+RUN npm install -g npm@latest && \
+    npm install -g typescript@5.3.3 && \
+    npm install --no-package-lock --no-save @types/node@22.14.0 && \
+    npm ci --legacy-peer-deps --omit=optional
 # Copy the rest of the application
 COPY . .
 
@@ -27,9 +28,12 @@ RUN echo "Building server..." && \
     npm run postbuild:server
 
 # ---- Production Stage ----
-FROM node:22-alpine
+FROM node:18.20.2-alpine
 
-# Install runtime dependencies (removed libusb and udev as we're not using hardware wallets)
+WORKDIR /app
+
+# Install runtime dependencies and build tools
+RUN apk add --no-cache libc6-compat python3 make g++ gcc
 RUN apk add --no-cache curl
 
 WORKDIR /app
@@ -50,22 +54,24 @@ COPY src/wallets/phantom-fallback.js src/wallets/
 # Set environment variables to skip optional dependencies and native builds
 ENV NODE_OPTIONS=--openssl-legacy-provider
 
-# Install production dependencies, excluding optional and native modules
+# Install build dependencies first
 RUN npm config set fund false && \
     npm config set audit false && \
-    # Remove package-lock.json to avoid conflicts with package.json
+    npm config set update-notifier false && \
+    # Clean npm cache and remove lock files
     rm -f package-lock.json && \
-    # Clean npm cache
     npm cache clean --force && \
-    # Install with explicit production-only flag and omit optional deps
-    npm install --omit=optional --only=production --legacy-peer-deps && \
-    # Remove any usb or native modules that might have been installed
+    # Install only production deps first (no dev deps)
+    npm install --omit=dev --omit=optional --legacy-peer-deps && \
+    # Clean up any problematic modules
     rm -rf node_modules/usb \
            node_modules/@ledgerhq/hw-transport-node-hid \
            node_modules/@ledgerhq/hw-transport-node-hid-singleton \
            node_modules/@solana/wallet-adapter-ledger \
            node_modules/.cache \
-           ~/.npm/_cacache
+           ~/.npm/_cacache && \
+    # Install TypeScript and Node types as dev deps
+    npm install --no-save typescript@5.3.3 @types/node@22.14.0
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
