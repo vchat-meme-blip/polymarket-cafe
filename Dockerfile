@@ -388,4 +388,4 @@ EOF
 WORKDIR /app
 
 # Start the application with node flags for better error handling
-CMD ["node", "--trace-warnings", "--unhandled-rejections=strict", "dist/server/index.js"]
+CMD ["node", "--es-module-specifier-resolution=node", "--experimental-specifier-resolution=node", "dist/server/index.js"]
