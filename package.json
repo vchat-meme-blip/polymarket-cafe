@@ -3,6 +3,11 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "browser": {
+    "usb": false,
+    "@ledgerhq/hw-transport-node-hid": false,
+    "@ledgerhq/hw-transport-node-hid-singleton": false
+  },
   "exports": "./dist/server/server/index.js",
   "main": "./dist/server/server/index.js",
   "types": "./dist/server/server/index.d.ts",
@@ -35,7 +40,7 @@
     "@react-three/fiber": "^8.16.8",
     "@react-three/postprocessing": "^2.6.0",
     "@solana/spl-token": "^0.4.14",
-    "@solana/wallet-adapter-base": "^0.9.27",
+    "@solana/wallet-adapter-base": "^0.9.28",
     "@solana/wallet-adapter-phantom": "^0.9.28",
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",
