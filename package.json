@@ -6,7 +6,13 @@
   "browser": {
     "usb": false,
     "@ledgerhq/hw-transport-node-hid": false,
-    "@ledgerhq/hw-transport-node-hid-singleton": false
+    "@ledgerhq/hw-transport-node-hid-singleton": false,
+    "@solana/wallet-adapter-ledger": false,
+    "@solana/wallet-adapter-solflare": "./src/wallets/solflare-fallback.js"
+  },
+  "optionalDependencies": {
+    "usb": "*",
+    "@ledgerhq/hw-transport-node-hid": "*"
   },
   "exports": "./dist/server/server/index.js",
   "main": "./dist/server/server/index.js",

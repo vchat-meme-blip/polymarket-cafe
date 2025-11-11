@@ -41,10 +41,27 @@ ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
 ENV DOCKER_ENV=true
 ENV NODE_ENV=production
 
-# Copy package files and install only production dependencies
+# Copy package files and fallbacks
 COPY package*.json ./
-# Skip optional dependencies and force clean install
-RUN npm ci --omit=optional --only=production --legacy-peer-deps --force
+RUN mkdir -p src/wallets
+COPY src/wallets/solflare-fallback.js src/wallets/
+
+# Set environment variables to skip optional dependencies and native builds
+ENV NPM_CONFIG_OPTIONAL=false
+ENV NPM_CONFIG_OMIT=optional
+ENV NPM_CONFIG_NO_OPTIONAL=1
+ENV NODE_OPTIONS=--openssl-legacy-provider
+
+# Install production dependencies, excluding optional and native modules
+RUN npm config set optional false && \
+    npm config set fund false && \
+    npm config set audit false && \
+    npm ci --only=production --legacy-peer-deps --omit=optional && \
+    # Remove any usb or native modules that might have been installed
+    rm -rf node_modules/usb \
+           node_modules/@ledgerhq/hw-transport-node-hid \
+           node_modules/@ledgerhq/hw-transport-node-hid-singleton \
+           node_modules/@solana/wallet-adapter-ledger
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
