@@ -49,8 +49,16 @@ RUN if [ -d "/app/dist/server/server" ]; then \
       rmdir /app/dist/server/server 2>/dev/null || true; \
     fi
 
+# Copy server files with correct directory structure
+RUN if [ -d "/app/dist/server/server" ]; then \
+      # Move files from nested server directory to the parent directory
+      mv /app/dist/server/server/* /app/dist/server/ 2>/dev/null || true; \
+      # Remove the now empty server directory
+      rmdir /app/dist/server/server 2>/dev/null || true; \
+    fi
+
 # Set the entry point to use the correct path to server.js
-CMD ["node", "/app/dist/server/server.js"]
+CMD ["node", "/app/dist/server/index.js"]
 
 # Set default port if not specified
 ENV PORT=${PORT:-3000}
