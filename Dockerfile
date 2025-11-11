@@ -214,5 +214,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose the port your application will run on
 EXPOSE ${PORT}
 
-# Start the application using the startup script
-CMD ["node", "--no-warnings", "--experimental-json-modules", "--loader", "ts-node/esm", "/app/server/startup.ts"]
+# Ensure TypeScript files are compiled
+RUN npm run build:server
+
+# Start the application using the compiled server file
+CMD ["node", "--no-warnings", "/app/dist/server/server/index.js"]
