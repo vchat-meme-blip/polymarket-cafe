@@ -52,8 +52,8 @@ RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs
 # Copy built files from builder
 COPY --from=builder /app/dist/ /app/dist/
 
-# Ensure the server directory exists
-RUN mkdir -p /app/dist/server
+# Ensure the server directory structure exists
+RUN mkdir -p /app/dist/server/server/workers
 
 # Copy and rename worker files from .js to .mjs
 RUN echo "Copying and renaming worker files..." && \
@@ -117,18 +117,26 @@ COPY --from=builder /app/server/env.ts ./dist/server/
 # Verify the build output, surface entry point, and persist it for runtime
 RUN set -e; \
     echo "Verifying build..."; \
+    echo "Checking for server entry points..."; \
+    # Debug: Show the directory structure
+    echo "Directory structure of /app/dist:"; \
+    find /app/dist -type d | sort; \
+    echo "\nPotential server entry points:"; \
+    find /app/dist -name "index.js" -o -name "index.mjs" | sort; \
+    # Check for entry points in the correct location first
     if [ -f "/app/dist/server/server/index.mjs" ]; then \
         ENTRYPOINT="/app/dist/server/server/index.mjs"; \
     elif [ -f "/app/dist/server/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/server/index.js"; \
+    # Fallback to other possible locations
     elif [ -f "/app/dist/server/index.mjs" ]; then \
         ENTRYPOINT="/app/dist/server/index.mjs"; \
     elif [ -f "/app/dist/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/index.js"; \
     else \
-        echo "Error: No entry point found in /app/dist/server"; \
+        echo "Error: No entry point found in expected locations"; \
         echo "Build output in /app/dist:"; \
-        find /app/dist -type f; \
+        find /app/dist -type f | sort; \
         exit 1; \
     fi; \
     echo "Found entry point at $ENTRYPOINT"; \
