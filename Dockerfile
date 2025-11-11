@@ -56,24 +56,41 @@ COPY --from=builder /app/dist/ /app/dist/
 RUN mkdir -p /app/dist/server/server/workers
 
 # Ensure the server entry point is in the correct location
-RUN if [ -f "/app/dist/server/server/index.js" ] && [ ! -f "/app/dist/server/index.js" ]; then \
-      echo "Copying server entry point to expected location"; \
-      cp /app/dist/server/server/index.js /app/dist/server/index.js; \
+RUN echo "Checking server entry point..." && \
+    if [ -f "/app/dist/server/server/index.js" ]; then \
+      echo "Found server entry point at /app/dist/server/server/index.js"; \
+      if [ ! -f "/app/dist/server/index.js" ]; then \
+        echo "Copying server entry point to /app/dist/server/index.js"; \
+        cp /app/dist/server/server/index.js /app/dist/server/index.js; \
+      else \
+        echo "Server entry point already exists at /app/dist/server/index.js"; \
+      fi; \
+    else \
+      echo "Warning: Server entry point not found at /app/dist/server/server/index.js"; \
+      echo "Contents of /app/dist/server/server/:"; \
+      ls -la /app/dist/server/server/ 2>/dev/null || echo "No server directory found"; \
     fi
 
 # Copy and rename worker files from .js to .mjs
-RUN echo "Copying and renaming worker files..." && \
+RUN echo "\n=== Processing worker files ===" && \
     mkdir -p /app/dist/server/workers && \
-    # First, copy all worker files to the target directory with .mjs extension
-    find /app/dist -name "*.worker.js" | while read file; do \
+    echo "Searching for worker files..." && \
+    WORKER_FILES=$(find /app/dist -name "*.worker.js" | wc -l) && \
+    if [ "$WORKER_FILES" -gt 0 ]; then \
+      echo "Found $WORKER_FILES worker file(s)"; \
+      find /app/dist -name "*.worker.js" | while read -r file; do \
         if [ -f "$file" ]; then \
-            cp "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
-            echo "Copied $file to /app/dist/server/workers/$(basename "$file" .js).mjs"; \
+          echo "Processing $file"; \
+          cp -v "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
         fi; \
-    done && \
-    # Verify the files were copied with .mjs extension
-    echo "Worker files in /app/dist/server/workers/:" && \
-    ls -la /app/dist/server/workers/ 2>/dev/null || echo "No worker files found"
+      done; \
+      echo "\nWorker files in /app/dist/server/workers/:"; \
+      ls -la /app/dist/server/workers/ 2>/dev/null || echo "No worker files found"; \
+    else \
+      echo "No worker files found in /app/dist"; \
+      echo "Contents of /app/dist:"; \
+      find /app/dist -type f | sort; \
+    fi
 
 # Copy client files
 # Client files are already in /app/dist from the previous copy
