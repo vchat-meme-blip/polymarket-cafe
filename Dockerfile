@@ -29,8 +29,15 @@ RUN echo "Building server..." && \
 # ---- Production Stage ----
 FROM node:22-alpine
 
-# Install runtime dependencies
-RUN apk add --no-cache libusb udev curl
+# Install runtime dependencies and build tools (including Python for native modules)
+RUN apk add --no-cache --virtual .gyp \
+    python3 \
+    make \
+    g++ \
+    libusb \
+    udev \
+    curl \
+    && ln -sf python3 /usr/bin/python
 
 WORKDIR /app
 
@@ -43,7 +50,9 @@ ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
-RUN npm ci --only=production --legacy-peer-deps
+RUN npm ci --only=production --legacy-peer-deps && \
+    # Remove build tools after installation
+    apk del .gyp
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
