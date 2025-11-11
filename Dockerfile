@@ -91,18 +91,15 @@ COPY --from=builder /app/dist/ /app/dist/client/
 RUN echo "Setting up worker files..." && \
     # Create worker directories if they don't exist
     mkdir -p /app/dist/workers /app/dist/server/workers && \
-    \
-    # Copy worker files from server/server/workers to both locations
     if [ -d "/app/dist/server/server/workers" ]; then \
         echo "Copying worker files from /app/dist/server/server/workers/..."; \
         find /app/dist/server/server/workers -name "*.worker.js" -o -name "*.worker.mjs" | while read -r file; do \
             if [ -f "$file" ]; then \
-                # Copy to both locations for compatibility
                 cp -v "$file" "/app/dist/workers/$(basename "$file" .js).mjs"; \
                 cp -v "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
             fi; \
+        done; \
     fi && \
-    # Debug: List the worker files that were copied
     echo "Worker files in /app/dist/workers/:" && \
     ls -la /app/dist/workers/ 2>/dev/null || echo "No worker files in /app/dist/workers" && \
     echo "Worker files in /app/dist/server/workers/:" && \
@@ -142,6 +139,18 @@ COPY --from=builder /app/ecosystem.config.* ./
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.env* ./
 
+# Copy built files
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/server/env.ts ./dist/server/
+
+# Verify build output structure
+RUN echo "Build output structure:" && \
+    echo "Contents of /app/dist:" && ls -la /app/dist/ && \
+    echo "Contents of /app/dist/server:" && ls -la /app/dist/server/ 2>/dev/null || echo "No server directory found" && \
+    echo "Contents of /app/dist/server/server:" && ls -la /app/dist/server/server/ 2>/dev/null || echo "No server/server directory found"
+
 # Create symlinks for backward compatibility (using .mjs extension)
 RUN if [ -d "/app/dist/server/server/workers" ]; then \
         # Create .js symlinks for all .mjs worker files
@@ -179,23 +188,21 @@ RUN set -e; \
     # Create a proper ES module entry point that imports the server
     echo "Creating server entry point..."; \
     mkdir -p /app/dist/server; \
-    # Try to find the correct path to startup.js
-    if [ -f "/app/dist/server/server/startup.js" ]; then \
-        echo 'import { startServer } from "./server/startup.js";' > /app/dist/server/index.js; \
-    else \
-        echo 'import { startServer } from "./startup.js";' > /app/dist/server/index.js; \
-    fi; \
-    echo '' >> /app/dist/server/index.js; \
-    echo 'console.log("Starting server...");' >> /app/dist/server/index.js; \
-    echo 'console.log("Current directory:", process.cwd());' >> /app/dist/server/index.js; \
-    echo 'console.log("__dirname:", __dirname);' >> /app/dist/server/index.js; \
-    echo 'console.log("__filename:", __filename);' >> /app/dist/server/index.js; \
-    echo 'console.log("Startup module path:", require.resolve("./startup.js"));' >> /app/dist/server/index.js; \
+    # Create the entry point with the correct path to startup.js
+    echo 'import { startServer } from "./server/startup.js";' > /app/dist/server/index.js; \
+    echo 'console.log("Starting server from", __filename);' >> /app/dist/server/index.js; \
     echo 'startServer().catch(err => {' >> /app/dist/server/index.js; \
     echo '  console.error("Failed to start server:", err);' >> /app/dist/server/index.js; \
     echo '  process.exit(1);' >> /app/dist/server/index.js; \
     echo '});' >> /app/dist/server/index.js; \
     chmod +x /app/dist/server/index.js; \
+    echo "Entry point created at /app/dist/server/index.js"; \
+    echo "Contents of /app/dist/server:"; \
+    ls -la /app/dist/server/; \
+    if [ -d "/app/dist/server/server" ]; then \
+        echo "Contents of /app/dist/server/server:"; \
+        ls -la /app/dist/server/server/; \
+    fi; \
     \
     # Look for entry points in common locations
     for path in \
@@ -312,5 +319,8 @@ log "🚀 Starting application..."
 exec node --no-warnings "$ENTRYPOINT_PATH"
 EOF
 
-# Start the application
-CMD ["/app/startup.sh"]
+# Set working directory to /app for consistent paths
+WORKDIR /app
+
+# Start the application with node flags for better error handling
+CMD ["node", "--trace-warnings", "--unhandled-rejections=strict", "dist/server/index.js"]
