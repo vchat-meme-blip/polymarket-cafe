@@ -4,7 +4,10 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache make python3 g++
+RUN apk add --no-cache make python3 g++ && \
+    # Install esbuild for the correct platform
+    npm install -g esbuild@0.19.2 && \
+    npm install --save-dev @esbuild/linux-x64@0.19.2
 
 # Copy package files and install all dependencies
 COPY package*.json ./
@@ -16,8 +19,13 @@ RUN rm -rf node_modules package-lock.json
 # Install dependencies and development tools
 RUN npm install -g typescript@5.3.3 && \
     npm install --save-dev @types/node@22.14.0 && \
-    # Install Rollup explicitly to avoid platform-specific issues
+    # Install Vite and related dependencies
+    npm install --save-dev vite@4.5.0 @vitejs/plugin-react@4.0.4 && \
+    # Install Rollup explicitly
     npm install --save-dev rollup@3.29.4 @rollup/rollup-linux-x64-musl && \
+    # Install esbuild for the correct platform
+    npm install --save-dev esbuild@0.19.2 @esbuild/linux-x64@0.19.2 && \
+    # Install remaining dependencies
     npm install --legacy-peer-deps --omit=optional
 
 # Copy the rest of the application
@@ -47,10 +55,13 @@ ENV DOCKER_ENV=true
 # Copy package files and install only production dependencies
 COPY package*.json ./
 
-# Clean up and install production dependencies
-RUN rm -rf node_modules package-lock.json && \
+# Install production dependencies including esbuild
+RUN apk add --no-cache python3 g++ && \
+    npm install -g esbuild@0.19.2 && \
+    npm install --save-dev @esbuild/linux-x64@0.19.2 && \
+    # Install production dependencies
     npm install --only=production --legacy-peer-deps --omit=optional && \
-    # Clean up any remaining development files
+    # Clean up
     rm -rf /root/.npm /tmp/*
 
 # Create necessary directories
