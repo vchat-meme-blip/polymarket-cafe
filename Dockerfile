@@ -63,10 +63,14 @@ WORKDIR /app
 
 # Set production environment
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-ENV VITE_SOCKET_URL=${VITE_SOCKET_URL}
+ENV VITE_SOCKET_URL=ws://0.0.0.0:3001
 ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
 ENV DOCKER_ENV=true
 ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=3001
+ENV WS_HOST=0.0.0.0
+ENV WS_PORT=3001
 
 # Create necessary directories first
 RUN mkdir -p /app/dist/server /app/dist/client /app/dist/workers /app/logs /app/dist/client/assets
@@ -168,7 +172,12 @@ RUN set -e; \
     # Create a proper ES module entry point that imports the server
     echo "Creating server entry point..."; \
     mkdir -p /app/dist/server; \
-    echo 'import { startServer } from "./server/startup.js";\n    startServer().catch(err => {\n      console.error("Failed to start server:", err);\n      process.exit(1);\n    });' > /app/dist/server/index.js && \
+    echo 'import { startServer } from "./server/startup.js";' > /app/dist/server/index.js; \
+    echo '' >> /app/dist/server/index.js; \
+    echo 'startServer().catch(err => {' >> /app/dist/server/index.js; \
+    echo '  console.error("Failed to start server:", err);' >> /app/dist/server/index.js; \
+    echo '  process.exit(1);' >> /app/dist/server/index.js; \
+    echo '});' >> /app/dist/server/index.js; \
     chmod +x /app/dist/server/index.js; \
     \
     # Look for entry points in common locations

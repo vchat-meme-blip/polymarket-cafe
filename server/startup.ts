@@ -163,9 +163,13 @@ export async function startServer() {
   });
 
   const PORT = process.env.PORT || 3001;
+  const HOST = process.env.HOST || '0.0.0.0';
+  
   webSocketService.init(server);
-  server.listen(PORT, () => {
-    console.log(`[Server] HTTP and WebSocket server running on http://localhost:${PORT}`);
+  server.listen(Number(PORT), HOST, () => {
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    console.log(`[Server] HTTP and WebSocket server running on ${protocol}://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+    console.log(`[Server] WebSocket URL: ws://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/socket.io/`);
   });
   
   const stop = async () => {
