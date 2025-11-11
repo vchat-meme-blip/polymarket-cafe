@@ -4,7 +4,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache make
+RUN apk add --no-cache make python3 g++
 
 # Copy package files and install all dependencies
 COPY package*.json ./
@@ -16,10 +16,10 @@ RUN rm -rf node_modules package-lock.json
 # Install dependencies and development tools
 RUN npm install -g typescript@5.3.3 && \
     npm install --save-dev @types/node@22.14.0 && \
-    npm install --legacy-peer-deps --omit=optional && \
-    # Ensure no Trezor or USB packages are installed
-    (npm ls @trezor || echo "No Trezor packages found") && \
-    (npm ls usb || echo "No USB package found")
+    # Install Rollup explicitly to avoid platform-specific issues
+    npm install --save-dev rollup@3.29.4 @rollup/rollup-linux-x64-musl && \
+    npm install --legacy-peer-deps --omit=optional
+
 # Copy the rest of the application
 COPY . .
 
@@ -35,25 +35,23 @@ RUN echo "Building server..." && \
 # ---- Production Stage ----
 FROM node:22-alpine
 
-# Install runtime dependencies
-RUN apk add --no-cache curl
-
 WORKDIR /app
 
 # Set production environment
+ENV NODE_ENV=production
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ENV VITE_SOCKET_URL=${VITE_SOCKET_URL}
 ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
 ENV DOCKER_ENV=true
-ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
+
+# Clean up and install production dependencies
 RUN rm -rf node_modules package-lock.json && \
     npm install --only=production --legacy-peer-deps --omit=optional && \
-    # Verify no Trezor or USB packages are installed in production
-    (npm ls @trezor || echo "No Trezor packages found") && \
-    (npm ls usb || echo "No USB package found")
+    # Clean up any remaining development files
+    rm -rf /root/.npm /tmp/*
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
@@ -64,14 +62,13 @@ COPY --from=builder /app/dist/server/ /app/dist/server/
 # Copy and rename worker files from .js to .mjs
 RUN echo "Copying and renaming worker files..." && \
     mkdir -p /app/dist/server/server/workers && \
-    # First, copy all worker files to the target directory with .mjs extension
-    find /app/dist -name "*.worker.js" | while read file; do \
-        if [ -f "$file" ]; then \
-            cp "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
-            echo "Copied $file to /app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
-        fi; \
-    done && \
-    # Verify the files were copied with .mjs extension
+    # Rename .js to .mjs in the server directory
+    find /app/dist/server -name "*.js" -exec sh -c 'mv "$1" "${1%.js}.mjs"' _ {} \; && \
+    # Copy worker files to the workers directory with .mjs extension
+    if [ -d "/app/dist/server" ]; then \
+        find /app/dist/server -name "*.worker.js" -exec sh -c 'cp "$1" "/app/dist/server/server/workers/$(basename "$1" .js).mjs"' _ {} \; ; \
+    fi && \
+    # List worker files for verification
     echo "Worker files in /app/dist/server/server/workers/:" && \
     ls -la /app/dist/server/server/workers/ 2>/dev/null || echo "No worker files found"
 
