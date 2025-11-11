@@ -23,14 +23,42 @@ import '@react-three/fiber';
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-
+import { StrictMode } from 'react';
+import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
+import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
+import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
+import { clusterApiUrl } from '@solana/web3.js';
 import App from './App';
+import WalletContextProvider from './components/providers/WalletContext';
+
+// Default to devnet if not specified
+const network = WalletAdapterNetwork.Devnet;
+const endpoint = process.env.VITE_SOLANA_RPC || clusterApiUrl(network);
+
+// Initialize browser wallet adapters
+const wallets = [
+  new PhantomWalletAdapter(),
+  new SolflareWalletAdapter()
+];
+
+// Import wallet modal styles
+import '@solana/wallet-adapter-react-ui/styles.css';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
+
 root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
+  <StrictMode>
+    <ConnectionProvider endpoint={endpoint}>
+      <WalletProvider wallets={wallets} autoConnect>
+        <WalletModalProvider>
+          <WalletContextProvider>
+            <App />
+          </WalletContextProvider>
+        </WalletModalProvider>
+      </WalletProvider>
+    </ConnectionProvider>
+  </StrictMode>
 );

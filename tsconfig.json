@@ -6,7 +6,15 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "skipLibCheck": true,
-    "types": ["node", "@types/node", "vite/client"],
+    "types": [
+      "node", 
+      "@types/node", 
+      "vite/client",
+      "@solana/wallet-adapter-base",
+      "@solana/wallet-adapter-react",
+      "@solana/wallet-adapter-react-ui",
+      "@solana/wallet-adapter-wallets"
+    ],
     "moduleResolution": "bundler",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -16,8 +24,20 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./node_modules/@solana"
+    ]
   },
-  "include": ["**/*.ts", "**/*.tsx", "vite.config.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "**/*.ts", 
+    "**/*.tsx", 
+    "vite.config.ts",
+    "node_modules/@solana/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
