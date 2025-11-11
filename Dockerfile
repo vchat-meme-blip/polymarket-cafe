@@ -4,40 +4,22 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache make && \
-    # Install esbuild for the correct platform
-    npm install --no-optional --prefer-offline --no-audit --progress=false esbuild@0.19.2
+RUN apk add --no-cache python3 make g++
 
 # Copy package files and install all dependencies
 COPY package*.json ./
 COPY tsconfig*.json ./
 
-# Clean up any existing node_modules and lock files
-RUN rm -rf node_modules package-lock.json
-
 # Install dependencies and development tools
 RUN npm install -g typescript@5.3.3 && \
-    # Install exact versions to avoid compatibility issues
-    npm install --no-optional --prefer-offline --no-audit --progress=false \
-        @types/node@22.14.0 \
-        vite@5.0.12 \
-        @vitejs/plugin-react@4.2.1 \
-        rollup@4.9.6 \
-        esbuild@0.20.1 && \
-    # Clean npm cache
-    npm cache clean --force && \
-    # Install remaining dependencies with legacy peer deps
-    npm install --legacy-peer-deps --omit=optional --no-audit --prefer-offline --no-fund
-
+    npm install --save-dev @types/node@22.14.0 && \
+    npm ci --legacy-peer-deps
 # Copy the rest of the application
 COPY . .
 
 # Build the application
 RUN echo "Building client..." && \
-    # Clear any existing build artifacts
-    rm -rf node_modules/.vite && \
-    # Run Vite build with debug information
-    NODE_OPTIONS=--max-old-space-size=4096 npm run build:client -- --debug
+    npm run build:client
 
 # Build server separately to handle any specific requirements
 RUN echo "Building server..." && \
@@ -47,28 +29,21 @@ RUN echo "Building server..." && \
 # ---- Production Stage ----
 FROM node:22-alpine
 
+# Install runtime dependencies
+RUN apk add --no-cache libusb udev curl
+
 WORKDIR /app
 
 # Set production environment
-ENV NODE_ENV=production
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ENV VITE_SOCKET_URL=${VITE_SOCKET_URL}
 ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
 ENV DOCKER_ENV=true
+ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
-
-# Install production dependencies with specific versions
-RUN npm install --no-optional --prefer-offline --no-audit --progress=false \
-        esbuild@0.20.1 && \
-    # Clean npm cache
-    npm cache clean --force && \
-    # Install production dependencies
-    npm install --only=production --legacy-peer-deps --omit=optional --no-audit --prefer-offline --no-fund && \
-    # Clean up
-    npm cache clean --force && \
-    rm -rf /root/.npm /tmp/*
+RUN npm ci --only=production --legacy-peer-deps
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
@@ -79,13 +54,14 @@ COPY --from=builder /app/dist/server/ /app/dist/server/
 # Copy and rename worker files from .js to .mjs
 RUN echo "Copying and renaming worker files..." && \
     mkdir -p /app/dist/server/server/workers && \
-    # Rename .js to .mjs in the server directory
-    find /app/dist/server -name "*.js" -exec sh -c 'mv "$1" "${1%.js}.mjs"' _ {} \; && \
-    # Copy worker files to the workers directory with .mjs extension
-    if [ -d "/app/dist/server" ]; then \
-        find /app/dist/server -name "*.worker.js" -exec sh -c 'cp "$1" "/app/dist/server/server/workers/$(basename "$1" .js).mjs"' _ {} \; ; \
-    fi && \
-    # List worker files for verification
+    # First, copy all worker files to the target directory with .mjs extension
+    find /app/dist -name "*.worker.js" | while read file; do \
+        if [ -f "$file" ]; then \
+            cp "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+            echo "Copied $file to /app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+        fi; \
+    done && \
+    # Verify the files were copied with .mjs extension
     echo "Worker files in /app/dist/server/server/workers/:" && \
     ls -la /app/dist/server/server/workers/ 2>/dev/null || echo "No worker files found"
 
