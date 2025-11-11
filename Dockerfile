@@ -10,10 +10,16 @@ RUN apk add --no-cache make
 COPY package*.json ./
 COPY tsconfig*.json ./
 
+# Clean up any existing node_modules and lock files
+RUN rm -rf node_modules package-lock.json
+
 # Install dependencies and development tools
 RUN npm install -g typescript@5.3.3 && \
     npm install --save-dev @types/node@22.14.0 && \
-    npm ci --legacy-peer-deps --omit=optional
+    npm install --legacy-peer-deps --omit=optional && \
+    # Ensure no Trezor or USB packages are installed
+    (npm ls @trezor || echo "No Trezor packages found") && \
+    (npm ls usb || echo "No USB package found")
 # Copy the rest of the application
 COPY . .
 
@@ -43,7 +49,11 @@ ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
-RUN npm ci --only=production --legacy-peer-deps --omit=optional
+RUN rm -rf node_modules package-lock.json && \
+    npm install --only=production --legacy-peer-deps --omit=optional && \
+    # Verify no Trezor or USB packages are installed in production
+    (npm ls @trezor || echo "No Trezor packages found") && \
+    (npm ls usb || echo "No USB package found")
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
