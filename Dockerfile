@@ -17,19 +17,29 @@ RUN npm install -g typescript@5.3.3 && \
     npm install --save-dev @types/node@22.14.0 && \
     npm ci --legacy-peer-deps
 
-# Copy the rest of the application
+# Copy all files except node_modules
 COPY . .
 
-# Ensure all TypeScript config files are present
-RUN ls -la tsconfig*.json
+# Verify files were copied correctly
+RUN echo "Current directory: $(pwd)" && \
+    echo "Files in current directory:" && \
+    ls -la && \
+    echo "TypeScript config files:" && \
+    find /app -name "tsconfig*.json" -exec ls -la {} \;
 
 # Build the application
 RUN echo "Building client..." && \
     npm run build:client
 
-# Build server separately to handle any specific requirements
+# Build server with explicit TypeScript config path
 RUN echo "Building server..." && \
-    npm run build:server
+    tsc -p ./tsconfig.server.json && \
+    npm run postbuild:server
+
+# Verify the build output
+RUN echo "Build output verification:" && \
+    ls -la /app/dist/server/server/ 2>/dev/null || echo "No server build output found" && \
+    ls -la /app/dist/server/server/workers/ 2>/dev/null || echo "No worker files found"
 
 # ---- Production Stage ----
 FROM node:22-alpine
@@ -217,5 +227,8 @@ EXPOSE ${PORT}
 # Ensure TypeScript files are compiled
 RUN npm run build:server
 
-# Start the application using the compiled server file
-CMD ["node", "--no-warnings", "/app/dist/server/server/index.js"]
+# Verify the startup script exists
+RUN ls -la /app/dist/server/startup.js || (echo "Startup script not found" && find /app/dist -name "*.js" | grep -v node_modules)
+
+# Start the application using the correct startup script
+CMD ["node", "--no-warnings", "/app/dist/server/startup.js"]
