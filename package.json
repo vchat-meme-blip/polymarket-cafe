@@ -12,7 +12,10 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build",
+    "build:server": "tsc && tsc-alias -p tsconfig.server.json",
+    "postbuild:server": "node scripts/copy-worker-files.js",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx --fix",
