@@ -32,7 +32,18 @@ RUN echo "Cleaning previous builds..." && \
     echo "Building client and server..." && \
     npm run build:client && \
     npm run build:server && \
-    npm run postbuild:server
+    npm run postbuild:server && \
+    # Create expected directory structure
+    mkdir -p /app/dist/client /app/dist/server && \
+    # Move client files to the correct location
+    mv /app/dist/assets /app/dist/client/ && \
+    mv /app/dist/index.html /app/dist/client/ 2>/dev/null || true && \
+    mv /app/dist/*.css /app/dist/client/ 2>/dev/null || true && \
+    mv /app/dist/*.js /app/dist/client/ 2>/dev/null || true && \
+    # Ensure server files are in the right place
+    if [ -d "/app/dist/server" ]; then \
+        mv /app/dist/server/* /app/dist/server/ 2>/dev/null || true; \
+    fi
 
 # Verify the build output
 RUN echo "Build output in /app/dist:" && \
@@ -58,7 +69,7 @@ ENV DOCKER_ENV=true
 ENV NODE_ENV=production
 
 # Create necessary directories first
-RUN mkdir -p /app/dist/server /app/dist/client /app/dist/workers /app/logs
+RUN mkdir -p /app/dist/server /app/dist/client /app/dist/workers /app/logs /app/dist/client/assets
 
 # Install production dependencies with clean cache
 COPY package*.json ./
@@ -66,18 +77,22 @@ RUN npm cache clean --force && \
     npm ci --only=production --legacy-peer-deps --prefer-offline --no-audit --progress=false
 
 # Copy built files from builder
-COPY --from=builder /app/dist/server /app/dist/server
-COPY --from=builder /app/dist/client /app/dist/client
+COPY --from=builder /app/dist/server/ /app/dist/server/
+COPY --from=builder /app/dist/client/ /app/dist/client/
 
-# Copy and rename worker files from .js to .mjs
+# Copy root level files to client
+COPY --from=builder /app/dist/ /app/dist/client/
+
+# Find and copy worker files from server directory
 RUN echo "Copying and renaming worker files..." && \
     mkdir -p /app/dist/server/workers && \
-    # Find and copy all worker files
-    find /app/dist -name "*.worker.js" | while read -r file; do \
-        if [ -f "$file" ]; then \
-            cp -v "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
-        fi; \
-    done && \
+    if [ -d "/app/dist/server/server/workers" ]; then \
+        find /app/dist/server/server/workers -name "*.worker.js" | while read -r file; do \
+            if [ -f "$file" ]; then \
+                cp -v "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
+            fi; \
+        done; \
+    fi && \
     # Verify the files were copied
     echo "\nWorker files in /app/dist/server/workers/:" && \
     ls -la /app/dist/server/workers/ 2>/dev/null || echo "No worker files found"
