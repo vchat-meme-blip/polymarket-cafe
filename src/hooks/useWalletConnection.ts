@@ -20,6 +20,7 @@ interface WalletConnection {
     options?: { skipPreflight?: boolean; maxRetries?: number }
   ) => Promise<string>;
   error: Error | null;
+  network: WalletAdapterNetwork | null;
 }
 
 export const useWalletConnection = (): WalletConnection => {
@@ -104,20 +105,6 @@ export const useWalletConnection = (): WalletConnection => {
     }
   }, [connect, wallet?.connected, isConnecting]);
 
-  return {
-    connection,
-    publicKey: wallet?.publicKey || null,
-    connected: wallet?.connected || false,
-    connecting: isConnecting || wallet?.connecting || false,
-    disconnecting: wallet?.disconnecting || false,
-    connect,
-    disconnect,
-    sendTransaction,
-    error,
-  };
-};
-  }, [disconnect]);
-
   // Enhanced sendTransaction with error handling
   const sendTransactionWithRetry = useCallback(
     async (
@@ -125,11 +112,11 @@ export const useWalletConnection = (): WalletConnection => {
       connection: Connection,
       options: { skipPreflight?: boolean; maxRetries?: number } = {}
     ) => {
-      if (!publicKey) throw new Error('Wallet not connected');
-      if (!sendTransaction) throw new Error('Send transaction function not available');
+      if (!wallet?.publicKey) throw new Error('Wallet not connected');
+      if (!wallet?.sendTransaction) throw new Error('Send transaction function not available');
 
       try {
-        const signature = await sendTransaction(transaction, connection, options);
+        const signature = await wallet.sendTransaction(transaction, connection, options);
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
         
         await connection.confirmTransaction({
@@ -139,23 +126,33 @@ export const useWalletConnection = (): WalletConnection => {
         }, 'confirmed');
 
         return signature;
-      } catch (error) {
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error('Transaction failed');
         console.error('Transaction failed:', error);
+        setError(error);
         throw error;
       }
     },
-    [publicKey, sendTransaction]
+    [wallet]
   );
 
   return {
     connection,
-    publicKey,
-    connected,
-    connecting,
-    disconnecting,
-    connect: handleConnect,
-    disconnect: handleDisconnect,
+    publicKey: wallet?.publicKey || null,
+    connected: wallet?.connected || false,
+    connecting: isConnecting || wallet?.connecting || false,
+    disconnecting: wallet?.disconnecting || false,
+    connect,
+    disconnect,
     sendTransaction: sendTransactionWithRetry,
+    error,
+    network: wallet?.publicKey ? 
+      (connection.rpcEndpoint.includes('mainnet') ? 
+        WalletAdapterNetwork.Mainnet : 
+        connection.rpcEndpoint.includes('testnet') ? 
+          WalletAdapterNetwork.Testnet : 
+          WalletAdapterNetwork.Devnet) : 
+      null
   };
 };
 
