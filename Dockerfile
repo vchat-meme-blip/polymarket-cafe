@@ -214,4 +214,5 @@ exec node --no-warnings "$ENTRYPOINT_PATH"
 EOF
 
 # Start the application
-CMD ["/app/startup.sh"]
+# Ensure only one process starts the application and handle process cleanup
+CMD ["/bin/sh", "-c", "trap 'pkill -f node || true; exit 0' INT TERM; /app/startup.sh"]

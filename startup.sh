@@ -1,6 +1,13 @@
 #!/bin/sh
 set -e
 
+# Kill any existing node processes to prevent multiple instances
+echo "🔍 Checking for existing Node.js processes..."
+pkill -f "node.*dist/server" || true
+pkill -f "pm2" || true
+# Small delay to ensure processes are fully terminated
+sleep 1
+
 # Print environment for debugging
 printenv
 
