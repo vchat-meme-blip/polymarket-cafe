@@ -111,27 +111,23 @@ RUN echo "Build output verification:" && \
 
 COPY --from=builder /app/server/env.ts ./dist/server/
 
-# Verify the build output, surface entry point, and persist it for runtime
+# Build the server files
+RUN npm run build:server && npm run postbuild:server
+
+# Verify the build output and set the entry point
 RUN set -e; \
     echo "Verifying build..."; \
-    if [ -f "/app/dist/server/server/index.mjs" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.mjs"; \
-    elif [ -f "/app/dist/server/server/index.js" ]; then \
+    if [ -f "/app/dist/server/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/server/index.js"; \
-    elif [ -f "/app/dist/server/index.mjs" ]; then \
-        ENTRYPOINT="/app/dist/server/index.mjs"; \
     elif [ -f "/app/dist/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/index.js"; \
     else \
-        echo "Error: No entry point found in /app/dist/server"; \
+        echo "Error: No entry point found"; \
         echo "Build output in /app/dist:"; \
         find /app/dist -type f; \
         exit 1; \
     fi; \
     echo "Found entry point at $ENTRYPOINT"; \
-    echo "First 10 lines of entry point:"; \
-    head -n 10 "$ENTRYPOINT" || true; \
-    echo "..."; \
     echo "$ENTRYPOINT" > /app/.entrypoint-path; \
     echo "Will use entry point: $(cat /app/.entrypoint-path)"
 
