@@ -20,13 +20,13 @@ RUN npm install -g typescript@5.3.3 && \
     # Install exact versions to avoid compatibility issues
     npm install --no-optional --prefer-offline --no-audit --progress=false \
         @types/node@22.14.0 \
-        vite@4.5.3 \
+        vite@5.0.12 \
         @vitejs/plugin-react@4.2.1 \
-        rollup@3.29.4 \
-        esbuild@0.19.12 && \
+        rollup@4.9.6 \
+        esbuild@0.20.1 && \
     # Clean npm cache
     npm cache clean --force && \
-    # Install remaining dependencies
+    # Install remaining dependencies with legacy peer deps
     npm install --legacy-peer-deps --omit=optional --no-audit --prefer-offline --no-fund
 
 # Copy the rest of the application
@@ -61,7 +61,7 @@ COPY package*.json ./
 
 # Install production dependencies with specific versions
 RUN npm install --no-optional --prefer-offline --no-audit --progress=false \
-        esbuild@0.19.12 && \
+        esbuild@0.20.1 && \
     # Clean npm cache
     npm cache clean --force && \
     # Install production dependencies
