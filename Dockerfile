@@ -30,8 +30,7 @@ RUN echo "Building server..." && \
 FROM node:22-alpine
 
 # Install runtime dependencies
-# Install runtime dependencies
-RUN apk add --no-cache curl
+RUN apk add --no-cache libusb udev curl
 
 WORKDIR /app
 
@@ -47,75 +46,27 @@ COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps
 
 # Create necessary directories
-RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs
+RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
 
 # Copy built files from builder
-COPY --from=builder /app/dist/ /app/dist/
-
-# Debug: Show what was copied
-RUN echo "=== Debug: Contents of /app/dist after copy ===" && \
-    find /app/dist -type f | sort && \
-    echo "\n=== Looking for server files ===" && \
-    find /app/dist -name "*.js" -o -name "*.mjs" | grep -i server || echo "No server files found"
-
-# Create server directory structure
-RUN mkdir -p /app/dist/server/workers
-
-# Try to find and copy the server entry point
-RUN if [ -f "/app/dist/server.js" ]; then \
-      echo "Found server entry point at /app/dist/server.js"; \
-      mkdir -p /app/dist/server && \
-      cp /app/dist/server.js /app/dist/server/index.js; \
-    elif [ -f "/app/dist/server/index.js" ]; then \
-      echo "Found server entry point at /app/dist/server/index.js"; \
-    elif [ -f "/app/dist/server/server/index.js" ]; then \
-      echo "Found server entry point at /app/dist/server/server/index.js"; \
-      cp /app/dist/server/server/index.js /app/dist/server/; \
-    else \
-      echo "=== ERROR: Could not find server entry point ==="; \
-      echo "Current directory: $(pwd)"; \
-      echo "\n=== Contents of /app/dist ==="; \
-      find /app/dist -type f | sort; \
-      exit 1; \
-    fi
-
-# Ensure the server entry point is in the correct location
-RUN echo "Checking server entry point..." && \
-    if [ -f "/app/dist/server/server/index.js" ]; then \
-      echo "Found server entry point at /app/dist/server/server/index.js"; \
-      if [ ! -f "/app/dist/server/index.js" ]; then \
-        echo "Copying server entry point to /app/dist/server/index.js"; \
-        cp /app/dist/server/server/index.js /app/dist/server/index.js; \
-      else \
-        echo "Server entry point already exists at /app/dist/server/index.js"; \
-      fi; \
-    else \
-      echo "Warning: Server entry point not found at /app/dist/server/server/index.js"; \
-      echo "Contents of /app/dist/server/server/:"; \
-      ls -la /app/dist/server/server/ 2>/dev/null || echo "No server directory found"; \
-    fi
+COPY --from=builder /app/dist/server/ /app/dist/server/
 
 # Copy and rename worker files from .js to .mjs
 RUN echo "Copying and renaming worker files..." && \
-    # Create both worker directories for compatibility
-    mkdir -p /app/dist/server/workers /app/dist/server/server/workers && \
-    # First, copy all worker files to both target directories with .mjs extension
+    mkdir -p /app/dist/server/server/workers && \
+    # First, copy all worker files to the target directory with .mjs extension
     find /app/dist -name "*.worker.js" | while read file; do \
         if [ -f "$file" ]; then \
-            # Copy to server/workers
-            cp -v "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
-            # Also copy to server/server/workers for backward compatibility
-            cp -v "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+            cp "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+            echo "Copied $file to /app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
         fi; \
     done && \
     # Verify the files were copied with .mjs extension
-    echo "\nWorker files in /app/dist/server/workers/:" && \
-    ls -la /app/dist/server/workers/ 2>/dev/null || echo "No worker files found" && \
-    echo "\nWorker files in /app/dist/server/server/workers/:" && \
+    echo "Worker files in /app/dist/server/server/workers/:" && \
     ls -la /app/dist/server/server/workers/ 2>/dev/null || echo "No worker files found"
 
 # Copy client files
-# Client files are already in /app/dist from the previous copy
+COPY --from=builder /app/dist/client/ /app/dist/client/
 
 # Handle public directory
 RUN if [ -d "/app/public" ]; then \
@@ -162,34 +113,20 @@ COPY --from=builder /app/server/env.ts ./dist/server/
 # Verify the build output, surface entry point, and persist it for runtime
 RUN set -e; \
     echo "Verifying build..."; \
-    echo "Searching for entry points in /app/dist..."; \
-    # Look for all possible entry points
-    ENTRYPOINT=""; \
-    for path in \
-        "/app/dist/server/server/index.mjs" \
-        "/app/dist/server/server/index.js" \
-        "/app/dist/server/index.mjs" \
-        "/app/dist/server/index.js" \
-        "/app/dist/index.mjs" \
-        "/app/dist/index.js"; \
-    do \
-        if [ -f "$path" ]; then \
-            ENTRYPOINT="$path"; \
-            break; \
-        fi; \
-    done; \
-    \
-    if [ -z "$ENTRYPOINT" ]; then \
-        echo "Error: No entry point found in /app/dist"; \
+    if [ -f "/app/dist/server/server/index.mjs" ]; then \
+        ENTRYPOINT="/app/dist/server/server/index.mjs"; \
+    elif [ -f "/app/dist/server/server/index.js" ]; then \
+        ENTRYPOINT="/app/dist/server/server/index.js"; \
+    elif [ -f "/app/dist/server/index.mjs" ]; then \
+        ENTRYPOINT="/app/dist/server/index.mjs"; \
+    elif [ -f "/app/dist/server/index.js" ]; then \
+        ENTRYPOINT="/app/dist/server/index.js"; \
+    else \
+        echo "Error: No entry point found in /app/dist/server"; \
         echo "Build output in /app/dist:"; \
-        find /app/dist -type f | sort; \
-        echo "\nContents of /app/dist/server:"; \
-        ls -la /app/dist/server/ 2>/dev/null || echo "No server directory found"; \
-        echo "\nContents of /app/dist/server/server:"; \
-        ls -la /app/dist/server/server/ 2>/dev/null || echo "No server/server directory found"; \
+        find /app/dist -type f; \
         exit 1; \
     fi; \
-    \
     echo "Found entry point at $ENTRYPOINT"; \
     echo "First 10 lines of entry point:"; \
     head -n 10 "$ENTRYPOINT" || true; \
