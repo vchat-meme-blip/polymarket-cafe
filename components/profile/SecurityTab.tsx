@@ -3,26 +3,49 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { useUI, useUser } from '../../lib/state/index.js';
-import React from 'react';
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useWalletConnection } from '../../src/hooks/useWalletConnection';
 import styles from './Profile.module.css';
 
 export default function SecurityTab() {
   const { setIsSignedIn } = useUI();
   const {
-    solanaWalletAddress,
     userApiKey,
     receivingWalletAddress,
-    connectWallet,
-    disconnectWallet,
     setUserApiKey,
     updateUserSettings,
     _setHandle,
   } = useUser();
+  
+  const {
+    connect,
+    disconnect,
+    connected,
+    connecting,
+    publicKey,
+    error: walletError
+  } = useWalletConnection();
+  
   const [apiKeyInput, setApiKeyInput] = useState(userApiKey || '');
   const [walletInput, setWalletInput] = useState(receivingWalletAddress || '');
-  const [isConnecting, setIsConnecting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Sync wallet address with user settings when it changes
+  useEffect(() => {
+    const syncWalletAddress = async () => {
+      if (connected && publicKey) {
+        try {
+          await updateUserSettings({ 
+            solanaWalletAddress: publicKey.toString() 
+          });
+        } catch (err) {
+          console.error('Failed to update wallet address:', err);
+        }
+      }
+    };
+    
+    syncWalletAddress();
+  }, [connected, publicKey, updateUserSettings]);
 
   function handleSignOut() {
     // Clear local state first for immediate UI update
@@ -32,15 +55,19 @@ export default function SecurityTab() {
   }
 
   const handleConnectWallet = async () => {
-    setIsConnecting(true);
-    await connectWallet('4p4h2h1q8z2z8z8y8f8e8d8c8b8a898887868584'); 
-    setIsConnecting(false);
+    try {
+      await connect();
+    } catch (err) {
+      console.error('Failed to connect wallet:', err);
+    }
   };
 
   const handleDisconnectWallet = async () => {
-    setIsConnecting(true);
-    await disconnectWallet();
-    setIsConnecting(false);
+    try {
+      await disconnect();
+    } catch (err) {
+      console.error('Failed to disconnect wallet:', err);
+    }
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -63,37 +90,50 @@ export default function SecurityTab() {
     <div className={styles.securityTabContent}>
       <form onSubmit={handleSaveSettings}>
         <div className={styles.securitySection}>
-            <h4>Wallet Connection</h4>
-            {solanaWalletAddress ? (
-            <div>
-                <p className={styles.walletAddressDisplay}>{solanaWalletAddress}</p>
-                <button type="button" className="button" onClick={handleDisconnectWallet} disabled={isConnecting}>
-                <span className="icon">link_off</span>
-                {isConnecting ? 'Disconnecting...' : 'Disconnect Wallet'}
-                </button>
+          <h4>Wallet Connection</h4>
+          {walletError && (
+            <div className={styles.errorMessage} style={{ marginBottom: '12px' }}>
+              {walletError.message}
             </div>
-            ) : (
+          )}
+          
+          {connected && publicKey ? (
             <div>
-                <p className={styles.stepHint} style={{ marginBottom: '12px' }}>
+              <p className={styles.walletAddressDisplay}>
+                {`${publicKey.toString().slice(0, 6)}...${publicKey.toString().slice(-4)}`}
+              </p>
+              <button 
+                type="button" 
+                className="button" 
+                onClick={handleDisconnectWallet} 
+                disabled={connecting}
+              >
+                <span className="icon">link_off</span>
+                {connecting ? 'Disconnecting...' : 'Disconnect Wallet'}
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className={styles.stepHint} style={{ marginBottom: '12px' }}>
                 Connect your Solana wallet to serve as your unique user ID and for
                 future on-chain interactions.
-                </p>
-                <div className={styles.walletButtonContainer}>
+              </p>
+              <div className={styles.walletButtonContainer}>
                 <button 
-                    type="button"
-                    className={`button primary ${styles.connectWalletBtn}`} 
-                    onClick={handleConnectWallet} 
-                    disabled={isConnecting}
-                    aria-label={isConnecting ? 'Connecting...' : 'Connect Wallet'}
+                  type="button"
+                  className={`button primary ${styles.connectWalletBtn}`} 
+                  onClick={handleConnectWallet} 
+                  disabled={connecting}
+                  aria-label={connecting ? 'Connecting...' : 'Connect Wallet'}
                 >
-                    <span className="icon">account_balance_wallet</span>
-                    <span className={styles.walletButtonText}>
-                    {isConnecting ? 'Connecting...' : 'Connect Wallet'}
-                    </span>
+                  <span className="icon">account_balance_wallet</span>
+                  <span className={styles.walletButtonText}>
+                    {connecting ? 'Connecting...' : 'Connect Wallet'}
+                  </span>
                 </button>
-                </div>
+              </div>
             </div>
-            )}
+          )}
         </div>
 
         <div className={styles.securitySection}>
