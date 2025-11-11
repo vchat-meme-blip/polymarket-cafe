@@ -387,5 +387,12 @@ EOF
 # Set working directory to /app for consistent paths
 WORKDIR /app
 
-# Start the application with node flags for better error handling
-CMD ["node", "--es-module-specifier-resolution=node", "--experimental-specifier-resolution=node", "dist/server/index.js"]
+# Start the application with node flags for ESM support
+ENV NODE_OPTIONS="--es-module-specifier-resolution=node --experimental-specifier-resolution=node"
+
+# Health check configuration
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1
+
+# Start the application
+CMD ["node", "dist/server/index.js"]

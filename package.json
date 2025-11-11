@@ -14,7 +14,7 @@
     "dev": "vite",
     "build": "rm -rf dist && npm run build:client && npm run build:server",
     "build:client": "vite build",
-    "build:server": "tsc -p tsconfig.server.json && tsc-alias -p tsconfig.server.json",
+    "build:server": "tsc -p tsconfig.server.json && tsc-alias -p tsconfig.server.json --esm",
     "postbuild:server": "node scripts/copy-worker-files.js && cp -r dist/server/server/* dist/server/ && cp -r dist/server/workers dist/workers",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
