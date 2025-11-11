@@ -142,17 +142,50 @@ COPY --from=builder /app/ecosystem.config.* ./
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.env* ./
 
-# Copy built files
-COPY --from=builder /app/dist ./dist
+# Copy built files with correct structure
+COPY --from=builder /app/dist/client/ /app/dist/client/
+COPY --from=builder /app/dist/server/ /app/dist/server/
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/server/env.ts ./dist/server/
+COPY --from=builder /app/server/env.ts /app/dist/server/server/
 
-# Verify build output structure
+# Verify build output structure and fix paths if needed
 RUN echo "Build output structure:" && \
     echo "Contents of /app/dist:" && ls -la /app/dist/ && \
+    # If server files are in /app/dist/client/server, move them to /app/dist/server
+    if [ -d "/app/dist/client/server" ]; then \
+        echo "Moving server files from /app/dist/client/server to /app/dist/server"; \
+        mv /app/dist/client/server /app/dist/; \
+    fi && \
     echo "Contents of /app/dist/server:" && ls -la /app/dist/server/ 2>/dev/null || echo "No server directory found" && \
     echo "Contents of /app/dist/server/server:" && ls -la /app/dist/server/server/ 2>/dev/null || echo "No server/server directory found"
+
+# Set up worker files
+RUN echo "Setting up worker files..." && \
+    mkdir -p /app/dist/workers /app/dist/server/workers && \
+    # First check the new location
+    if [ -d "/app/dist/server/server/workers" ]; then \
+        echo "Copying worker files from /app/dist/server/server/workers/..."; \
+        find /app/dist/server/server/workers -name "*.worker.js" -o -name "*.worker.mjs" | while read -r file; do \
+            if [ -f "$file" ]; then \
+                cp -v "$file" "/app/dist/workers/$(basename "$file" .js).mjs"; \
+                cp -v "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
+            fi; \
+        done; \
+    # Fallback to checking the client directory
+    elif [ -d "/app/dist/client/server/workers" ]; then \
+        echo "Copying worker files from /app/dist/client/server/workers/..."; \
+        find /app/dist/client/server/workers -name "*.worker.js" -o -name "*.worker.mjs" | while read -r file; do \
+            if [ -f "$file" ]; then \
+                cp -v "$file" "/app/dist/workers/$(basename "$file" .js).mjs"; \
+                cp -v "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
+            fi; \
+        done; \
+    fi && \
+    echo "Worker files in /app/dist/workers/:" && \
+    ls -la /app/dist/workers/ 2>/dev/null || echo "No worker files in /app/dist/workers" && \
+    echo "Worker files in /app/dist/server/workers/:" && \
+    ls -la /app/dist/server/workers/ 2>/dev/null || echo "No worker files in /app/dist/server/workers"
 
 # Create symlinks for backward compatibility (using .mjs extension)
 RUN if [ -d "/app/dist/server/server/workers" ]; then \

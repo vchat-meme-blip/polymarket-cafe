@@ -76,7 +76,8 @@ export default defineConfig(({ mode }) => {
         
         // Build configuration
         build: {
-            outDir: 'dist',
+            outDir: 'dist/client',
+            emptyOutDir: true,
             assetsDir: 'assets',
             sourcemap: !isProduction,
             minify: isProduction ? 'esbuild' : false,
