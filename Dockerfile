@@ -50,14 +50,14 @@ RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/clie
 
 # Copy built files from builder with correct directory structure
 RUN mkdir -p /app/dist/server
-# First copy the server files to a temporary location
-COPY --from=builder /app/dist/server/ /app/dist/temp-server/
-# Then move the files to the correct location
-RUN mv /app/dist/temp-server/server/* /app/dist/server/ 2>/dev/null || true && \
-    mv /app/dist/temp-server/*.js /app/dist/server/ 2>/dev/null || true && \
-    mv /app/dist/temp-server/*.json /app/dist/server/ 2>/dev/null || true && \
-    mv /app/dist/temp-server/workers /app/dist/server/ 2>/dev/null || true && \
-    rm -rf /app/dist/temp-server
+# Copy all server files from builder
+COPY --from=builder /app/dist/server/ /app/dist/server/
+# If the files are in a nested server directory, move them up
+RUN if [ -d "/app/dist/server/server" ]; then \
+      echo "Moving files from nested server directory..." && \
+      mv /app/dist/server/server/* /app/dist/server/ 2>/dev/null || true && \
+      rmdir /app/dist/server/server 2>/dev/null || true; \
+    fi
 
 # Handle worker files
 RUN echo "Setting up worker files..." && \
@@ -131,20 +131,25 @@ COPY --from=builder /app/server/env.ts ./dist/server/
 # Verify the build output, surface entry point, and persist it for runtime
 RUN set -e; \
     echo "Verifying build..."; \
+    echo "Current directory: $(pwd)"; \
+    echo "Directory contents:"; \
+    ls -la /app/dist/server/; \
+    \
     # Check for entry points in the correct location
     if [ -f "/app/dist/server/index.mjs" ]; then \
         ENTRYPOINT="/app/dist/server/index.mjs"; \
     elif [ -f "/app/dist/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/index.js"; \
-    # Fallback to server directory if needed
-    elif [ -f "/app/dist/server/server/index.mjs" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.mjs"; \
-    elif [ -f "/app/dist/server/server/index.js" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.js"; \
+    # Check for compiled TypeScript files
+    elif [ -f "/app/dist/server/dist/server/index.js" ]; then \
+        ENTRYPOINT="/app/dist/server/dist/server/index.js"; \
+    # Check for server.js as fallback
+    elif [ -f "/app/dist/server/server.js" ]; then \
+        ENTRYPOINT="/app/dist/server/server.js"; \
     else \
         echo "Error: No entry point found in /app/dist/server"; \
-        echo "Build output in /app/dist:"; \
-        find /app/dist -type f; \
+        echo "Build output in /app/dist/server:"; \
+        find /app/dist/server -type f; \
         exit 1; \
     fi; \
     # Ensure the entry point exists and is executable
@@ -152,13 +157,17 @@ RUN set -e; \
         echo "Error: Entry point $ENTRYPOINT does not exist"; \
         exit 1; \
     fi; \
+    # Make the entry point executable
     chmod +x "$ENTRYPOINT"; \
-    echo "Found entry point at $ENTRYPOINT"; \
-    echo "First 10 lines of entry point:"; \
+    # Create a symlink to the entry point for easier access
+    ln -sf "$ENTRYPOINT" "/app/dist/server/entrypoint" 2>/dev/null || true; \
+    # Save the entry point path for later use
+    echo "$ENTRYPOINT" > /app/.entrypoint-path; \
+    echo "✅ Found entry point at $ENTRYPOINT"; \
+    echo "📋 First 10 lines of entry point:"; \
     head -n 10 "$ENTRYPOINT" || true; \
     echo "..."; \
-    echo "$ENTRYPOINT" > /app/.entrypoint-path; \
-    echo "Will use entry point: $(cat /app/.entrypoint-path)"
+    echo "🚀 Will use entry point: $(cat /app/.entrypoint-path)"
 
 # Set working directory to the app root
 WORKDIR /app
