@@ -1,6 +1,17 @@
-import { useCallback, useEffect, useState, useMemo } from 'react';
-import { useConnection, useWallet as useWalletAdapter } from '@solana/wallet-adapter-react';
-import { Connection, PublicKey, Transaction, VersionedTransaction, Commitment } from '@solana/web3.js';
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import { 
+  ConnectionProvider, 
+  WalletProvider as WalletAdapterProvider, 
+  useConnection as useWalletConnectionHook,
+  useWallet as useWalletAdapter
+} from '@solana/wallet-adapter-react';
+import { 
+  PhantomWalletAdapter,
+  SolflareWalletAdapter,
+  // Add other wallet adapters as needed
+} from '@solana/wallet-adapter-wallets';
+import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
+import { Connection, PublicKey, Transaction, VersionedTransaction, Commitment, clusterApiUrl } from '@solana/web3.js';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 
 // Default commitment level for transactions
@@ -176,17 +187,39 @@ export const useNetwork = (): WalletAdapterNetwork | null => {
   return network;
 };
 
+// Default styles for the wallet modal
+import '@solana/wallet-adapter-react-ui/styles.css';
+
+// Get the network from environment variables or default to devnet
+const network = (import.meta.env.VITE_SOLANA_NETWORK || 'devnet') as WalletAdapterNetwork;
+
+// Get the RPC endpoint from environment variables or use the default for the selected network
+const endpoint = import.meta.env.VITE_SOLANA_RPC || clusterApiUrl(network);
+
 // Context provider component
 export const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Initialize browser wallet adapters only
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter()
+    ],
+    [] // No dependencies since we're not using network-specific adapters
+  );
+
   return (
-    <>
-      {children}
-    </>
+    <ConnectionProvider endpoint={endpoint}>
+      <WalletAdapterProvider wallets={wallets} autoConnect={false}>
+        <WalletModalProvider>
+          {children}
+        </WalletModalProvider>
+      </WalletAdapterProvider>
+    </ConnectionProvider>
   );
 };
 
 // Re-export the wallet adapter hooks for convenience
-export { useConnection, useWallet } from '@solana/wallet-adapter-react';
+export { useWalletConnectionHook as useConnection, useWalletAdapter as useWallet };
 
 // Export the context provider as default
 export default WalletContextProvider;
