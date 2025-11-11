@@ -175,3 +175,18 @@ export const useNetwork = (): WalletAdapterNetwork | null => {
   const { network } = useWalletConnection();
   return network;
 };
+
+// Context provider component
+export const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return (
+    <>
+      {children}
+    </>
+  );
+};
+
+// Re-export the wallet adapter hooks for convenience
+export { useConnection, useWallet } from '@solana/wallet-adapter-react';
+
+// Export the context provider as default
+export default WalletContextProvider;

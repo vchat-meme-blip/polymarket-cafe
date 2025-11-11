@@ -40,7 +40,7 @@ import MarketDetailModal from './components/modals/MarketDetailModal';
 import VisitStorefrontModal from './components/modals/VisitStorefrontModal.js';
 import CreateTaskModal from './components/modals/CreateTaskModal';
 import TaskDetailModal from './components/modals/TaskDetailModal';
-import { WalletContextProvider } from './components/providers/WalletContextProvider';
+import WalletContextProvider from './components/providers/WalletContextProvider';
 import PaywallModal from './components/modals/PaywallModal';
 
 /**
