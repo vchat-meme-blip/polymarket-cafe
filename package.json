@@ -12,17 +12,19 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "rm -rf dist && npm run build:client && npm run build:server",
+    "clean": "if exist dist rmdir /s /q dist",
+    "build": "npm run clean && npm run build:client && npm run build:server",
     "build:client": "vite build",
-    "build:server": "tsc -p tsconfig.server.json && tsc-alias -p tsconfig.server.json --esm && node scripts/fix-esm-imports.js && node scripts/ensure-esm.js",
-    "postbuild:server": "node scripts/copy-worker-files.js && cp -r dist/server/server/* dist/server/ && cp -r dist/server/workers dist/workers",
+    "build:server": "tsc -p tsconfig.server.json && npm run postbuild:server",
+    "postbuild:server": "node scripts/fix-imports.js && node scripts/copy-files.js",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "start": "node dist/server/index.js"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.16.0",

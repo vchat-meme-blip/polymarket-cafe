@@ -25,7 +25,8 @@
   },
   "include": [
     "server/**/*.ts",
-    "lib/**/*.ts"
+    "lib/**/*.ts",
+    "types/**/*.d.ts"
   ],
   "exclude": [
     "node_modules",
