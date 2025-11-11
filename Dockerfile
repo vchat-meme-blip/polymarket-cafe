@@ -14,6 +14,7 @@ COPY tsconfig*.json ./
 RUN npm install -g typescript@5.3.3 && \
     npm install --save-dev @types/node@22.14.0 && \
     npm ci --legacy-peer-deps
+
 # Copy the rest of the application
 COPY . .
 
@@ -137,13 +138,6 @@ RUN set -e; \
 # Set working directory to the app root
 WORKDIR /app
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/api/health || exit 1
-
-# Expose the port your application will run on
-EXPOSE ${PORT}
-
 # Create a startup script with debug info and dynamic entry point detection
 RUN cat <<'EOF' > /app/startup.sh && \
     chmod +x /app/startup.sh
@@ -203,7 +197,7 @@ fi
 log "  - Node version: $(node --version)"
 log "  - NPM version: $(npm --version)"
 log "  - Environment variables:"
-printenv | grep -v "PASSWORD\|SECRET\|TOKEN\|KEY" | sort | sed 's/^/    /'
+printenv | grep -v "PASSWORD\\|SECRET\\|TOKEN\\|KEY" | sort | sed 's/^/    /'
 
 log "  - First 20 lines of entry point:"
 head -n 20 "$ENTRYPOINT_PATH" 2>/dev/null || log "    Could not read entry point file"
@@ -213,5 +207,12 @@ log "🚀 Starting application..."
 exec node --no-warnings "$ENTRYPOINT_PATH"
 EOF
 
-# Start the application
-CMD ["/app/startup.sh"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/health || exit 1
+
+# Expose the port your application will run on
+EXPOSE ${PORT}
+
+# Start the application using the TypeScript startup file
+CMD ["node", "--loader", "ts-node/esm", "--no-warnings", "/app/server/startup.ts"]
