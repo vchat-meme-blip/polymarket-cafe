@@ -101,23 +101,30 @@ RUN echo "Setting up worker files..." && \
                 cp -v "$file" "/app/dist/workers/$(basename "$file" .js).mjs"; \
                 cp -v "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
             fi; \
-        done; \
     fi && \
-    \
-    # Create a default worker if none exist
-    if [ ! "$(ls -A /app/dist/workers 2>/dev/null)" ] && [ ! "$(ls -A /app/dist/server/workers 2>/dev/null)" ]; then \
-        echo "No worker files found, creating a default worker..."; \
-        echo 'self.onmessage = (e) => { console.log("Worker received:", e.data); };' > /app/dist/workers/default.worker.mjs; \
-        cp /app/dist/workers/default.worker.mjs /app/dist/server/workers/; \
-    fi && \
-    \
-    # Verify the files were copied
-    echo "\nWorker files in /app/workers/:"; \
-    ls -la /app/workers/ 2>/dev/null || echo "No worker files in /app/workers"; \
-    echo "\nWorker files in /app/dist/workers/:"; \
-    ls -la /app/dist/workers/ 2>/dev/null || echo "No worker files in /app/dist/workers"; \
-    echo "\nWorker files in /app/dist/server/workers/:"; \
+    # Debug: List the worker files that were copied
+    echo "Worker files in /app/dist/workers/:" && \
+    ls -la /app/dist/workers/ 2>/dev/null || echo "No worker files in /app/dist/workers" && \
+    echo "Worker files in /app/dist/server/workers/:" && \
     ls -la /app/dist/server/workers/ 2>/dev/null || echo "No worker files in /app/dist/server/workers"
+
+# Ensure the server directory structure is correct
+RUN mkdir -p /app/dist/server && \
+    if [ -f "/app/dist/server/server/startup.js" ]; then \
+        # If startup.js is in server/server, create a symlink in server/
+        ln -sf /app/dist/server/server/startup.js /app/dist/server/startup.js 2>/dev/null || true; \
+    fi && \
+    if [ -f "/app/dist/server/startup.js" ]; then \
+        echo "startup.js found at /app/dist/server/startup.js"; \
+    else \
+        echo "WARNING: startup.js not found in expected locations"; \
+        echo "Contents of /app/dist/server:"; \
+        ls -la /app/dist/server/ 2>/dev/null || echo "Could not list /app/dist/server"; \
+        if [ -d "/app/dist/server/server" ]; then \
+            echo "Contents of /app/dist/server/server:"; \
+            ls -la /app/dist/server/server/ 2>/dev/null || echo "Could not list /app/dist/server/server"; \
+        fi; \
+    fi
 
 # Copy client files
 COPY --from=builder /app/dist/client/ /app/dist/client/
@@ -172,8 +179,18 @@ RUN set -e; \
     # Create a proper ES module entry point that imports the server
     echo "Creating server entry point..."; \
     mkdir -p /app/dist/server; \
-    echo 'import { startServer } from "./startup.js";' > /app/dist/server/index.js; \
+    # Try to find the correct path to startup.js
+    if [ -f "/app/dist/server/server/startup.js" ]; then \
+        echo 'import { startServer } from "./server/startup.js";' > /app/dist/server/index.js; \
+    else \
+        echo 'import { startServer } from "./startup.js";' > /app/dist/server/index.js; \
+    fi; \
     echo '' >> /app/dist/server/index.js; \
+    echo 'console.log("Starting server...");' >> /app/dist/server/index.js; \
+    echo 'console.log("Current directory:", process.cwd());' >> /app/dist/server/index.js; \
+    echo 'console.log("__dirname:", __dirname);' >> /app/dist/server/index.js; \
+    echo 'console.log("__filename:", __filename);' >> /app/dist/server/index.js; \
+    echo 'console.log("Startup module path:", require.resolve("./startup.js"));' >> /app/dist/server/index.js; \
     echo 'startServer().catch(err => {' >> /app/dist/server/index.js; \
     echo '  console.error("Failed to start server:", err);' >> /app/dist/server/index.js; \
     echo '  process.exit(1);' >> /app/dist/server/index.js; \
