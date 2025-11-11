@@ -54,9 +54,10 @@ RUN if [ -d "/app/dist/server" ]; then \
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/api/health || exit 1
+# Health check with proper error handling and correct endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || \
+       wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1
 
 # Expose the port the app runs on
 EXPOSE 3000
