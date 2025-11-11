@@ -20,7 +20,10 @@ async function main() {
   
   monitoringDirector.initialize(emitToMain);
 
-  parentPort.on('message', (message: { type: string; payload: any; }) => {
+  // We already checked that parentPort is not null at the start of the file
+  const port = parentPort!; // Non-null assertion is safe here due to the check above
+  
+  port.on('message', (message: { type: string; payload: any; }) => {
     if (message.type === 'apiKeyResponse') {
       apiKeyProvider.handleMessage(message);
       return;
