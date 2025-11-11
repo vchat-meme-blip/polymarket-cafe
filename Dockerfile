@@ -172,7 +172,7 @@ RUN set -e; \
     # Create a proper ES module entry point that imports the server
     echo "Creating server entry point..."; \
     mkdir -p /app/dist/server; \
-    echo 'import { startServer } from "./server/startup.js";' > /app/dist/server/index.js; \
+    echo 'import { startServer } from "./startup.js";' > /app/dist/server/index.js; \
     echo '' >> /app/dist/server/index.js; \
     echo 'startServer().catch(err => {' >> /app/dist/server/index.js; \
     echo '  console.error("Failed to start server:", err);' >> /app/dist/server/index.js; \
