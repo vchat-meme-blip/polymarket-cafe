@@ -29,7 +29,8 @@ RUN apk add --no-cache curl
 COPY package*.json ./
 
 # Install production dependencies only
-RUN npm ci --only=production
+# Using npm install instead of ci to handle potential lockfile mismatches
+RUN npm install --only=production --no-audit --prefer-offline
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
