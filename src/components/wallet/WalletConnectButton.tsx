@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useWalletConnection } from '../../hooks/useWalletConnection';
+import { useWalletConnection, useIsWalletConnected, useWalletPublicKey } from '../../hooks/useWalletConnection';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { PublicKey } from '@solana/web3.js';
 

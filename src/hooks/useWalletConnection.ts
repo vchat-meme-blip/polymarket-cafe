@@ -1,6 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useConnection, useWallet as useWalletAdapter } from '@solana/wallet-adapter-react';
-import { Connection, PublicKey, Transaction, VersionedTransaction, Commitment } from '@solana/web3.js';
+import { useCallback, useEffect, useState, useMemo } from 'react';
+import { 
+  useConnection as useSolanaConnection, 
+  useWallet as useWalletAdapter,
+  WalletContextState
+} from '@solana/wallet-adapter-react';
+import { 
+  Connection, 
+  PublicKey, 
+  Transaction, 
+  VersionedTransaction, 
+  Commitment,
+  clusterApiUrl 
+} from '@solana/web3.js';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 
 // Default commitment level for transactions
@@ -24,27 +35,27 @@ interface WalletConnection {
 }
 
 export const useWalletConnection = (): WalletConnection => {
-  const { connection } = useConnection();
+  const { connection } = useSolanaConnection();
   const wallet = useWalletAdapter();
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [network, setNetwork] = useState<WalletAdapterNetwork | null>(null);
-
-  // Set network from connection endpoint
-  useEffect(() => {
-    if (!connection) return;
-
-    const endpoint = (connection as any)._rpcEndpoint;
-    if (endpoint.includes('mainnet')) {
-      setNetwork(WalletAdapterNetwork.Mainnet);
-    } else if (endpoint.includes('testnet')) {
-      setNetwork(WalletAdapterNetwork.Testnet);
-    } else {
-      setNetwork(WalletAdapterNetwork.Devnet);
+  
+  // Get network from connection endpoint
+  const network = useMemo(() => {
+    if (!connection) return null;
+    try {
+      const endpoint = (connection as any)._rpcEndpoint?.toLowerCase() || '';
+      if (endpoint.includes('mainnet')) return WalletAdapterNetwork.Mainnet;
+      if (endpoint.includes('testnet')) return WalletAdapterNetwork.Testnet;
+      if (endpoint.includes('devnet')) return WalletAdapterNetwork.Devnet;
+      return WalletAdapterNetwork.Devnet; // default to devnet
+    } catch (err) {
+      console.warn('Could not determine network from connection:', err);
+      return null;
     }
   }, [connection]);
 
-  // Handle connection with loading state
+  // Connect wallet handler
   const connect = useCallback(async () => {
     if (!wallet) {
       setError(new Error('Wallet not available'));
@@ -55,39 +66,28 @@ export const useWalletConnection = (): WalletConnection => {
       setIsConnecting(true);
       setError(null);
       await wallet.connect();
-
-      // Save auto-connect preference
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('walletAutoConnect', 'true');
-      }
     } catch (err) {
-      console.error('Failed to connect wallet:', err);
-      setError(err instanceof Error ? err : new Error('Failed to connect wallet'));
-      throw err;
+      const error = err instanceof Error ? err : new Error('Failed to connect wallet');
+      setError(error);
+      throw error;
     } finally {
       setIsConnecting(false);
     }
   }, [wallet]);
 
-  // Handle disconnection
+  // Disconnect wallet handler
   const disconnect = useCallback(async () => {
     if (!wallet) return;
-
     try {
       await wallet.disconnect();
-
-      // Clear auto-connect preference
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem('walletAutoConnect');
-      }
     } catch (err) {
-      console.error('Failed to disconnect wallet:', err);
-      setError(err instanceof Error ? err : new Error('Failed to disconnect wallet'));
-      throw err;
+      const error = err instanceof Error ? err : new Error('Failed to disconnect wallet');
+      setError(error);
+      throw error;
     }
   }, [wallet]);
 
-  // Handle transaction sending with retry logic
+  // Send transaction with retry logic
   const sendTransaction = useCallback(async (
     transaction: Transaction | VersionedTransaction,
     connection: Connection,
@@ -103,37 +103,25 @@ export const useWalletConnection = (): WalletConnection => {
       try {
         const signature = await wallet.sendTransaction(transaction, connection, {
           skipPreflight,
-          maxRetries: 1, // We handle retries ourselves
+          maxRetries: 1,
         });
-
-        // Wait for confirmation
         await connection.confirmTransaction(signature, COMMITMENT_LEVEL);
         return signature;
       } catch (err) {
         lastError = err instanceof Error ? err : new Error('Transaction failed');
-        console.warn(`Transaction attempt ${attempt + 1} failed:`, lastError);
-
-        // If this is the last attempt, throw the error
         if (attempt === maxRetries - 1) {
           setError(lastError);
           throw lastError;
         }
-
-        // Wait before retrying
         await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
       }
     }
-
-    // This should never be reached due to the throw in the loop
     throw lastError || new Error('Transaction failed after multiple attempts');
   }, [wallet]);
 
-  // Handle auto-connect on mount
+  // Auto-connect wallet if previously connected
   useEffect(() => {
-    const shouldAutoConnect =
-      typeof window !== 'undefined' &&
-      window.localStorage.getItem('walletAutoConnect') === 'true';
-
+    const shouldAutoConnect = localStorage.getItem('walletAutoConnect') === 'true';
     if (shouldAutoConnect && !wallet?.connected && !isConnecting) {
       connect().catch(() => {
         console.warn('Failed to auto-connect wallet');
@@ -155,20 +143,21 @@ export const useWalletConnection = (): WalletConnection => {
   };
 };
 
-// Export a hook to check if the wallet is connected
+// Export convenience hooks
 export const useIsWalletConnected = (): boolean => {
   const { connected } = useWalletConnection();
   return connected;
 };
 
-// Export a hook to get the wallet's public key
 export const useWalletPublicKey = (): PublicKey | null => {
   const { publicKey } = useWalletConnection();
   return publicKey;
 };
 
-// Export a hook to get the current network
 export const useNetwork = (): WalletAdapterNetwork | null => {
   const { network } = useWalletConnection();
   return network;
 };
+
+// Re-export wallet adapter hooks for convenience
+export { useSolanaConnection as useConnection, useWalletAdapter as useWallet };
