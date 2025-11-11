@@ -50,7 +50,6 @@ RUN npm ci --only=production --legacy-peer-deps
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs
 
 # Copy built files from builder
-COPY --from=builder /app/package.json /app/
 COPY --from=builder /app/dist/ /app/dist/
 
 # Debug: Show what was copied
@@ -97,25 +96,23 @@ RUN echo "Checking server entry point..." && \
     fi
 
 # Copy and rename worker files from .js to .mjs
-RUN echo "\n=== Processing worker files ===" && \
-    mkdir -p /app/dist/server/workers && \
-    echo "Searching for worker files..." && \
-    WORKER_FILES=$(find /app/dist -name "*.worker.js" | wc -l) && \
-    if [ "$WORKER_FILES" -gt 0 ]; then \
-      echo "Found $WORKER_FILES worker file(s)"; \
-      find /app/dist -name "*.worker.js" | while read -r file; do \
+RUN echo "Copying and renaming worker files..." && \
+    # Create both worker directories for compatibility
+    mkdir -p /app/dist/server/workers /app/dist/server/server/workers && \
+    # First, copy all worker files to both target directories with .mjs extension
+    find /app/dist -name "*.worker.js" | while read file; do \
         if [ -f "$file" ]; then \
-          echo "Processing $file"; \
-          cp -v "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
+            # Copy to server/workers
+            cp -v "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
+            # Also copy to server/server/workers for backward compatibility
+            cp -v "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
         fi; \
-      done; \
-      echo "\nWorker files in /app/dist/server/workers/:"; \
-      ls -la /app/dist/server/workers/ 2>/dev/null || echo "No worker files found"; \
-    else \
-      echo "No worker files found in /app/dist"; \
-      echo "Contents of /app/dist:"; \
-      find /app/dist -type f | sort; \
-    fi
+    done && \
+    # Verify the files were copied with .mjs extension
+    echo "\nWorker files in /app/dist/server/workers/:" && \
+    ls -la /app/dist/server/workers/ 2>/dev/null || echo "No worker files found" && \
+    echo "\nWorker files in /app/dist/server/server/workers/:" && \
+    ls -la /app/dist/server/server/workers/ 2>/dev/null || echo "No worker files found"
 
 # Copy client files
 # Client files are already in /app/dist from the previous copy
@@ -162,33 +159,37 @@ RUN echo "Build output verification:" && \
 
 COPY --from=builder /app/server/env.ts ./dist/server/
 
-# Verify the build output and find the server entry point
+# Verify the build output, surface entry point, and persist it for runtime
 RUN set -e; \
-    echo "\n=== Verifying build ==="; \
-    echo "Current working directory: $(pwd)"; \
+    echo "Verifying build..."; \
+    echo "Searching for entry points in /app/dist..."; \
+    # Look for all possible entry points
+    ENTRYPOINT=""; \
+    for path in \
+        "/app/dist/server/server/index.mjs" \
+        "/app/dist/server/server/index.js" \
+        "/app/dist/server/index.mjs" \
+        "/app/dist/server/index.js" \
+        "/app/dist/index.mjs" \
+        "/app/dist/index.js"; \
+    do \
+        if [ -f "$path" ]; then \
+            ENTRYPOINT="$path"; \
+            break; \
+        fi; \
+    done; \
     \
-    echo "\n=== All JavaScript files in /app/dist ==="; \
-    find /app/dist -name "*.js" -o -name "*.mjs" | sort; \
-    \
-    # Check for entry points in common locations
-    if [ -f "/app/dist/server/index.js" ]; then \
-        ENTRYPOINT="/app/dist/server/index.js"; \
-    elif [ -f "/app/dist/server.js" ]; then \
-        ENTRYPOINT="/app/dist/server.js"; \
-    elif [ -f "/app/dist/server/server/index.js" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.js"; \
-    elif [ -f "/app/dist/index.js" ]; then \
-        ENTRYPOINT="/app/dist/index.js"; \
-    else \
-        echo "\n=== ERROR: No entry point found in expected locations ==="; \
-        echo "\n=== All files in /app/dist ==="; \
+    if [ -z "$ENTRYPOINT" ]; then \
+        echo "Error: No entry point found in /app/dist"; \
+        echo "Build output in /app/dist:"; \
         find /app/dist -type f | sort; \
-        echo "\n=== Contents of /app/dist/server ==="; \
+        echo "\nContents of /app/dist/server:"; \
         ls -la /app/dist/server/ 2>/dev/null || echo "No server directory found"; \
-        echo "\n=== Checking for any JavaScript files ==="; \
-        find /app/dist -name "*.js" -o -name "*.mjs" | sort; \
+        echo "\nContents of /app/dist/server/server:"; \
+        ls -la /app/dist/server/server/ 2>/dev/null || echo "No server/server directory found"; \
         exit 1; \
     fi; \
+    \
     echo "Found entry point at $ENTRYPOINT"; \
     echo "First 10 lines of entry point:"; \
     head -n 10 "$ENTRYPOINT" || true; \
