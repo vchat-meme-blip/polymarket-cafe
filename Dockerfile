@@ -137,12 +137,12 @@ RUN set -e; \
 # Set working directory to the app root
 WORKDIR /app
 
-# Health check
+# Health check on port 3002
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/api/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3002/api/health || exit 1
 
-# Expose the port your application will run on
-EXPOSE ${PORT}
+# Expose both application and health check ports
+EXPOSE ${PORT} 3002
 
 # Create a startup script with debug info and dynamic entry point detection
 RUN cat <<'EOF' > /app/startup.sh && \
@@ -213,9 +213,5 @@ log "🚀 Starting application..."
 exec node --no-warnings "$ENTRYPOINT_PATH"
 EOF
 
-# Add health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1
-
-# Start the application with proper signal handling
+# Start the application
 CMD ["/bin/sh", "-c", "trap 'pkill -f node || true; exit 0' INT TERM; /app/startup.sh"]

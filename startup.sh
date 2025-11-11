@@ -5,7 +5,15 @@ set -e
 echo "🔍 Checking for existing Node.js processes..."
 pkill -f "node.*dist/server" || true
 pkill -f "pm2" || true
+pkill -f "health-server.js" || true
 # Small delay to ensure processes are fully terminated
+sleep 2
+
+# Start health check server in the background
+echo "🚀 Starting health check server on port 3002..."
+node health-server.js &
+
+# Small delay to ensure health server is up
 sleep 2
 
 # Print environment for debugging
