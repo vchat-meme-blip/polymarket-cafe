@@ -49,22 +49,39 @@ RUN npm ci --only=production --legacy-peer-deps
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
 
 # Copy built files from builder with correct directory structure
-RUN mkdir -p /app/dist/server/server
-COPY --from=builder /app/dist/server/ /app/dist/server/server/
+RUN mkdir -p /app/dist/server
+# First copy the server files to a temporary location
+COPY --from=builder /app/dist/server/ /app/dist/temp-server/
+# Then move the files to the correct location
+RUN mv /app/dist/temp-server/server/* /app/dist/server/ 2>/dev/null || true && \
+    mv /app/dist/temp-server/*.js /app/dist/server/ 2>/dev/null || true && \
+    mv /app/dist/temp-server/*.json /app/dist/server/ 2>/dev/null || true && \
+    mv /app/dist/temp-server/workers /app/dist/server/ 2>/dev/null || true && \
+    rm -rf /app/dist/temp-server
 
-# Copy and rename worker files from .js to .mjs
-RUN echo "Copying and renaming worker files..." && \
-    mkdir -p /app/dist/server/server/workers && \
-    # First, copy all worker files to the target directory with .mjs extension
-    find /app/dist -name "*.worker.js" | while read file; do \
+# Handle worker files
+RUN echo "Setting up worker files..." && \
+    mkdir -p /app/dist/workers && \
+    # Copy worker files from server directory to workers directory
+    if [ -d "/app/dist/server/workers" ]; then \
+        cp -r /app/dist/server/workers/* /app/dist/workers/ 2>/dev/null || true; \
+    fi && \
+    # Ensure all worker files have .mjs extension
+    find /app/dist/workers -name "*.worker.js" | while read file; do \
         if [ -f "$file" ]; then \
-            cp "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
-            echo "Copied $file to /app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+            mv "$file" "${file%.js}.mjs"; \
+            echo "Renamed $file to ${file%.js}.mjs"; \
         fi; \
     done && \
-    # Verify the files were copied with .mjs extension
-    echo "Worker files in /app/dist/server/server/workers/:" && \
-    ls -la /app/dist/server/server/workers/ 2>/dev/null || echo "No worker files found"
+    # Create symlinks for backward compatibility
+    for file in /app/dist/workers/*.mjs; do \
+        if [ -f "$file" ]; then \
+            ln -sf "$file" "/app/dist/workers/$(basename "$file" .mjs).js" 2>/dev/null || true; \
+        fi; \
+    done && \
+    # Verify the worker files
+    echo "Worker files in /app/dist/workers/:" && \
+    ls -la /app/dist/workers/ 2>/dev/null || echo "No worker files found"
 
 # Copy client files
 COPY --from=builder /app/dist/client/ /app/dist/client/
@@ -114,20 +131,28 @@ COPY --from=builder /app/server/env.ts ./dist/server/
 # Verify the build output, surface entry point, and persist it for runtime
 RUN set -e; \
     echo "Verifying build..."; \
-    if [ -f "/app/dist/server/server/index.mjs" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.mjs"; \
-    elif [ -f "/app/dist/server/server/index.js" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.js"; \
-    elif [ -f "/app/dist/server/index.mjs" ]; then \
+    # Check for entry points in the correct location
+    if [ -f "/app/dist/server/index.mjs" ]; then \
         ENTRYPOINT="/app/dist/server/index.mjs"; \
     elif [ -f "/app/dist/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/index.js"; \
+    # Fallback to server directory if needed
+    elif [ -f "/app/dist/server/server/index.mjs" ]; then \
+        ENTRYPOINT="/app/dist/server/server/index.mjs"; \
+    elif [ -f "/app/dist/server/server/index.js" ]; then \
+        ENTRYPOINT="/app/dist/server/server/index.js"; \
     else \
         echo "Error: No entry point found in /app/dist/server"; \
         echo "Build output in /app/dist:"; \
         find /app/dist -type f; \
         exit 1; \
     fi; \
+    # Ensure the entry point exists and is executable
+    if [ ! -f "$ENTRYPOINT" ]; then \
+        echo "Error: Entry point $ENTRYPOINT does not exist"; \
+        exit 1; \
+    fi; \
+    chmod +x "$ENTRYPOINT"; \
     echo "Found entry point at $ENTRYPOINT"; \
     echo "First 10 lines of entry point:"; \
     head -n 10 "$ENTRYPOINT" || true; \
