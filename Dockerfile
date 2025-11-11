@@ -3,18 +3,33 @@ FROM node:20.17.0-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies (no python3 needed as we're skipping USB module)
-RUN apk add --no-cache libc6-compat python3 make g++ gcc
+# Install build dependencies
+RUN apk add --no-cache libc6-compat python3 make g++ gcc linux-headers
 
-# Copy package files and install all dependencies
-COPY package*.json ./
+# Set environment to skip optional deps and native builds
+ENV NPM_CONFIG_OPTIONAL=false
+ENV NPM_CONFIG_OMIT=optional
+ENV NPM_CONFIG_NO_OPTIONAL=1
+ENV NODE_OPTIONS=--openssl-legacy-provider
+
+# Copy package files first for better caching
+COPY package.json package-lock.json* ./
 COPY tsconfig*.json ./
 
 # Install specific npm version and development tools
 RUN npm install -g npm@10.2.4 && \
     npm install -g typescript@5.3.3 && \
-    npm install --no-package-lock --no-save @types/node@20.11.0 && \
-    npm ci --legacy-peer-deps --omit=optional
+    npm install --no-package-lock --no-save @types/node@20.11.0
+
+# Install production deps only, force ignore optional
+RUN npm ci --omit=optional --omit=dev --legacy-peer-deps && \
+    # Remove any usb-related modules that might have been installed
+    rm -rf node_modules/usb \
+           node_modules/@ledgerhq/hw-transport-node-hid \
+           node_modules/@ledgerhq/hw-transport-node-hid-singleton \
+           node_modules/@solana/wallet-adapter-ledger \
+           node_modules/.cache \
+           ~/.npm/_cacache
 # Copy the rest of the application
 COPY . .
 
@@ -32,18 +47,15 @@ FROM node:20.17.0-alpine
 
 WORKDIR /app
 
-# Install runtime dependencies and build tools
-RUN apk add --no-cache libc6-compat python3 make g++ gcc
-RUN apk add --no-cache curl
-
-WORKDIR /app
+# Install minimal runtime dependencies
+RUN apk add --no-cache libc6-compat
 
 # Set production environment
-ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-ENV VITE_SOCKET_URL=${VITE_SOCKET_URL}
-ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
-ENV DOCKER_ENV=true
 ENV NODE_ENV=production
+ENV NPM_CONFIG_OPTIONAL=false
+ENV NPM_CONFIG_OMIT=optional
+ENV NPM_CONFIG_NO_OPTIONAL=1
+ENV NODE_OPTIONS=--openssl-legacy-provider
 
 # Copy package files and fallbacks
 COPY package*.json ./
@@ -51,27 +63,26 @@ RUN mkdir -p src/wallets
 COPY src/wallets/solflare-fallback.js src/wallets/
 COPY src/wallets/phantom-fallback.js src/wallets/
 
-# Set environment variables to skip optional dependencies and native builds
-ENV NODE_OPTIONS=--openssl-legacy-provider
-
-# Install build dependencies first
+# Install production deps only, force ignore optional
 RUN npm config set fund false && \
     npm config set audit false && \
     npm config set update-notifier false && \
-    # Clean npm cache and remove lock files
+    npm config set optional false && \
+    # Clean cache and lock files
     rm -f package-lock.json && \
     npm cache clean --force && \
-    # Install only production deps first (no dev deps)
-    npm install --omit=dev --omit=optional --legacy-peer-deps && \
-    # Clean up any problematic modules
+    # Install with no optional deps
+    npm install --omit=optional --omit=dev --legacy-peer-deps && \
+    # Force remove any usb-related modules
     rm -rf node_modules/usb \
-           node_modules/@ledgerhq/hw-transport-node-hid \
-           node_modules/@ledgerhq/hw-transport-node-hid-singleton \
+           node_modules/@ledgerhq/hw-transport-* \
            node_modules/@solana/wallet-adapter-ledger \
            node_modules/.cache \
-           ~/.npm/_cacache && \
-    # Install TypeScript and Node types as dev deps
-    npm install --no-save typescript@5.3.3 @types/node@20.11.0
+           ~/.npm/_cacache \
+    # Clean up to reduce image size
+    && npm cache clean --force \
+    && apk del .build-deps \
+    && rm -rf /var/cache/apk/*
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
