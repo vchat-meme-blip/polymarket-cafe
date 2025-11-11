@@ -14,18 +14,37 @@
     "@solana/wallet-adapter-safepal": false,
     "@solana/wallet-adapter-slope": false,
     "@solana/wallet-adapter-solong": false,
-    "@solana/wallet-adapter-tokenpocket": false
+    "@solana/wallet-adapter-tokenpocket": false,
+    "@solana/wallet-adapter-bitkeep": false,
+    "@solana/wallet-adapter-bitpie": false,
+    "@solana/wallet-adapter-blocto": false,
+    "@solana/wallet-adapter-coin98": false,
+    "@solana/wallet-adapter-coinhub": false,
+    "@solana/wallet-adapter-mathwallet": false,
+    "@solana/wallet-adapter-phantom": "./src/wallets/solflare-fallback.js"
   },
   "optionalDependencies": {
     "usb": "*",
     "@ledgerhq/hw-transport-node-hid": "*",
+    "@ledgerhq/hw-transport-node-hid-singleton": "*",
     "@solana/wallet-adapter-ledger": "*",
     "@solana/wallet-adapter-torus": "*",
     "@solana/wallet-adapter-walletconnect": "*",
     "@solana/wallet-adapter-safepal": "*",
     "@solana/wallet-adapter-slope": "*",
     "@solana/wallet-adapter-solong": "*",
-    "@solana/wallet-adapter-tokenpocket": "*"
+    "@solana/wallet-adapter-tokenpocket": "*",
+    "@solana/wallet-adapter-bitkeep": "*",
+    "@solana/wallet-adapter-bitpie": "*",
+    "@solana/wallet-adapter-blocto": "*",
+    "@solana/wallet-adapter-coin98": "*",
+    "@solana/wallet-adapter-coinhub": "*",
+    "@solana/wallet-adapter-mathwallet": "*"
+  },
+  "overrides": {
+    "@solana/wallet-adapter-base": {
+      "usb": "npm:usb-optional@latest"
+    }
   },
   "exports": "./dist/server/server/index.js",
   "main": "./dist/server/server/index.js",
