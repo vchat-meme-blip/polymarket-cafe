@@ -43,9 +43,8 @@ ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
-# Skip optional dependencies and set npm config to skip optional deps
-RUN npm config set optional false && \
-    npm ci --only=production --legacy-peer-deps --no-optional
+# Skip optional dependencies and force clean install
+RUN npm ci --omit=optional --only=production --legacy-peer-deps --force
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
