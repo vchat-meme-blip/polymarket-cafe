@@ -257,3 +257,58 @@ form textarea:focus {
   border-color: var(--Blue-400);
   outline: none;
 }
+
+/* Wallet adapter overrides */
+.wallet-adapter-button {
+  background-color: #512da8;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.wallet-adapter-button:hover {
+  background-color: #4527a0;
+}
+
+.wallet-adapter-button:not([disabled]):hover {
+  background-color: #4527a0;
+}
+
+.wallet-adapter-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.wallet-adapter-dropdown-list {
+  position: absolute;
+  z-index: 99;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  margin: 0;
+  list-style: none;
+  background: #2c2c2c;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+}
+
+.wallet-adapter-dropdown-list-active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .wallet-adapter-dropdown-list {
+    right: 0;
+  }
+}

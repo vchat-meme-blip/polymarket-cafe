@@ -8,32 +8,45 @@ import { resolve } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
     // Load environment variables
     const env = loadEnv(mode, process.cwd(), '');
     
+    // Set production mode based on Vite's mode
+    const isProduction = mode === 'production';
+    
     // Create a safe environment object to expose to the client
     const clientEnv = {
-        // Explicitly define which environment variables should be available to the client
-        NODE_ENV: process.env.NODE_ENV || mode,
+        // App configuration
         VITE_APP_TITLE: env.VITE_APP_TITLE || 'Poly Café',
-        VITE_API_BASE_URL: env.VITE_API_BASE_URL,
-        VITE_SOCKET_URL: env.VITE_SOCKET_URL,
+        VITE_API_BASE_URL: isProduction ? env.VITE_API_BASE_URL : 'http://localhost:3001',
+        VITE_SOCKET_URL: isProduction ? env.VITE_SOCKET_URL : 'ws://localhost:3001',
         
-        // Solana specific environment variables
+        // Solana configuration
         VITE_SOLANA_NETWORK: env.VITE_SOLANA_NETWORK || 'devnet',
         VITE_SOLANA_RPC: env.VITE_SOLANA_RPC || 'https://api.devnet.solana.com',
         VITE_AUTO_CONNECT_WALLET: env.VITE_AUTO_CONNECT_WALLET || 'true',
-        
-        // Application settings
-        VITE_APP_ENV: env.VITE_APP_ENV || 'development',
         
         // Feature flags
         VITE_ENABLE_ANALYTICS: env.VITE_ENABLE_ANALYTICS || 'false',
         VITE_ENABLE_MAINTENANCE_MODE: env.VITE_ENABLE_MAINTENANCE_MODE || 'false'
     };
+    
+    // Log environment in development
+    if (!isProduction) {
+        console.log('Vite Environment:', {
+            mode,
+            isProduction,
+            ...clientEnv
+        });
+    }
 
     return {
+        // Base public path when served in production
+        base: isProduction ? '/' : '/',
+        
+        // Plugins
         plugins: [
             react({
                 jsxImportSource: 'react',
@@ -44,20 +57,56 @@ export default defineConfig(({ mode }) => {
                 }
             })
         ],
+        
+        // Environment variables
         define: {
             'process.env': JSON.stringify(clientEnv),
             '__APP_ENV__': JSON.stringify(mode),
-            'global': 'window'
+            'global': 'window',
+            'process.env.NODE_ENV': JSON.stringify(isProduction ? 'production' : 'development')
         },
+        
+        // Resolve configuration
+        resolve: {
+            alias: {
+                '@': path.resolve(__dirname, './src'),
+                '~': path.resolve(__dirname, './')
+            }
+        },
+        
+        // Build configuration
+        build: {
+            outDir: 'dist',
+            assetsDir: 'assets',
+            sourcemap: !isProduction,
+            minify: isProduction ? 'esbuild' : false,
+            rollupOptions: {
+                input: {
+                    main: path.resolve(__dirname, 'index.html')
+                },
+                output: {
+                    manualChunks: {
+                        vendor: ['react', 'react-dom', '@solana/web3.js', '@solana/wallet-adapter-react']
+                    },
+                    chunkFileNames: 'assets/js/[name]-[hash].js',
+                    entryFileNames: 'assets/js/[name]-[hash].js',
+                    assetFileNames: 'assets/[ext]/[name]-[hash][extname]'
+                }
+            }
+        },
+        // Server configuration
         server: {
+            port: 3000,
+            strictPort: true,
+            open: !isProduction,
             proxy: {
                 '/api': {
-                    target: env.VITE_API_BASE_URL || 'http://localhost:3001',
+                    target: clientEnv.VITE_API_BASE_URL,
                     changeOrigin: true,
-                    secure: false,
+                    secure: false
                 },
                 '/socket.io': {
-                    target: env.VITE_SOCKET_URL || 'ws://localhost:3001',
+                    target: clientEnv.VITE_SOCKET_URL,
                     // Required for WebSocket connections
                     ws: true,
                     changeOrigin: true,
@@ -77,72 +126,16 @@ export default defineConfig(({ mode }) => {
                 }
             }
         },
-        // Configure build settings
-        build: {
-            outDir: 'dist/client',
-            emptyOutDir: true,
-            assetsDir: 'assets',
-            // Don't inline any files, keep them as separate files
-            assetsInlineLimit: 0,
-            rollupOptions: {
-                external: [
-                    '@solana/wallet-adapter-base',
-                    '@solana/wallet-adapter-react',
-                    '@solana/wallet-adapter-react-ui',
-                    '@solana/wallet-adapter-phantom',
-                    '@solana/wallet-adapter-solflare',
-                    '@solana/web3.js',
-                    '@solana/spl-token',
-                ],
-                output: {
-                    // Ensure consistent chunk names
-                    chunkFileNames: 'assets/js/[name]-[hash].js',
-                    entryFileNames: 'assets/js/[name]-[hash].js',
-                    assetFileNames: (assetInfo) => {
-                        // Handle case where name might be undefined
-                        if (!assetInfo.name) {
-                            return 'assets/[name]-[hash][extname]';
-                        }
-                        
-                        // Put different asset types in different directories
-                        if (/\.(png|jpe?g|svg|gif|webp|avif)$/i.test(assetInfo.name)) {
-                            return `assets/images/[name]-[hash][extname]`;
-                        }
-                        if (/\.(woff|woff2|eot|ttf|otf)$/i.test(assetInfo.name)) {
-                            return `assets/fonts/[name]-[hash][extname]`;
-                        }
-                        if (/\.(vrm|glb|gltf|bin)$/i.test(assetInfo.name)) {
-                            return `assets/models/[name]-[hash][extname]`;
-                        }
-                        // Default path for other assets
-                        return 'assets/[name]-[hash][extname]';
-                    },
-                },
-            },
-            // Increase chunk size warning limit
-            chunkSizeWarningLimit: 2000, // Increased to 2MB
-            // Enable sourcemaps in development
-            sourcemap: mode === 'development',
-            // Minify for production
-            minify: mode === 'production' ? 'esbuild' : false,
-        },
-        // Configure static assets handling
+        // Static assets handling
         publicDir: 'public',
-        // Copy public directory to dist
         copyPublicDir: true,
-        // Explicitly include all asset types
+        
+        // Asset handling
         assetsInclude: [
             '**/*.vrm', '**/*.glb', '**/*.gltf', '**/*.bin',
             '**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.gif', '**/*.webp', '**/*.avif',
             '**/*.svg', '**/*.woff', '**/*.woff2', '**/*.eot', '**/*.ttf', '**/*.otf',
-            '**/*.mp4', '**/*.webm', '**/*.ogg', '**/*.mp3', '**/*.wav', '**/*.flac',
-            '**/*.aac', '**/*.pdf', '**/*.zip', '**/*.wasm'
-        ],
-        resolve: {
-            alias: {
-                '@': path.resolve(__dirname, './src'),
-                mongoose: 'mongoose',
-            }
-        },
+            '**/*.mp4', '**/*.webm', '**/*.ogg', '**/*.mp3', '**/*.wav', '**/*.flac'
+        ]
     };
 });

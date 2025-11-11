@@ -11,19 +11,15 @@
     "npm": ">=9.0.0"
   },
   "scripts": {
-    "dev": "concurrently \"npm:dev:*\"",
-    "dev:client": "vite --host --port 5173",
-    "dev:server": "nodemon -q --watch server --ext ts,mts,js,mjs,json --exec \"node --import tsx server/index.ts\"",
-    "build:client": "vite build",
-    "clean:dist": "rimraf dist",
-    "build:server": "tsc --project tsconfig.server.json --noEmit false --skipLibCheck true --pretty --noImplicitAny false --strictNullChecks false --strictFunctionTypes false --strictBindCallApply false --noImplicitThis false --noUnusedLocals false --noUnusedParameters false --noImplicitReturns false --noFallthroughCasesInSwitch false --outDir dist/server",
-    "postbuild:server": "tsc-alias -p tsconfig.server.json",
-    "build": "npm run clean:dist && npm run build:client && npm run build:server && npm run postbuild:server",
-    "start": "NODE_ENV=production node dist/server/server/index.js",
-    "start:pm2": "NODE_ENV=production pm2-runtime start ecosystem.config.mjs",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx --fix",
-    "reset-db": "tsx server/scripts/reset-db.ts"
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.16.0",
@@ -40,6 +36,7 @@
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",
     "@solana/wallet-adapter-solflare": "^0.6.32",
+    "@solana/wallet-adapter-wallets": "^0.19.37",
     "@solana/web3.js": "^1.98.4",
     "@types/helmet": "^0.0.48",
     "@types/joi": "^17.2.2",
@@ -48,6 +45,7 @@
     "@types/react-dom": "^18.3.0",
     "@types/socket.io": "^3.0.2",
     "@types/ws": "^8.5.10",
+    "autoprefixer": "^10.4.19",
     "axios": "^1.11.0",
     "classnames": "^2.5.1",
     "compression": "^1.7.4",
@@ -64,14 +62,18 @@
     "mongodb": "^6.8.0",
     "natural": "^8.1.0",
     "openai": "^4.52.2",
+    "postcss": "^8.4.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-error-boundary": "^6.0.0",
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.7.5",
+    "tailwindcss": "^3.4.1",
     "three": "^0.164.1",
     "tsx": "^4.7.0",
     "twilio": "^5.2.2",
+    "vite": "^5.4.21",
+    "vite-tsconfig-paths": "^4.3.2",
     "ws": "^8.17.0",
     "zustand": "^5.0.7"
   },
@@ -84,8 +86,6 @@
     "@types/lodash": "^4.17.20",
     "@types/mongoose": "^5.11.96",
     "@types/node": "^22.18.12",
-    "@types/react": "^18.3.1",
-    "@types/react-dom": "^18.3.0",
     "@types/three": "^0.164.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
@@ -103,9 +103,7 @@
     "ts-node": "^10.9.2",
     "tsc-alias": "^1.8.16",
     "typescript": "^5.9.3",
-    "vite": "^5.4.21",
     "vite-plugin-node-polyfills": "^0.24.0",
-    "vite-plugin-static-copy": "^3.1.4",
-    "vite-tsconfig-paths": "^4.3.2"
+    "vite-plugin-static-copy": "^3.1.4"
   }
 }
