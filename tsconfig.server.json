@@ -15,27 +15,15 @@
       "@/*": ["./server/*"]
     },
     "preserveSymlinks": true,
-    "moduleDetection": "force",
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
-    "noEmit": false,
-    "emitDeclarationOnly": false,
-    "sourceMap": true
+    "moduleDetection": "force"
   },
   "include": [
     "server/**/*.ts",
-    "lib/**/*.ts",
-    "types/**/*.d.ts"
+    "lib/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "**/*.test.ts",
-    "**/node_modules/**"
-  ],
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  }
+    "**/*.test.ts"
+  ]
 }
