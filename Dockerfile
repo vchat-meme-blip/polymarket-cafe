@@ -55,10 +55,10 @@ COPY --from=builder /app/dist/ /app/dist/
 # Ensure the server directory structure exists
 RUN mkdir -p /app/dist/server/server/workers
 
-# If the server files are in dist/server/server, create a symlink for backward compatibility
-RUN if [ -d "/app/dist/server/server" ] && [ ! -f "/app/dist/server/index.js" ]; then \
-      echo "Creating symlink for server entry point"; \
-      ln -s /app/dist/server/server/index.js /app/dist/server/index.js; \
+# Ensure the server entry point is in the correct location
+RUN if [ -f "/app/dist/server/server/index.js" ] && [ ! -f "/app/dist/server/index.js" ]; then \
+      echo "Copying server entry point to expected location"; \
+      cp /app/dist/server/server/index.js /app/dist/server/index.js; \
     fi
 
 # Copy and rename worker files from .js to .mjs
@@ -130,15 +130,15 @@ RUN set -e; \
     echo "\nPotential server entry points:"; \
     find /app/dist -name "index.js" -o -name "index.mjs" | sort; \
     # Check for entry points in the correct location first
-    if [ -f "/app/dist/server/server/index.mjs" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.mjs"; \
+    if [ -f "/app/dist/server/index.js" ]; then \
+        ENTRYPOINT="/app/dist/server/index.js"; \
+    # Fallback to other possible locations
     elif [ -f "/app/dist/server/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/server/index.js"; \
-    # Fallback to other possible locations
     elif [ -f "/app/dist/server/index.mjs" ]; then \
         ENTRYPOINT="/app/dist/server/index.mjs"; \
-    elif [ -f "/app/dist/server/index.js" ]; then \
-        ENTRYPOINT="/app/dist/server/index.js"; \
+    elif [ -f "/app/dist/server/server/index.mjs" ]; then \
+        ENTRYPOINT="/app/dist/server/server/index.mjs"; \
     else \
         echo "Error: No entry point found in expected locations"; \
         echo "Build output in /app/dist:"; \
