@@ -1,5 +1,5 @@
 # ---- Build Stage ----
-FROM node:18.20.2-alpine AS builder
+FROM node:20.17.0-alpine AS builder
 
 WORKDIR /app
 
@@ -10,10 +10,10 @@ RUN apk add --no-cache libc6-compat python3 make g++ gcc
 COPY package*.json ./
 COPY tsconfig*.json ./
 
-# Install dependencies and development tools
-RUN npm install -g npm@latest && \
+# Install specific npm version and development tools
+RUN npm install -g npm@10.2.4 && \
     npm install -g typescript@5.3.3 && \
-    npm install --no-package-lock --no-save @types/node@22.14.0 && \
+    npm install --no-package-lock --no-save @types/node@20.11.0 && \
     npm ci --legacy-peer-deps --omit=optional
 # Copy the rest of the application
 COPY . .
@@ -28,7 +28,7 @@ RUN echo "Building server..." && \
     npm run postbuild:server
 
 # ---- Production Stage ----
-FROM node:18.20.2-alpine
+FROM node:20.17.0-alpine
 
 WORKDIR /app
 
@@ -71,7 +71,7 @@ RUN npm config set fund false && \
            node_modules/.cache \
            ~/.npm/_cacache && \
     # Install TypeScript and Node types as dev deps
-    npm install --no-save typescript@5.3.3 @types/node@22.14.0
+    npm install --no-save typescript@5.3.3 @types/node@20.11.0
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
