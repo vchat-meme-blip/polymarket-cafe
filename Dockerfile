@@ -132,29 +132,35 @@ COPY --from=builder /app/server/env.ts ./dist/server/
 RUN set -e; \
     echo "Verifying build..."; \
     echo "Current directory: $(pwd)"; \
-    echo "Directory contents:"; \
+    echo "Directory contents of /app/dist/server/:"; \
     ls -la /app/dist/server/; \
     \
     # Check for entry points in the correct location
-    if [ -f "/app/dist/server/index.mjs" ]; then \
+    if [ -f "/app/dist/server/dist/server/index.js" ]; then \
+        ENTRYPOINT="/app/dist/server/dist/server/index.js"; \
+    elif [ -f "/app/dist/server/server/dist/server/index.js" ]; then \
+        ENTRYPOINT="/app/dist/server/server/dist/server/index.js"; \
+    elif [ -f "/app/dist/server/dist/index.js" ]; then \
+        ENTRYPOINT="/app/dist/server/dist/index.js"; \
+    elif [ -f "/app/dist/server/index.mjs" ]; then \
         ENTRYPOINT="/app/dist/server/index.mjs"; \
     elif [ -f "/app/dist/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/index.js"; \
-    # Check for compiled TypeScript files
-    elif [ -f "/app/dist/server/dist/server/index.js" ]; then \
-        ENTRYPOINT="/app/dist/server/dist/server/index.js"; \
-    # Check for server.js as fallback
     elif [ -f "/app/dist/server/server.js" ]; then \
         ENTRYPOINT="/app/dist/server/server.js"; \
     else \
         echo "Error: No entry point found in /app/dist/server"; \
-        echo "Build output in /app/dist/server:"; \
+        echo "Searching for possible entry points..."; \
+        find /app/dist/server -type f -name "*.js" -o -name "*.mjs" | grep -v "node_modules" || true; \
+        echo "\nBuild output in /app/dist/server:"; \
         find /app/dist/server -type f; \
         exit 1; \
     fi; \
     # Ensure the entry point exists and is executable
     if [ ! -f "$ENTRYPOINT" ]; then \
         echo "Error: Entry point $ENTRYPOINT does not exist"; \
+        echo "Trying to find alternative entry points..."; \
+        find /app/dist/server -type f -name "*.js" -o -name "*.mjs" | grep -v "node_modules" || true; \
         exit 1; \
     fi; \
     # Make the entry point executable
