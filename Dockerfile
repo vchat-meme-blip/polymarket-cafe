@@ -31,26 +31,25 @@ RUN echo "Cleaning previous builds..." && \
     rm -rf dist/ && \
     echo "Building client and server..." && \
     npm run build:client && \
-    npm run build:server && \
+    # Build server with the updated TypeScript config
+    echo "Building server with TypeScript..." && \
+    npx tsc -p tsconfig.server.json && \
+    npx tsc-alias -p tsconfig.server.json && \
+    # Run postbuild steps
     npm run postbuild:server && \
     # Create expected directory structure
-    mkdir -p /app/dist/client /app/dist/server/lib /app/dist/server/server && \
-    # Copy lib directory
-    if [ -d "/app/lib" ]; then \
-        echo "Copying lib directory..." && \
-        cp -r /app/lib/* /app/dist/server/lib/; \
-    fi && \
+    mkdir -p /app/dist/client /app/dist/server/server && \
     # Move client files to the correct location
     mv /app/dist/assets /app/dist/client/ 2>/dev/null || true && \
     mv /app/dist/index.html /app/dist/client/ 2>/dev/null || true && \
     mv /app/dist/*.css /app/dist/client/ 2>/dev/null || true && \
     mv /app/dist/*.js /app/dist/client/ 2>/dev/null || true && \
-    # Ensure server files are in the right place
-    if [ -d "/app/dist/server" ]; then \
-        mv /app/dist/server/* /app/dist/ 2>/dev/null || true; \
-    fi && \
-    # Verify the lib directory was copied
-    echo "Lib directory contents after build:" && \
+    # Verify the build output
+    echo "Build output structure:" && \
+    find /app/dist -type f | sort && \
+    echo "\nServer files:" && \
+    find /app/dist/server -type f 2>/dev/null || echo "No server files found" && \
+    echo "\nLib files:" && \
     find /app/dist/server/lib -type f 2>/dev/null || echo "No lib files found"
 
 # Verify the build output
