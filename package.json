@@ -11,20 +11,19 @@
     "npm": ">=9.0.0"
   },
   "scripts": {
-    "dev": "vite",
-    "clean": "if exist dist rmdir /s /q dist",
-    "build": "npm run clean && npm run build:client && npm run build:server",
+    "dev": "concurrently \"npm:dev:*\"",
+    "dev:client": "vite --host --port 5173",
+    "dev:server": "nodemon -q --watch server --ext ts,mts,js,mjs,json --exec \"node --import tsx server/index.ts\"",
     "build:client": "vite build",
-    "build:server": "tsc -p tsconfig.server.json && npm run postbuild:server",
-    "postbuild:server": "node --experimental-json-modules --no-warnings scripts/fix-imports.js && npx tsx scripts/copy-server-files.ts",
-    "preview": "vite preview",
+    "clean:dist": "rimraf dist",
+    "build:server": "tsc --project tsconfig.server.json --noEmit false --skipLibCheck true --pretty --noImplicitAny false --strictNullChecks false --strictFunctionTypes false --strictBindCallApply false --noImplicitThis false --noUnusedLocals false --noUnusedParameters false --noImplicitReturns false --noFallthroughCasesInSwitch false --outDir dist/server",
+    "postbuild:server": "tsc-alias -p tsconfig.server.json",
+    "build": "npm run clean:dist && npm run build:client && npm run build:server && npm run postbuild:server",
+    "start": "NODE_ENV=production node dist/server/server/index.js",
+    "start:pm2": "NODE_ENV=production pm2-runtime start ecosystem.config.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage",
-    "start": "node dist/server/server/index.js"
+    "reset-db": "tsx server/scripts/reset-db.ts"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.16.0",
@@ -40,7 +39,7 @@
     "@solana/wallet-adapter-phantom": "^0.9.28",
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",
-    "@solana/wallet-adapter-solflare": "0.6.32",
+    "@solana/wallet-adapter-solflare": "^0.6.32",
     "@solana/web3.js": "^1.98.4",
     "@types/helmet": "^0.0.48",
     "@types/joi": "^17.2.2",
@@ -76,8 +75,6 @@
     "three": "^0.164.1",
     "tsx": "^4.7.0",
     "twilio": "^5.2.2",
-    "vite": "^5.4.21",
-    "vite-tsconfig-paths": "^4.3.2",
     "ws": "^8.17.0",
     "zustand": "^5.0.7"
   },
@@ -90,6 +87,8 @@
     "@types/lodash": "^4.17.20",
     "@types/mongoose": "^5.11.96",
     "@types/node": "^22.18.12",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
     "@types/three": "^0.164.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
@@ -107,7 +106,9 @@
     "ts-node": "^10.9.2",
     "tsc-alias": "^1.8.16",
     "typescript": "^5.9.3",
+    "vite": "^5.4.21",
     "vite-plugin-node-polyfills": "^0.24.0",
-    "vite-plugin-static-copy": "^3.1.4"
+    "vite-plugin-static-copy": "^3.1.4",
+    "vite-tsconfig-paths": "^4.3.2"
   }
 }

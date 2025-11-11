@@ -8,38 +8,23 @@ RUN apk add --no-cache python3 make g++
 
 # Copy package files and install all dependencies
 COPY package*.json ./
-
-# Copy TypeScript configuration files
 COPY tsconfig*.json ./
 
 # Install dependencies and development tools
 RUN npm install -g typescript@5.3.3 && \
     npm install --save-dev @types/node@22.14.0 && \
     npm ci --legacy-peer-deps
-
-# Copy all files except node_modules
+# Copy the rest of the application
 COPY . .
-
-# Verify files were copied correctly
-RUN echo "Current directory: $(pwd)" && \
-    echo "Files in current directory:" && \
-    ls -la && \
-    echo "TypeScript config files:" && \
-    find /app -name "tsconfig*.json" -exec ls -la {} \;
 
 # Build the application
 RUN echo "Building client..." && \
     npm run build:client
 
-# Build server with explicit TypeScript config path
+# Build server separately to handle any specific requirements
 RUN echo "Building server..." && \
-    tsc -p ./tsconfig.server.json && \
+    npm run build:server && \
     npm run postbuild:server
-
-# Verify the build output
-RUN echo "Build output verification:" && \
-    ls -la /app/dist/server/server/ 2>/dev/null || echo "No server build output found" && \
-    ls -la /app/dist/server/server/workers/ 2>/dev/null || echo "No worker files found"
 
 # ---- Production Stage ----
 FROM node:22-alpine
@@ -125,28 +110,39 @@ RUN echo "Build output verification:" && \
 
 COPY --from=builder /app/server/env.ts ./dist/server/
 
-# Build the server files
-RUN npm run build:server && npm run postbuild:server
-
-# Verify the build output and set the entry point
+# Verify the build output, surface entry point, and persist it for runtime
 RUN set -e; \
     echo "Verifying build..."; \
-    if [ -f "/app/dist/server/server/index.js" ]; then \
+    if [ -f "/app/dist/server/server/index.mjs" ]; then \
+        ENTRYPOINT="/app/dist/server/server/index.mjs"; \
+    elif [ -f "/app/dist/server/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/server/index.js"; \
+    elif [ -f "/app/dist/server/index.mjs" ]; then \
+        ENTRYPOINT="/app/dist/server/index.mjs"; \
     elif [ -f "/app/dist/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/index.js"; \
     else \
-        echo "Error: No entry point found"; \
+        echo "Error: No entry point found in /app/dist/server"; \
         echo "Build output in /app/dist:"; \
         find /app/dist -type f; \
         exit 1; \
     fi; \
     echo "Found entry point at $ENTRYPOINT"; \
+    echo "First 10 lines of entry point:"; \
+    head -n 10 "$ENTRYPOINT" || true; \
+    echo "..."; \
     echo "$ENTRYPOINT" > /app/.entrypoint-path; \
     echo "Will use entry point: $(cat /app/.entrypoint-path)"
 
 # Set working directory to the app root
 WORKDIR /app
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/health || exit 1
+
+# Expose the port your application will run on
+EXPOSE ${PORT}
 
 # Create a startup script with debug info and dynamic entry point detection
 RUN cat <<'EOF' > /app/startup.sh && \
@@ -207,7 +203,7 @@ fi
 log "  - Node version: $(node --version)"
 log "  - NPM version: $(npm --version)"
 log "  - Environment variables:"
-printenv | grep -v "PASSWORD\\|SECRET\\|TOKEN\\|KEY" | sort | sed 's/^/    /'
+printenv | grep -v "PASSWORD\|SECRET\|TOKEN\|KEY" | sort | sed 's/^/    /'
 
 log "  - First 20 lines of entry point:"
 head -n 20 "$ENTRYPOINT_PATH" 2>/dev/null || log "    Could not read entry point file"
@@ -217,18 +213,5 @@ log "🚀 Starting application..."
 exec node --no-warnings "$ENTRYPOINT_PATH"
 EOF
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/api/health || exit 1
-
-# Expose the port your application will run on
-EXPOSE ${PORT}
-
-# Ensure TypeScript files are compiled
-RUN npm run build:server
-
-# Verify the startup script exists
-RUN ls -la /app/dist/server/startup.js || (echo "Startup script not found" && find /app/dist -name "*.js" | grep -v node_modules)
-
-# Start the application using the correct startup script
-CMD ["node", "--no-warnings", "/app/dist/server/startup.js"]
+# Start the application
+CMD ["/app/startup.sh"]

@@ -23,7 +23,7 @@ if [ ! -f "$ENTRYPOINT" ]; then
     for entry in "${POSSIBLE_ENTRIES[@]}"; do
         if [ -f "$entry" ]; then
             ENTRYPOINT="$entry"
-            echo "Found entry point at: $ENTRYPOINT"
+            echo "🚀 Found entry point at: $ENTRYPOINT"
             break
         fi
     done

@@ -73,17 +73,39 @@ export default defineConfig(({ mode }) => {
             // Don't inline any files, keep them as separate files
             assetsInlineLimit: 0,
             rollupOptions: {
-                input: {
-                    main: path.resolve(__dirname, 'index.html')
-                },
+                external: [
+                    '@solana/wallet-adapter-base',
+                    '@solana/wallet-adapter-react',
+                    '@solana/wallet-adapter-react-ui',
+                    '@solana/wallet-adapter-phantom',
+                    '@solana/wallet-adapter-solflare',
+                    '@solana/web3.js',
+                    '@solana/spl-token',
+                ],
                 output: {
-                    manualChunks: {
-                        vendor: ['react', 'react-dom', '@solana/web3.js', '@solana/wallet-adapter-react']
-                    },
+                    // Ensure consistent chunk names
                     chunkFileNames: 'assets/js/[name]-[hash].js',
                     entryFileNames: 'assets/js/[name]-[hash].js',
-                    assetFileNames: 'assets/[ext]/[name]-[hash][extname]'
-                }
+                    assetFileNames: (assetInfo) => {
+                        // Handle case where name might be undefined
+                        if (!assetInfo.name) {
+                            return 'assets/[name]-[hash][extname]';
+                        }
+                        
+                        // Put different asset types in different directories
+                        if (/\.(png|jpe?g|svg|gif|webp|avif)$/i.test(assetInfo.name)) {
+                            return `assets/images/[name]-[hash][extname]`;
+                        }
+                        if (/\.(woff|woff2|eot|ttf|otf)$/i.test(assetInfo.name)) {
+                            return `assets/fonts/[name]-[hash][extname]`;
+                        }
+                        if (/\.(vrm|glb|gltf|bin)$/i.test(assetInfo.name)) {
+                            return `assets/models/[name]-[hash][extname]`;
+                        }
+                        // Default path for other assets
+                        return 'assets/[name]-[hash][extname]';
+                    },
+                },
             },
             // Increase chunk size warning limit
             chunkSizeWarningLimit: 2000, // Increased to 2MB
