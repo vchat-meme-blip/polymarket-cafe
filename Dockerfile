@@ -213,6 +213,9 @@ log "🚀 Starting application..."
 exec node --no-warnings "$ENTRYPOINT_PATH"
 EOF
 
-# Start the application
-# Ensure only one process starts the application and handle process cleanup
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1
+
+# Start the application with proper signal handling
 CMD ["/bin/sh", "-c", "trap 'pkill -f node || true; exit 0' INT TERM; /app/startup.sh"]

@@ -6,9 +6,10 @@ echo "🔍 Checking for existing Node.js processes..."
 pkill -f "node.*dist/server" || true
 pkill -f "pm2" || true
 # Small delay to ensure processes are fully terminated
-sleep 1
+sleep 2
 
 # Print environment for debugging
+echo "🔍 Environment variables:"
 printenv
 
 # Default entry point

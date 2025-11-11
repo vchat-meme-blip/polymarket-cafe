@@ -170,12 +170,42 @@ export async function startServer() {
   const PORT = process.env.PORT || 3001;
   const HOST = process.env.HOST || '0.0.0.0';
   
+  // Function to start the server with retry logic
+  const startServerWithRetry = (port: number, maxRetries = 3, retryCount = 0) => {
+    const onError = (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        if (retryCount < maxRetries) {
+          console.warn(`[Server] Port ${port} is in use, retrying (${retryCount + 1}/${maxRetries})...`);
+          setTimeout(() => {
+            server.close(() => {
+              startServerWithRetry(port, maxRetries, retryCount + 1);
+            });
+          }, 2000);
+        } else {
+          console.error(`[Server] Failed to start: Port ${port} is in use after ${maxRetries} retries`);
+          process.exit(1);
+        }
+      } else {
+        console.error('[Server] Failed to start:', error);
+        process.exit(1);
+      }
+    };
+
+    server.on('error', onError);
+    
+    server.listen(port, HOST, () => {
+      server.off('error', onError); // Remove error handler once server is running
+      const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+      console.log(`[Server] HTTP and WebSocket server running on ${protocol}://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${port}`);
+      console.log(`[Server] WebSocket URL: ws://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${port}/socket.io/`);
+    });
+  };
+
+  // Initialize WebSocket service
   webSocketService.init(server);
-  server.listen(Number(PORT), HOST, () => {
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    console.log(`[Server] HTTP and WebSocket server running on ${protocol}://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
-    console.log(`[Server] WebSocket URL: ws://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/socket.io/`);
-  });
+  
+  // Start the server with retry logic
+  startServerWithRetry(Number(PORT));
   
   const stop = async () => {
     console.log('[Server] Stopping server...');
