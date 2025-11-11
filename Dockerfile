@@ -3,8 +3,8 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apk add --no-cache python3 make g++
+# Install build dependencies (no python3 needed as we're skipping USB module)
+RUN apk add --no-cache make g++
 
 # Copy package files and install all dependencies
 COPY package*.json ./
@@ -29,8 +29,8 @@ RUN echo "Building server..." && \
 # ---- Production Stage ----
 FROM node:22-alpine
 
-# Install runtime dependencies
-RUN apk add --no-cache libusb udev curl
+# Install runtime dependencies (removed libusb and udev as we're not using hardware wallets)
+RUN apk add --no-cache curl
 
 WORKDIR /app
 
@@ -43,7 +43,9 @@ ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
-RUN npm ci --only=production --legacy-peer-deps
+# Skip optional dependencies and set npm config to skip optional deps
+RUN npm config set optional false && \
+    npm ci --only=production --legacy-peer-deps --no-optional
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
