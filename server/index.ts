@@ -1,14 +1,21 @@
 /// <reference types="node" />
 
+// Import required modules
 import { fileURLToPath } from 'node:url';
-import path from 'node:path';
+import { dirname, join } from 'node:path';
+import http from 'node:http';
+import { startServer } from './startup.js';
 
 // Define __filename and __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = dirname(__filename);
 
-import { startServer } from './startup.js';
-import http from 'http';
+// Set project root directory
+const projectRoot = join(__dirname, '..');
+
+// Log the current file and directory for debugging
+console.log('Project root:', projectRoot);
+console.log('Starting server from:', __filename);
 
 let serverInstance: { stop: () => Promise<void> } | null = null;
 

@@ -22,9 +22,8 @@ RUN npm cache clean --force && \
     npm install --save-dev @types/node@22.14.0 && \
     npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false
 
-# Copy the rest of the application with .dockerignore handling
-# Using ADD instead of COPY to handle .dockerignore more reliably
-ADD . .
+# Copy the rest of the application
+COPY . .
 
 # Clean any previous builds and build the application
 RUN echo "Cleaning previous builds..." && \
@@ -38,7 +37,10 @@ RUN echo "Cleaning previous builds..." && \
     # Run postbuild steps
     npm run postbuild:server && \
     # Create expected directory structure
-    mkdir -p /app/dist/client /app/dist/server/server && \
+    mkdir -p /app/dist/client /app/dist/server && \
+    # Copy necessary files for ESM
+    cp -r /app/lib /app/dist/ && \
+    cp -r /app/public /app/dist/ && \
     # Move client files to the correct location
     mv /app/dist/assets /app/dist/client/ 2>/dev/null || true && \
     mv /app/dist/index.html /app/dist/client/ 2>/dev/null || true && \
