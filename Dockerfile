@@ -47,27 +47,30 @@ COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps
 
 # Create necessary directories
-RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
+RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs
 
 # Copy built files from builder
-COPY --from=builder /app/dist/server/ /app/dist/server/
+COPY --from=builder /app/dist/ /app/dist/
+
+# Ensure the server directory exists
+RUN mkdir -p /app/dist/server
 
 # Copy and rename worker files from .js to .mjs
 RUN echo "Copying and renaming worker files..." && \
-    mkdir -p /app/dist/server/server/workers && \
+    mkdir -p /app/dist/server/workers && \
     # First, copy all worker files to the target directory with .mjs extension
     find /app/dist -name "*.worker.js" | while read file; do \
         if [ -f "$file" ]; then \
-            cp "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
-            echo "Copied $file to /app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+            cp "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
+            echo "Copied $file to /app/dist/server/workers/$(basename "$file" .js).mjs"; \
         fi; \
     done && \
     # Verify the files were copied with .mjs extension
-    echo "Worker files in /app/dist/server/server/workers/:" && \
-    ls -la /app/dist/server/server/workers/ 2>/dev/null || echo "No worker files found"
+    echo "Worker files in /app/dist/server/workers/:" && \
+    ls -la /app/dist/server/workers/ 2>/dev/null || echo "No worker files found"
 
 # Copy client files
-COPY --from=builder /app/dist/client/ /app/dist/client/
+# Client files are already in /app/dist from the previous copy
 
 # Handle public directory
 RUN if [ -d "/app/public" ]; then \
