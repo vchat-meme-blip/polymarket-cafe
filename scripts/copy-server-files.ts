@@ -22,6 +22,8 @@ async function copyFileWithDir(src: string, dest: string) {
 async function copyDirRecursive(src: string, dest: string, exclude: string[] = []) {
   const entries = await fs.readdir(src, { withFileTypes: true });
   
+  const operations = [];
+  
   for (const entry of entries) {
     // Skip excluded directories/files
     if (['node_modules', '.git', 'dist', 'build', '.DS_Store', ...exclude].includes(entry.name)) {
@@ -33,34 +35,42 @@ async function copyDirRecursive(src: string, dest: string, exclude: string[] = [
     const destPath = path.join(dest, entry.name);
     
     if (entry.isDirectory()) {
-      await ensureDirectoryExists(destPath);
-      await copyDirRecursive(srcPath, destPath, exclude);
+      operations.push(
+        ensureDirectoryExists(destPath)
+          .then(() => copyDirRecursive(srcPath, destPath, exclude))
+      );
     } else {
-      // Skip .ts files but copy their .js and .d.ts counterparts
-      if (entry.name.endsWith('.ts')) {
-        // If it's a .d.ts file, copy it
-        if (entry.name.endsWith('.d.ts')) {
-          await copyFileWithDir(srcPath, destPath);
+      // Handle file copy operations
+      operations.push((async () => {
+        // Skip .ts files but copy their .js and .d.ts counterparts
+        if (entry.name.endsWith('.ts')) {
+          // If it's a .d.ts file, copy it
+          if (entry.name.endsWith('.d.ts')) {
+            await copyFileWithDir(srcPath, destPath);
+          }
+          // Skip the .ts file as it should be compiled to .js
+          return;
         }
-        // Skip the .ts file as it should be compiled to .js
-        continue;
-      }
-      
-      // Copy all other files
-      await copyFileWithDir(srcPath, destPath);
-      
-      // If this is a .js file, check for and copy the corresponding .d.ts file
-      if (entry.name.endsWith('.js')) {
-        const dtsPath = srcPath.replace(/\.js$/, '.d.ts');
-        try {
-          await fs.access(dtsPath);
-          await copyFileWithDir(dtsPath, destPath.replace(/\.js$/, '.d.ts'));
-        } catch {
-          // No .d.ts file, that's fine
+        
+        // Copy all other files
+        await copyFileWithDir(srcPath, destPath);
+        
+        // If this is a .js file, check for and copy the corresponding .d.ts file
+        if (entry.name.endsWith('.js')) {
+          const dtsPath = srcPath.replace(/\.js$/, '.d.ts');
+          try {
+            await fs.access(dtsPath);
+            await copyFileWithDir(dtsPath, destPath.replace(/\.js$/, '.d.ts'));
+          } catch {
+            // No .d.ts file, that's fine
+          }
         }
-      }
+      })());
     }
   }
+  
+  // Wait for all operations to complete
+  await Promise.all(operations);
 }
 
 async function copyServerFiles() {
@@ -157,7 +167,13 @@ async function copyServerFiles() {
 }
 
 // Run the copy process
-copyServerFiles().catch((error) => {
-  console.error('Unhandled error in copy-server-files:', error);
-  process.exit(1);
-});
+(async () => {
+  try {
+    await copyServerFiles();
+    // Explicitly exit to ensure the process doesn't hang
+    process.exit(0);
+  } catch (error) {
+    console.error('Unhandled error in copy-server-files:', error);
+    process.exit(1);
+  }
+})();
