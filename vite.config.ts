@@ -16,9 +16,21 @@ export default defineConfig(({ mode }) => {
     const clientEnv = {
         // Explicitly define which environment variables should be available to the client
         NODE_ENV: process.env.NODE_ENV || mode,
-        VITE_APP_TITLE: env.VITE_APP_TITLE,
+        VITE_APP_TITLE: env.VITE_APP_TITLE || 'Poly Café',
         VITE_API_BASE_URL: env.VITE_API_BASE_URL,
         VITE_SOCKET_URL: env.VITE_SOCKET_URL,
+        
+        // Solana specific environment variables
+        VITE_SOLANA_NETWORK: env.VITE_SOLANA_NETWORK || 'devnet',
+        VITE_SOLANA_RPC: env.VITE_SOLANA_RPC || 'https://api.devnet.solana.com',
+        VITE_AUTO_CONNECT_WALLET: env.VITE_AUTO_CONNECT_WALLET || 'true',
+        
+        // Application settings
+        VITE_APP_ENV: env.VITE_APP_ENV || 'development',
+        
+        // Feature flags
+        VITE_ENABLE_ANALYTICS: env.VITE_ENABLE_ANALYTICS || 'false',
+        VITE_ENABLE_MAINTENANCE_MODE: env.VITE_ENABLE_MAINTENANCE_MODE || 'false'
     };
 
     return {

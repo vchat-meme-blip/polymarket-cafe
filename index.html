@@ -23,31 +23,8 @@
 <script type="importmap">
 {
   "imports": {
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "three/": "https://aistudiocdn.com/three@^0.181.1/",
-    "three": "https://aistudiocdn.com/three@^0.181.1",
-    "zustand": "https://aistudiocdn.com/zustand@^5.0.8",
-    "zustand/": "https://aistudiocdn.com/zustand@^5.0.8/",
-    "html-to-image": "https://aistudiocdn.com/html-to-image@^1.11.13",
-    "vite": "https://aistudiocdn.com/vite@^7.2.2",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.0",
-    "@react-three/fiber": "https://aistudiocdn.com/@react-three/fiber@^9.4.0",
-    "@solana/spl-token": "https://aistudiocdn.com/@solana/spl-token@^0.4.14",
-    "openai": "https://aistudiocdn.com/openai@^6.8.1",
-    "eventemitter3": "https://aistudiocdn.com/eventemitter3@^5.0.1",
-    "compression": "https://aistudiocdn.com/compression@^1.8.1",
-    "@solana/wallet-adapter-react-ui": "https://aistudiocdn.com/@solana/wallet-adapter-react-ui@^0.9.39",
-    "@solana/wallet-adapter-react-ui/": "https://aistudiocdn.com/@solana/wallet-adapter-react-ui@^0.9.39/",
-    "mongoose": "https://aistudiocdn.com/mongoose@^8.19.3",
-    "mongodb": "https://aistudiocdn.com/mongodb@^7.0.0",
-    "url": "https://aistudiocdn.com/url@^0.11.4",
-    "lodash": "https://aistudiocdn.com/lodash@^4.17.21",
-    "fs": "https://aistudiocdn.com/fs@^0.0.1-security",
-    "fs/": "https://aistudiocdn.com/fs@^0.0.1-security/",
-    "socket.io-client": "https://aistudiocdn.com/socket.io-client@^4.8.1",
+    // Let Vite handle all dependencies
+    "@google/genai": "./node_modules/@google/genai/dist/index.js",
     "helmet": "https://aistudiocdn.com/helmet@^8.1.0",
     "stream": "https://aistudiocdn.com/stream@^0.0.3",
     "dotenv": "https://aistudiocdn.com/dotenv@^17.2.3",
@@ -75,12 +52,12 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
-</head>
 
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
+    <!-- Include the wallet adapter styles -->
+    <link rel="stylesheet" href="/node_modules/@solana/wallet-adapter-react-ui/styles.css" />
   </body>
 </html>

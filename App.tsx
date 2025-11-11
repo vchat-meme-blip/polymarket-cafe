@@ -18,6 +18,9 @@
  * limitations under the License.
  */
 
+// Import the wallet adapter styles
+import '@solana/wallet-adapter-react-ui/styles.css';
+
 /** @jsxImportSource react */
 import React, { useEffect, useState } from 'react';
 import { useUI, useUser, useAgent } from './lib/state/index.js';
@@ -41,13 +44,15 @@ import VisitStorefrontModal from './components/modals/VisitStorefrontModal.js';
 import CreateTaskModal from './components/modals/CreateTaskModal';
 import TaskDetailModal from './components/modals/TaskDetailModal';
 import { WalletContextProvider } from './components/providers/WalletContextProvider';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import PaywallModal from './components/modals/PaywallModal';
 
 /**
  * Main application component.
  * Acts as a router to show the landing page, onboarding, or the main app.
  */
-function App() {
+// Main application component with wallet integration
+function AppContent() {
   const { 
     isSignedIn, showServerHealthModal, 
     agentDossierId, showAboutPage, showOnboarding, showProfileView, 
@@ -140,4 +145,13 @@ function App() {
   );
 }
 
-export default App;
+// Wrap the app with the wallet provider
+export default function App() {
+  return (
+    <WalletContextProvider>
+      <AppContent />
+    </WalletContextProvider>
+  );
+}
+
+export { AppContent };
