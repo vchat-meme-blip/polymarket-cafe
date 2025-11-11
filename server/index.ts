@@ -1,3 +1,12 @@
+/// <reference types="node" />
+
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+// Define __filename and __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 import { startServer } from './startup.js';
 import http from 'http';
 

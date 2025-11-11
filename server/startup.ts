@@ -26,6 +26,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.join(__dirname, '..');
 
+// Log the current file and directory for debugging
+console.log('Starting server from:', __filename);
+console.log('Project root:', projectRoot);
+
 export async function startServer() {
   if (!process.env.MONGODB_URI) {
     console.error('[FATAL] MONGODB_URI is not set.');
