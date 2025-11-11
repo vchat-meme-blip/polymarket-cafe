@@ -4,7 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "browser": {
-    "usb": false
+    "usb": false,
+    "@ledgerhq/hw-transport-node-hid": false,
+    "@ledgerhq/hw-transport-node-hid-singleton": false
+  },
+  "optionalDependencies": {
+    "usb": "^2.0.0"
   },
   "exports": "./dist/server/server/index.js",
   "main": "./dist/server/server/index.js",
