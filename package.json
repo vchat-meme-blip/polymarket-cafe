@@ -3,56 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": {
-    "preinstall": "node -e \"const pkg = require('./package.json'); if (pkg.dependencies['usb'] || pkg.optionalDependencies['usb']) { console.error('Error: The usb module is not supported in this environment'); process.exit(1); }\""
-  },
   "browser": {
-    "usb": "./src/wallets/usb-fallback.js",
-    "@ledgerhq/hw-transport-node-hid": false,
-    "@ledgerhq/hw-transport-node-hid-singleton": false,
-    "@solana/wallet-adapter-ledger": false,
-    "@solana/wallet-adapter-solflare": "./src/wallets/solflare-fallback.js",
-    "@solana/wallet-adapter-torus": false,
-    "@solana/wallet-adapter-walletconnect": false,
-    "@solana/wallet-adapter-safepal": false,
-    "@solana/wallet-adapter-slope": false,
-    "@solana/wallet-adapter-solong": false,
-    "@solana/wallet-adapter-tokenpocket": false,
-    "@solana/wallet-adapter-bitkeep": false,
-    "@solana/wallet-adapter-bitpie": false,
-    "@solana/wallet-adapter-blocto": false,
-    "@solana/wallet-adapter-coin98": false,
-    "@solana/wallet-adapter-coinhub": false,
-    "@solana/wallet-adapter-mathwallet": false,
-    "@solana/wallet-adapter-phantom": "./src/wallets/solflare-fallback.js"
-  },
-  "resolutions": {
-    "usb": "4.3.0",
-    "@ledgerhq/hw-transport-node-hid": "6.27.3",
-    "@ledgerhq/hw-transport-node-hid-singleton": "6.27.3"
-  },
-  "optionalDependencies": {
-    "usb": "4.3.0",
-    "@ledgerhq/hw-transport-node-hid": "6.27.3",
-    "@ledgerhq/hw-transport-node-hid-singleton": "6.27.3",
-    "@solana/wallet-adapter-ledger": "0.9.28",
-    "@solana/wallet-adapter-torus": "0.15.2",
-    "@solana/wallet-adapter-walletconnect": "0.15.2",
-    "@solana/wallet-adapter-safepal": "0.2.0",
-    "@solana/wallet-adapter-slope": "0.5.22",
-    "@solana/wallet-adapter-solong": "0.9.0",
-    "@solana/wallet-adapter-tokenpocket": "0.2.0",
-    "@solana/wallet-adapter-bitkeep": "0.2.0",
-    "@solana/wallet-adapter-bitpie": "0.2.0",
-    "@solana/wallet-adapter-blocto": "0.5.22",
-    "@solana/wallet-adapter-coin98": "0.2.0",
-    "@solana/wallet-adapter-coinhub": "0.2.0",
-    "@solana/wallet-adapter-mathwallet": "0.2.0"
-  },
-  "overrides": {
-    "@solana/wallet-adapter-base": {
-      "usb": "npm:usb-optional@latest"
-    }
+    "usb": false
   },
   "exports": "./dist/server/server/index.js",
   "main": "./dist/server/server/index.js",
