@@ -3,28 +3,44 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+# Add a build-arg to force cache invalidation
+ARG CACHEBUST=1
+
 # Install build dependencies
 RUN apk add --no-cache python3 make g++
 
-# Copy package files and install all dependencies
+# First, copy only package files for better layer caching
 COPY package*.json ./
 COPY tsconfig*.json ./
 
 # Install dependencies and development tools
-RUN npm install -g typescript@5.3.3 && \
+# Install global dependencies
+RUN npm install -g typescript@5.3.3
+
+# Install project dependencies with clean cache
+RUN npm cache clean --force && \
     npm install --save-dev @types/node@22.14.0 && \
-    npm ci --legacy-peer-deps
-# Copy the rest of the application
-COPY . .
+    npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false
 
-# Build the application
-RUN echo "Building client..." && \
-    npm run build:client
+# Copy the rest of the application with .dockerignore handling
+# Using ADD instead of COPY to handle .dockerignore more reliably
+ADD . .
 
-# Build server separately to handle any specific requirements
-RUN echo "Building server..." && \
+# Clean any previous builds and build the application
+RUN echo "Cleaning previous builds..." && \
+    rm -rf dist/ && \
+    echo "Building client and server..." && \
+    npm run build:client && \
     npm run build:server && \
     npm run postbuild:server
+
+# Verify the build output
+RUN echo "Build output in /app/dist:" && \
+    find /app/dist -type f && \
+    echo "\nServer files:" && \
+    find /app/dist/server -type f 2>/dev/null || echo "No server files found" && \
+    echo "\nClient files:" && \
+    find /app/dist/client -type f 2>/dev/null || echo "No client files found"
 
 # ---- Production Stage ----
 FROM node:22-alpine
@@ -41,29 +57,30 @@ ENV VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
 ENV DOCKER_ENV=true
 ENV NODE_ENV=production
 
-# Copy package files and install only production dependencies
-COPY package*.json ./
-RUN npm ci --only=production --legacy-peer-deps
+# Create necessary directories first
+RUN mkdir -p /app/dist/server /app/dist/client /app/dist/workers /app/logs
 
-# Create necessary directories
-RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
+# Install production dependencies with clean cache
+COPY package*.json ./
+RUN npm cache clean --force && \
+    npm ci --only=production --legacy-peer-deps --prefer-offline --no-audit --progress=false
 
 # Copy built files from builder
-COPY --from=builder /app/dist/server/ /app/dist/server/
+COPY --from=builder /app/dist/server /app/dist/server
+COPY --from=builder /app/dist/client /app/dist/client
 
 # Copy and rename worker files from .js to .mjs
 RUN echo "Copying and renaming worker files..." && \
-    mkdir -p /app/dist/server/server/workers && \
-    # First, copy all worker files to the target directory with .mjs extension
-    find /app/dist -name "*.worker.js" | while read file; do \
+    mkdir -p /app/dist/server/workers && \
+    # Find and copy all worker files
+    find /app/dist -name "*.worker.js" | while read -r file; do \
         if [ -f "$file" ]; then \
-            cp "$file" "/app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
-            echo "Copied $file to /app/dist/server/server/workers/$(basename "$file" .js).mjs"; \
+            cp -v "$file" "/app/dist/server/workers/$(basename "$file" .js).mjs"; \
         fi; \
     done && \
-    # Verify the files were copied with .mjs extension
-    echo "Worker files in /app/dist/server/server/workers/:" && \
-    ls -la /app/dist/server/server/workers/ 2>/dev/null || echo "No worker files found"
+    # Verify the files were copied
+    echo "\nWorker files in /app/dist/server/workers/:" && \
+    ls -la /app/dist/server/workers/ 2>/dev/null || echo "No worker files found"
 
 # Copy client files
 COPY --from=builder /app/dist/client/ /app/dist/client/
@@ -110,27 +127,36 @@ RUN echo "Build output verification:" && \
 
 COPY --from=builder /app/server/env.ts ./dist/server/
 
-# Verify the build output, surface entry point, and persist it for runtime
+# Verify the build output and find entry point
 RUN set -e; \
     echo "Verifying build..."; \
-    if [ -f "/app/dist/server/server/index.mjs" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.mjs"; \
-    elif [ -f "/app/dist/server/server/index.js" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.js"; \
-    elif [ -f "/app/dist/server/index.mjs" ]; then \
-        ENTRYPOINT="/app/dist/server/index.mjs"; \
-    elif [ -f "/app/dist/server/index.js" ]; then \
-        ENTRYPOINT="/app/dist/server/index.js"; \
-    else \
-        echo "Error: No entry point found in /app/dist/server"; \
+    echo "Searching for entry points in /app/dist..."; \
+    \
+    # Look for entry points in common locations
+    for path in \
+        "/app/dist/server/index.js" \
+        "/app/dist/server/index.mjs" \
+        "/app/dist/server/server/index.js" \
+        "/app/dist/server/server/index.mjs" \
+        "/app/dist/index.js" \
+        "/app/dist/index.mjs"; \
+    do \
+        if [ -f "$path" ]; then \
+            ENTRYPOINT="$path"; \
+            break; \
+        fi; \
+    done; \
+    \
+    if [ -z "$ENTRYPOINT" ]; then \
+        echo "Error: No entry point found"; \
         echo "Build output in /app/dist:"; \
-        find /app/dist -type f; \
+        find /app/dist -type f | sort; \
+        echo "\nContents of /app/dist/server:"; \
+        ls -la /app/dist/server/ 2>/dev/null || echo "No server directory found"; \
         exit 1; \
     fi; \
+    \
     echo "Found entry point at $ENTRYPOINT"; \
-    echo "First 10 lines of entry point:"; \
-    head -n 10 "$ENTRYPOINT" || true; \
-    echo "..."; \
     echo "$ENTRYPOINT" > /app/.entrypoint-path; \
     echo "Will use entry point: $(cat /app/.entrypoint-path)"
 
