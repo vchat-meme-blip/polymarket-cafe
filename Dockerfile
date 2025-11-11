@@ -107,20 +107,23 @@ RUN echo "Setting up worker files..." && \
 
 # Ensure the server directory structure is correct
 RUN mkdir -p /app/dist/server && \
-    if [ -f "/app/dist/server/server/startup.js" ]; then \
-        # If startup.js is in server/server, create a symlink in server/
-        ln -sf /app/dist/server/server/startup.js /app/dist/server/startup.js 2>/dev/null || true; \
-    fi && \
-    if [ -f "/app/dist/server/startup.js" ]; then \
-        echo "startup.js found at /app/dist/server/startup.js"; \
-    else \
-        echo "WARNING: startup.js not found in expected locations"; \
-        echo "Contents of /app/dist/server:"; \
-        ls -la /app/dist/server/ 2>/dev/null || echo "Could not list /app/dist/server"; \
-        if [ -d "/app/dist/server/server" ]; then \
-            echo "Contents of /app/dist/server/server:"; \
-            ls -la /app/dist/server/server/ 2>/dev/null || echo "Could not list /app/dist/server/server"; \
+    # Create a symlink to the server files for backward compatibility
+    if [ -d "/app/dist/server/server" ]; then \
+        echo "Creating symlinks for server files..."; \
+        # Create a symlink for startup.js in the root server directory
+        if [ -f "/app/dist/server/server/startup.js" ]; then \
+            ln -sf /app/dist/server/server/startup.js /app/dist/server/startup.js 2>/dev/null || true; \
         fi; \
+        # List all files for debugging
+        echo "Contents of /app/dist/server:"; \
+        ls -la /app/dist/server/; \
+        echo "Contents of /app/dist/server/server:"; \
+        ls -la /app/dist/server/server/; \
+    else \
+        echo "ERROR: Server files not found in /app/dist/server/server"; \
+        echo "Current directory structure:"; \
+        find /app/dist -type d | sort; \
+        exit 1; \
     fi
 
 # Copy client files
