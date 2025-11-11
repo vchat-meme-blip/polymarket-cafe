@@ -49,8 +49,8 @@ RUN if [ -d "/app/dist/server/server" ]; then \
       rmdir /app/dist/server/server 2>/dev/null || true; \
     fi
 
-# Set the entry point to use server.js which is the compiled version of server.ts
-CMD ["node", "dist/server/server.js"]
+# Set the entry point to use the correct path to server.js
+CMD ["node", "/app/dist/server/server.js"]
 
 # Set default port if not specified
 ENV PORT=${PORT:-3000}
