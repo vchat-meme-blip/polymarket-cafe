@@ -47,21 +47,25 @@ RUN mkdir -p src/wallets
 COPY src/wallets/solflare-fallback.js src/wallets/
 
 # Set environment variables to skip optional dependencies and native builds
-ENV NPM_CONFIG_OPTIONAL=false
-ENV NPM_CONFIG_OMIT=optional
-ENV NPM_CONFIG_NO_OPTIONAL=1
 ENV NODE_OPTIONS=--openssl-legacy-provider
 
 # Install production dependencies, excluding optional and native modules
-RUN npm config set optional false && \
-    npm config set fund false && \
+RUN npm config set fund false && \
     npm config set audit false && \
-    npm ci --only=production --legacy-peer-deps --omit=optional && \
+    # Create a clean .npmrc with the necessary settings
+    { \
+      echo "legacy-peer-deps=true"; \
+      echo "omit=optional"; \
+      echo "optional=false"; \
+    } > .npmrc && \
+    # Install with explicit production-only flag
+    npm ci --only=production && \
     # Remove any usb or native modules that might have been installed
     rm -rf node_modules/usb \
            node_modules/@ledgerhq/hw-transport-node-hid \
            node_modules/@ledgerhq/hw-transport-node-hid-singleton \
-           node_modules/@solana/wallet-adapter-ledger
+           node_modules/@solana/wallet-adapter-ledger \
+           node_modules/.cache
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client

@@ -8,11 +8,24 @@
     "@ledgerhq/hw-transport-node-hid": false,
     "@ledgerhq/hw-transport-node-hid-singleton": false,
     "@solana/wallet-adapter-ledger": false,
-    "@solana/wallet-adapter-solflare": "./src/wallets/solflare-fallback.js"
+    "@solana/wallet-adapter-solflare": "./src/wallets/solflare-fallback.js",
+    "@solana/wallet-adapter-torus": false,
+    "@solana/wallet-adapter-walletconnect": false,
+    "@solana/wallet-adapter-safepal": false,
+    "@solana/wallet-adapter-slope": false,
+    "@solana/wallet-adapter-solong": false,
+    "@solana/wallet-adapter-tokenpocket": false
   },
   "optionalDependencies": {
     "usb": "*",
-    "@ledgerhq/hw-transport-node-hid": "*"
+    "@ledgerhq/hw-transport-node-hid": "*",
+    "@solana/wallet-adapter-ledger": "*",
+    "@solana/wallet-adapter-torus": "*",
+    "@solana/wallet-adapter-walletconnect": "*",
+    "@solana/wallet-adapter-safepal": "*",
+    "@solana/wallet-adapter-slope": "*",
+    "@solana/wallet-adapter-solong": "*",
+    "@solana/wallet-adapter-tokenpocket": "*"
   },
   "exports": "./dist/server/server/index.js",
   "main": "./dist/server/server/index.js",
