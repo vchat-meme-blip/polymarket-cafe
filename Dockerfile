@@ -214,5 +214,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose the port your application will run on
 EXPOSE ${PORT}
 
-# Start the application using the compiled server file
-CMD ["node", "/app/dist/server/server/index.js"]
+# Set Linux-specific configurations
+RUN chmod +x /app/startup.sh \
+    && dos2unix /app/startup.sh
+
+# Start the application using the startup script
+CMD ["/app/startup.sh"]
