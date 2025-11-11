@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection, useWallet as useWalletAdapter } from '@solana/wallet-adapter-react';
 import { Connection, PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
 
 interface WalletConnection {
@@ -15,58 +15,103 @@ interface WalletConnection {
     connection: Connection,
     options?: { skipPreflight?: boolean; maxRetries?: number }
   ) => Promise<string>;
+  error: Error | null;
 }
 
 export const useWalletConnection = (): WalletConnection => {
   const { connection } = useConnection();
-  const { 
-    publicKey, 
-    connect, 
-    disconnect, 
-    sendTransaction,
-    connecting,
-    disconnecting,
-    connected
-  } = useWallet();
+  const wallet = useWalletAdapter();
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  
+  // Handle connection with loading state
+  const connect = useCallback(async () => {
+    if (!wallet) {
+      setError(new Error('Wallet not available'));
+      return;
+    }
 
-  // Handle auto-connect
+    try {
+      setIsConnecting(true);
+      setError(null);
+      await wallet.connect();
+      
+      // Save auto-connect preference
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('walletAutoConnect', 'true');
+      }
+    } catch (err) {
+      console.error('Failed to connect wallet:', err);
+      setError(err instanceof Error ? err : new Error('Failed to connect wallet'));
+      throw err;
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [wallet]);
+
+  // Handle disconnection
+  const disconnect = useCallback(async () => {
+    if (!wallet) return;
+    
+    try {
+      await wallet.disconnect();
+      
+      // Clear auto-connect preference
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('walletAutoConnect');
+      }
+    } catch (err) {
+      console.error('Failed to disconnect wallet:', err);
+      setError(err instanceof Error ? err : new Error('Failed to disconnect wallet'));
+      throw err;
+    }
+  }, [wallet]);
+
+  // Handle transaction sending
+  const sendTransaction = useCallback(async (
+    transaction: Transaction | VersionedTransaction,
+    connection: Connection,
+    options?: { skipPreflight?: boolean; maxRetries?: number }
+  ) => {
+    if (!wallet?.publicKey || !wallet?.sendTransaction) {
+      throw new Error('Wallet not connected');
+    }
+
+    try {
+      const signature = await wallet.sendTransaction(transaction, connection, options);
+      return signature;
+    } catch (err) {
+      console.error('Transaction failed:', err);
+      setError(err instanceof Error ? err : new Error('Transaction failed'));
+      throw err;
+    }
+  }, [wallet]);
+
+  // Handle auto-connect on mount
   useEffect(() => {
     const shouldAutoConnect = 
       typeof window !== 'undefined' && 
       window.localStorage.getItem('walletAutoConnect') === 'true';
 
-    if (shouldAutoConnect && !connected && !connecting) {
+    if (shouldAutoConnect && !wallet?.connected && !isConnecting) {
       connect().catch(() => {
-        // Handle error (e.g., no wallet found)
         console.warn('Failed to auto-connect wallet');
       });
     }
-  }, [connect, connected, connecting]);
+  }, [connect, wallet?.connected, isConnecting]);
 
-  // Handle wallet connection
-  const handleConnect = useCallback(async () => {
-    try {
-      await connect();
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('walletAutoConnect', 'true');
-      }
-    } catch (error) {
-      console.error('Error connecting wallet:', error);
-      throw error;
-    }
-  }, [connect]);
-
-  // Handle wallet disconnection
-  const handleDisconnect = useCallback(async () => {
-    try {
-      await disconnect();
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem('walletAutoConnect');
-      }
-    } catch (error) {
-      console.error('Error disconnecting wallet:', error);
-      throw error;
-    }
+  return {
+    connection,
+    publicKey: wallet?.publicKey || null,
+    connected: wallet?.connected || false,
+    connecting: isConnecting || wallet?.connecting || false,
+    disconnecting: wallet?.disconnecting || false,
+    connect,
+    disconnect,
+    sendTransaction,
+    error,
+  };
+};
   }, [disconnect]);
 
   // Enhanced sendTransaction with error handling

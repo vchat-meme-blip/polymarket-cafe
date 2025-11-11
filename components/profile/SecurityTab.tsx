@@ -111,9 +111,9 @@ export default function SecurityTab() {
         </div>
 
         <div className={styles.securitySection}>
-            <h4>Gemini API Key</h4>
+            <h4>OpenAI API Key</h4>
             <p className={styles.stepHint} style={{ marginBottom: '12px' }}>
-            Save your own Gemini API key to be used for your personal agent chats.
+            Save your own OpenAI API key to be used for your personal agent chats.
             Your key will be stored securely on our server.
             </p>
             <input

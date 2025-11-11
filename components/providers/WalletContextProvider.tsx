@@ -1,10 +1,10 @@
-import React, { FC, ReactNode, useMemo } from 'react';
+import React, { FC, ReactNode, useMemo, useEffect, useState } from 'react';
 import { ConnectionProvider, WalletProvider, useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
 import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { clusterApiUrl, Connection } from '@solana/web3.js';
+import { clusterApiUrl } from '@solana/web3.js';
 import { ErrorBoundary } from 'react-error-boundary';
 
 // Error boundary fallback component
@@ -21,50 +21,75 @@ const WalletErrorFallback = ({ error, resetErrorBoundary }: { error: Error, rese
   </div>
 );
 
-// Default styles that can be overridden by your app
+// Import default styles
 import '@solana/wallet-adapter-react-ui/styles.css';
 
-// Define network from environment variable or default to devnet
+// Get network from environment or default to devnet
 const getNetwork = (): WalletAdapterNetwork => {
-  const network = import.meta.env.VITE_SOLANA_NETWORK || 'devnet';
-  return network as WalletAdapterNetwork || WalletAdapterNetwork.Devnet;
+  try {
+    const network = import.meta.env.VITE_SOLANA_NETWORK || 'devnet';
+    return (network as WalletAdapterNetwork) || WalletAdapterNetwork.Devnet;
+  } catch (error) {
+    console.warn('Error getting network, defaulting to devnet:', error);
+    return WalletAdapterNetwork.Devnet;
+  }
 };
 
-// Custom RPC endpoint from environment variable or use clusterApiUrl
+// Get RPC URL with fallback
 const getRpcUrl = (network: WalletAdapterNetwork): string => {
-  return import.meta.env.VITE_SOLANA_RPC || clusterApiUrl(network);
+  try {
+    return import.meta.env.VITE_SOLANA_RPC || clusterApiUrl(network);
+  } catch (error) {
+    console.warn('Error getting RPC URL, using default cluster URL');
+    return clusterApiUrl(network);
+  }
 };
 
 export const WalletContextProvider: FC<{ children: ReactNode }> = ({ children }) => {
-    const network = getNetwork();
-    const endpoint = useMemo(() => getRpcUrl(network), [network]);
-    
-    // Initialize wallets with auto-connect
-    const wallets = useMemo(
-        () => [
-            new PhantomWalletAdapter(),
-            new SolflareWalletAdapter(),
-        ],
-        [network] // Recreate wallets when network changes
-    );
+  const [mounted, setMounted] = useState(false);
+  
+  // Initialize network and endpoint with useMemo to prevent unnecessary recalculations
+  const { network, endpoint } = useMemo(() => {
+    const net = getNetwork();
+    return {
+      network: net,
+      endpoint: getRpcUrl(net)
+    };
+  }, []);
 
-    // Create a connection to check RPC health
-    const connection = useMemo(() => new Connection(endpoint, 'confirmed'), [endpoint]);
+  // Initialize wallets with auto-connect
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+    ],
+    [network]
+  );
 
-    return (
-        <ErrorBoundary 
-            FallbackComponent={WalletErrorFallback}
-            onReset={() => window.location.reload()}
-        >
-            <ConnectionProvider endpoint={endpoint}>
-                <WalletProvider wallets={wallets} autoConnect>
-                    <WalletModalProvider>
-                        {children}
-                    </WalletModalProvider>
-                </WalletProvider>
-            </ConnectionProvider>
-        </ErrorBoundary>
-    );
+  // Set mounted state after initial render
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Don't render anything until we're on the client side
+  if (!mounted) {
+    return <>{children}</>;
+  }
+
+  return (
+    <ErrorBoundary 
+      FallbackComponent={WalletErrorFallback}
+      onReset={() => window.location.reload()}
+    >
+      <ConnectionProvider endpoint={endpoint}>
+        <WalletProvider wallets={wallets} autoConnect={false}>
+          <WalletModalProvider>
+            {children}
+          </WalletModalProvider>
+        </WalletProvider>
+      </ConnectionProvider>
+    </ErrorBoundary>
+  );
 };
 
 interface WalletConnection {
