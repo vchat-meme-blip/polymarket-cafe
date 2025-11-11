@@ -165,12 +165,11 @@ RUN set -e; \
     echo "Verifying build..."; \
     echo "Searching for entry points in /app/dist..."; \
     \
-    # Create a default entry point if none found
-    if [ ! -f "/app/dist/server/index.js" ]; then \
-        echo "Creating default server entry point..."; \
-        mkdir -p /app/dist/server; \
-        echo 'console.log("Server started"); require("./server/index.js");' > /app/dist/server/index.js; \
-    fi; \
+    # Create a proper ES module entry point that imports the server
+    echo "Creating server entry point..."; \
+    mkdir -p /app/dist/server; \
+    echo 'import { startServer } from "./server/startup.js";\n    startServer().catch(err => {\n      console.error("Failed to start server:", err);\n      process.exit(1);\n    });' > /app/dist/server/index.js && \
+    chmod +x /app/dist/server/index.js; \
     \
     # Look for entry points in common locations
     for path in \
