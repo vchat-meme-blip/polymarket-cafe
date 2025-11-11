@@ -50,7 +50,23 @@ RUN npm ci --only=production --legacy-peer-deps
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs
 
 # Copy built files from builder
+COPY --from=builder /app/package.json /app/
 COPY --from=builder /app/dist/ /app/dist/
+
+# Ensure the server directory exists
+RUN mkdir -p /app/dist/server
+
+# Try to find and copy the server entry point
+RUN if [ -f "/app/dist/server/server/index.js" ]; then \
+      echo "Found server entry point at /app/dist/server/server/index.js"; \
+      cp /app/dist/server/server/index.js /app/dist/server/; \
+    elif [ -f "/app/dist/server/index.js" ]; then \
+      echo "Found server entry point at /app/dist/server/index.js"; \
+    else \
+      echo "Warning: Could not find server entry point"; \
+      echo "Contents of /app/dist/server:"; \
+      ls -la /app/dist/server/ 2>/dev/null || echo "No server directory found"; \
+    fi
 
 # Ensure the server directory structure exists
 RUN mkdir -p /app/dist/server/server/workers
@@ -137,33 +153,40 @@ RUN echo "Build output verification:" && \
 
 COPY --from=builder /app/server/env.ts ./dist/server/
 
-# Verify the build output, surface entry point, and persist it for runtime
+# Verify the build output and find the server entry point
 RUN set -e; \
-    echo "Verifying build..."; \
-    echo "Checking for server entry points..."; \
-    # Debug: Show the directory structure
-    echo "Directory structure of /app/dist:"; \
+    echo "\n=== Verifying build ==="; \
+    echo "Current working directory: $(pwd)"; \
+    echo "\n=== Directory structure of /app ==="; \
+    find /app -maxdepth 2 -type d | sort; \
+    \
+    echo "\n=== Directory structure of /app/dist ==="; \
     find /app/dist -type d | sort; \
-    echo "\nPotential server entry points:"; \
-    find /app/dist -name "index.js" -o -name "index.mjs" | sort; \
-    # Check for entry points in the correct location first
+    \
+    echo "\n=== All potential server entry points ==="; \
+    find /app -name "index.js" -o -name "index.mjs" | grep -v "node_modules" | sort; \
+    \
+    # Check for entry points in common locations
     if [ -f "/app/dist/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/index.js"; \
-    # Fallback to other possible locations
     elif [ -f "/app/dist/server/server/index.js" ]; then \
         ENTRYPOINT="/app/dist/server/server/index.js"; \
     elif [ -f "/app/dist/server/index.mjs" ]; then \
         ENTRYPOINT="/app/dist/server/index.mjs"; \
-    elif [ -f "/app/dist/server/server/index.mjs" ]; then \
-        ENTRYPOINT="/app/dist/server/server/index.mjs"; \
+    elif [ -f "/app/dist/index.js" ]; then \
+        ENTRYPOINT="/app/dist/index.js"; \
     else \
-        echo "Error: No entry point found in expected locations"; \
-        echo "Build output in /app/dist:"; \
-        find /app/dist -type f | sort; \
-        echo "\nContents of /app/dist/server:"; \
+        echo "\n=== ERROR: No entry point found in expected locations ==="; \
+        echo "\n=== Contents of /app ==="; \
+        ls -la /app; \
+        echo "\n=== Contents of /app/dist ==="; \
+        ls -la /app/dist; \
+        echo "\n=== Contents of /app/dist/server ==="; \
         ls -la /app/dist/server/ 2>/dev/null || echo "No server directory found"; \
-        echo "\nContents of /app/dist/server/server:"; \
-        ls -la /app/dist/server/server/ 2>/dev/null || echo "No server/server directory found"; \
+        echo "\n=== All files in /app/dist ==="; \
+        find /app/dist -type f | sort; \
+        echo "\n=== Checking for server files in /app/dist ==="; \
+        find /app/dist -name "server" -type d -exec ls -la {} \;; \
         exit 1; \
     fi; \
     echo "Found entry point at $ENTRYPOINT"; \
