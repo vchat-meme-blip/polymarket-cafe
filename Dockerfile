@@ -17,22 +17,27 @@ RUN rm -rf node_modules package-lock.json
 
 # Install dependencies and development tools
 RUN npm install -g typescript@5.3.3 && \
-    npm install --no-optional --prefer-offline --no-audit --progress=false @types/node@22.14.0 && \
-    # Install Vite with compatible versions
+    # Install exact versions to avoid compatibility issues
     npm install --no-optional --prefer-offline --no-audit --progress=false \
-        vite@^4.5.0 \
-        @vitejs/plugin-react@^4.0.0 \
-        rollup@^3.29.0 \
-        esbuild@^0.19.0 && \
+        @types/node@22.14.0 \
+        vite@4.5.3 \
+        @vitejs/plugin-react@4.2.1 \
+        rollup@3.29.4 \
+        esbuild@0.19.12 && \
+    # Clean npm cache
+    npm cache clean --force && \
     # Install remaining dependencies
-    npm install --legacy-peer-deps --omit=optional --no-audit --prefer-offline
+    npm install --legacy-peer-deps --omit=optional --no-audit --prefer-offline --no-fund
 
 # Copy the rest of the application
 COPY . .
 
 # Build the application
 RUN echo "Building client..." && \
-    npm run build:client
+    # Clear any existing build artifacts
+    rm -rf node_modules/.vite && \
+    # Run Vite build with debug information
+    NODE_OPTIONS=--max-old-space-size=4096 npm run build:client -- --debug
 
 # Build server separately to handle any specific requirements
 RUN echo "Building server..." && \
@@ -54,12 +59,15 @@ ENV DOCKER_ENV=true
 # Copy package files and install only production dependencies
 COPY package*.json ./
 
-# Install production dependencies
+# Install production dependencies with specific versions
 RUN npm install --no-optional --prefer-offline --no-audit --progress=false \
-        esbuild@0.19.2 && \
+        esbuild@0.19.12 && \
+    # Clean npm cache
+    npm cache clean --force && \
     # Install production dependencies
-    npm install --only=production --legacy-peer-deps --omit=optional --no-audit --prefer-offline && \
+    npm install --only=production --legacy-peer-deps --omit=optional --no-audit --prefer-offline --no-fund && \
     # Clean up
+    npm cache clean --force && \
     rm -rf /root/.npm /tmp/*
 
 # Create necessary directories
