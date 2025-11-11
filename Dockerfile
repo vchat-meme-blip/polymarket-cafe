@@ -49,8 +49,8 @@ RUN if [ -d "/app/dist/server/server" ]; then \
       rmdir /app/dist/server/server 2>/dev/null || true; \
     fi
 
-# Set the entry point
-CMD ["node", "dist/server/index.js"]
+# Set the entry point to use server.js which is the compiled version of server.ts
+CMD ["node", "dist/server/server.js"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
