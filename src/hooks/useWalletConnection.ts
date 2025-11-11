@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useConnection, useWallet as useWalletAdapter } from '@solana/wallet-adapter-react';
-import { Connection, PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, VersionedTransaction, Commitment } from '@solana/web3.js';
+import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
+
+// Default commitment level for transactions
+const COMMITMENT_LEVEL: Commitment = 'confirmed';
 
 interface WalletConnection {
   connection: Connection | null;
