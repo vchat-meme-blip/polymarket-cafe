@@ -8,6 +8,8 @@ RUN apk add --no-cache python3 make g++
 
 # Copy package files and install all dependencies
 COPY package*.json ./
+
+# Copy TypeScript configuration files
 COPY tsconfig*.json ./
 
 # Install dependencies and development tools
@@ -18,14 +20,16 @@ RUN npm install -g typescript@5.3.3 && \
 # Copy the rest of the application
 COPY . .
 
+# Ensure all TypeScript config files are present
+RUN ls -la tsconfig*.json
+
 # Build the application
 RUN echo "Building client..." && \
     npm run build:client
 
 # Build server separately to handle any specific requirements
 RUN echo "Building server..." && \
-    npm run build:server && \
-    npm run postbuild:server
+    npm run build:server
 
 # ---- Production Stage ----
 FROM node:22-alpine
