@@ -1,7 +1,8 @@
 /// <reference types="node" />
 
-import { promises as fs, existsSync } from 'fs';
+import { promises as fs, existsSync, createReadStream, createWriteStream } from 'fs';
 import * as path from 'path';
+import { pipeline } from 'stream/promises';
 
 async function ensureDirectoryExists(dir: string) {
   try {
@@ -15,8 +16,22 @@ async function ensureDirectoryExists(dir: string) {
 
 async function copyFileWithDir(src: string, dest: string) {
   await ensureDirectoryExists(path.dirname(dest));
-  await fs.copyFile(src, dest);
-  console.log(`Copied ${path.relative(process.cwd(), src)} to ${path.relative(process.cwd(), dest)}`);
+  
+  // Skip if source and destination are the same
+  if (src === dest) {
+    return;
+  }
+  
+  try {
+    const source = createReadStream(src);
+    const destStream = createWriteStream(dest);
+    
+    await pipeline(source, destStream);
+    console.log(`Copied ${path.relative(process.cwd(), src)} to ${path.relative(process.cwd(), dest)}`);
+  } catch (error) {
+    console.error(`Error copying ${src} to ${dest}:`, error);
+    throw error;
+  }
 }
 
 async function copyDirRecursive(src: string, dest: string, exclude: string[] = []) {
@@ -77,32 +92,25 @@ async function copyServerFiles() {
   try {
     const srcDir = path.join(process.cwd(), 'server');
     const destDir = path.join(process.cwd(), 'dist', 'server');
+    const tempDir = path.join(process.cwd(), 'dist', 'temp');
 
-    console.log(`Copying server files from ${srcDir} to ${destDir}`);
+    console.log(`📂 Copying server files from ${srcDir} to ${destDir}`);
     
-    // Ensure destination directory exists
-    await ensureDirectoryExists(destDir);
-
-    // Copy all files from server to dist/server, excluding common directories
-    await copyDirRecursive(srcDir, destDir, [
+    // Create a temporary directory for atomic operations
+    await ensureDirectoryExists(tempDir);
+    
+    // Copy all files from server to temp directory first
+    await copyDirRecursive(srcDir, tempDir, [
       'node_modules',
       '__tests__',
       'test',
       'coverage',
       '.github',
-      '.vscode'
+      '.vscode',
+      '**/*.test.ts',
+      '**/*.spec.ts',
+      '**/*.d.ts'
     ]);
-
-    // Copy essential root files
-    const rootFiles = [
-      'package.json',
-      'package-lock.json',
-      '.env',
-      '.env.production',
-      '.env.development',
-      '.env.local',
-      'ecosystem.config.cjs'
-    ];
 
     // Handle compiled .js and .d.ts files
     const compiledDirs = [
@@ -113,13 +121,14 @@ async function copyServerFiles() {
       'workers'
     ];
 
-    // Copy compiled files from dist/server/server to dist/server
+    // Copy compiled files from dist/server/server to temp directory
     for (const dir of compiledDirs) {
       const srcPath = path.join(process.cwd(), 'dist', 'server', 'server', dir);
-      const destPath = path.join(process.cwd(), 'dist', 'server', dir);
+      const destPath = path.join(tempDir, dir);
       
       try {
         if (existsSync(srcPath)) {
+          console.log(`📦 Copying compiled ${dir} directory...`);
           await copyDirRecursive(srcPath, destPath);
           console.log(`✅ Copied compiled ${dir} directory`);
         }
@@ -128,36 +137,61 @@ async function copyServerFiles() {
       }
     }
 
+    // Copy essential root files to temp directory
+    const rootFiles = [
+      'package.json',
+      'package-lock.json',
+      '.env',
+      '.env.production',
+      '.env.development',
+      '.env.local',
+      'ecosystem.config.cjs'
+    ];
+
+    console.log('📄 Copying root files...');
     for (const file of rootFiles) {
       try {
         const srcPath = path.join(process.cwd(), file);
-        const destPath = path.join(destDir, file);
-        await fs.copyFile(srcPath, destPath);
-        console.log(`Copied ${file} to dist/server/`);
+        const destPath = path.join(tempDir, file);
+        
+        if (existsSync(srcPath)) {
+          await copyFileWithDir(srcPath, destPath);
+        }
       } catch (error: any) {
         if (error.code !== 'ENOENT') {
-          throw error;
+          console.warn(`⚠️  Error copying ${file}:`, error.message);
         }
-        console.warn(`Skipping ${file}: not found`);
       }
     }
 
-    // Ensure index.js exists (copy from server.js if needed)
-    const indexPath = path.join(destDir, 'index.js');
-    const serverPath = path.join(destDir, 'server.js');
+    // Ensure index.js exists in temp directory
+    const indexPath = path.join(tempDir, 'index.js');
+    const serverPath = path.join(tempDir, 'server.js');
     
-    try {
-      await fs.access(indexPath);
-      console.log('index.js already exists');
-    } catch {
+    if (!existsSync(indexPath) && existsSync(serverPath)) {
       try {
-        await fs.copyFile(serverPath, indexPath);
-        console.log(`Created index.js from server.js`);
+        await copyFileWithDir(serverPath, indexPath);
+        console.log(`✅ Created index.js from server.js`);
       } catch (error) {
-        console.error('Failed to create index.js:', error);
+        console.error('❌ Failed to create index.js:', error);
         throw new Error('Could not create index.js entry point');
       }
     }
+
+    // Atomically replace the destination directory
+    console.log('🔄 Finalizing file copy...');
+    
+    // Remove existing destination directory if it exists
+    if (existsSync(destDir)) {
+      try {
+        await fs.rm(destDir, { recursive: true, force: true });
+      } catch (error) {
+        console.warn('⚠️  Could not remove existing destination directory:', error);
+      }
+    }
+    
+    // Rename temp directory to destination
+    await fs.rename(tempDir, destDir);
 
     console.log('✅ Server files copied successfully');
   } catch (error) {
@@ -166,14 +200,22 @@ async function copyServerFiles() {
   }
 }
 
-// Run the copy process
+// Run the copy process with proper cleanup
 (async () => {
   try {
+    console.log('🚀 Starting file copy process...');
+    const startTime = Date.now();
+    
     await copyServerFiles();
-    // Explicitly exit to ensure the process doesn't hang
+    
+    const endTime = Date.now();
+    console.log(`✨ File copy completed successfully in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+    
+    // Force exit to prevent hanging
     process.exit(0);
   } catch (error) {
-    console.error('Unhandled error in copy-server-files:', error);
+    console.error('❌ Unhandled error in copy-server-files:', error);
+    // Force exit even if there's an error
     process.exit(1);
   }
 })();
