@@ -8,8 +8,14 @@
     "@ledgerhq/hw-transport-node-hid": false,
     "@ledgerhq/hw-transport-node-hid-singleton": false
   },
-  "optionalDependencies": {
-    "usb": "^2.0.0"
+  "resolutions": {
+    "**/usb": "0.0.0"
+  },
+  "optionalDependencies": {},
+  "overrides": {
+    "usb": {
+      "usb": "0.0.0"
+    }
   },
   "exports": "./dist/server/server/index.js",
   "main": "./dist/server/server/index.js",

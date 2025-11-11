@@ -13,7 +13,7 @@ COPY tsconfig*.json ./
 # Install dependencies and development tools
 RUN npm install -g typescript@5.3.3 && \
     npm install --save-dev @types/node@22.14.0 && \
-    npm ci --legacy-peer-deps --no-optional
+    npm ci --legacy-peer-deps --omit=optional
 # Copy the rest of the application
 COPY . .
 
@@ -43,7 +43,7 @@ ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
-RUN npm ci --only=production --legacy-peer-deps --no-optional
+RUN npm ci --only=production --legacy-peer-deps --omit=optional
 
 # Create necessary directories
 RUN mkdir -p /app/dist/workers /app/dist/server/workers /app/logs /app/dist/client
