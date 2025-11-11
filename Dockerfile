@@ -214,9 +214,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose the port your application will run on
 EXPOSE ${PORT}
 
-# Set Linux-specific configurations
-RUN chmod +x /app/startup.sh \
-    && dos2unix /app/startup.sh
-
-# Start the application using the startup script
-CMD ["/app/startup.sh"]
+# Start the application using the TypeScript entry point
+CMD ["node", "--no-warnings", "--loader", "ts-node/esm", "/app/server/startup.ts"]
