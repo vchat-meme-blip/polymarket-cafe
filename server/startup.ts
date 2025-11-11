@@ -21,6 +21,7 @@ import fs from 'fs';
 import { ApiKeyManager } from './services/apiKey.service.js';
 import { usersCollection } from './db.js';
 
+// ES Modules compatible __filename and __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.join(__dirname, '..');

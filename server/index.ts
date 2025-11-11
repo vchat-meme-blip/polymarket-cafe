@@ -1,5 +1,3 @@
-/// <reference types="node" />
-
 import { startServer } from './startup.js';
 
 let serverInstance: { stop: () => Promise<void> } | null = null;
