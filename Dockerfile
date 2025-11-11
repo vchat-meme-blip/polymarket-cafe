@@ -55,6 +55,12 @@ COPY --from=builder /app/dist/ /app/dist/
 # Ensure the server directory structure exists
 RUN mkdir -p /app/dist/server/server/workers
 
+# If the server files are in dist/server/server, create a symlink for backward compatibility
+RUN if [ -d "/app/dist/server/server" ] && [ ! -f "/app/dist/server/index.js" ]; then \
+      echo "Creating symlink for server entry point"; \
+      ln -s /app/dist/server/server/index.js /app/dist/server/index.js; \
+    fi
+
 # Copy and rename worker files from .js to .mjs
 RUN echo "Copying and renaming worker files..." && \
     mkdir -p /app/dist/server/workers && \
@@ -137,6 +143,10 @@ RUN set -e; \
         echo "Error: No entry point found in expected locations"; \
         echo "Build output in /app/dist:"; \
         find /app/dist -type f | sort; \
+        echo "\nContents of /app/dist/server:"; \
+        ls -la /app/dist/server/ 2>/dev/null || echo "No server directory found"; \
+        echo "\nContents of /app/dist/server/server:"; \
+        ls -la /app/dist/server/server/ 2>/dev/null || echo "No server/server directory found"; \
         exit 1; \
     fi; \
     echo "Found entry point at $ENTRYPOINT"; \
