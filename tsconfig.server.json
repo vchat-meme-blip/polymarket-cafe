@@ -3,7 +3,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "target": "ES2022",
-    "outDir": "./dist/server",
+    "outDir": "./dist",
     "rootDir": ".",
     "esModuleInterop": true,
     "strict": true,
@@ -18,7 +18,9 @@
     "moduleDetection": "force",
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "emitDeclarationOnly": false,
+    "sourceMap": true
   },
   "include": [
     "server/**/*.ts",
@@ -29,9 +31,5 @@
     "dist",
     "**/*.test.ts",
     "**/node_modules/**"
-  ],
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  }
+  ]
 }

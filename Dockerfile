@@ -390,7 +390,7 @@ WORKDIR /app
 # Start the application with node flags for ESM support
 ENV NODE_OPTIONS="--es-module-specifier-resolution=node --experimental-specifier-resolution=node"
 
-# Health check configuration
+# Health check configuration (only one is needed)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1
 
