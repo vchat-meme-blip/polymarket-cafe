@@ -34,16 +34,24 @@ RUN echo "Cleaning previous builds..." && \
     npm run build:server && \
     npm run postbuild:server && \
     # Create expected directory structure
-    mkdir -p /app/dist/client /app/dist/server && \
+    mkdir -p /app/dist/client /app/dist/server/lib /app/dist/server/server && \
+    # Copy lib directory
+    if [ -d "/app/lib" ]; then \
+        echo "Copying lib directory..." && \
+        cp -r /app/lib/* /app/dist/server/lib/; \
+    fi && \
     # Move client files to the correct location
-    mv /app/dist/assets /app/dist/client/ && \
+    mv /app/dist/assets /app/dist/client/ 2>/dev/null || true && \
     mv /app/dist/index.html /app/dist/client/ 2>/dev/null || true && \
     mv /app/dist/*.css /app/dist/client/ 2>/dev/null || true && \
     mv /app/dist/*.js /app/dist/client/ 2>/dev/null || true && \
     # Ensure server files are in the right place
     if [ -d "/app/dist/server" ]; then \
-        mv /app/dist/server/* /app/dist/server/ 2>/dev/null || true; \
-    fi
+        mv /app/dist/server/* /app/dist/ 2>/dev/null || true; \
+    fi && \
+    # Verify the lib directory was copied
+    echo "Lib directory contents after build:" && \
+    find /app/dist/server/lib -type f 2>/dev/null || echo "No lib files found"
 
 # Verify the build output
 RUN echo "Build output in /app/dist:" && \
@@ -143,22 +151,44 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.env* ./
 
 # Copy built files with correct structure
-COPY --from=builder /app/dist/client/ /app/dist/client/
-COPY --from=builder /app/dist/server/ /app/dist/server/
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/server/env.ts /app/dist/server/server/
+RUN echo "Copying built files..." && \
+    # Create necessary directories
+    mkdir -p /app/dist/server /app/dist/client /app/dist/workers && \
+    # Copy server files
+    if [ -d "/app/dist/server/server" ]; then \
+        echo "Server files already in correct location"; \
+    else \
+        echo "Moving server files to correct location"; \
+        mv /app/dist/server/* /app/dist/ 2>/dev/null || true; \
+    fi && \
+    # Ensure lib directory exists and copy it
+    echo "Copying lib directory..." && \
+    mkdir -p /app/dist/server/lib && \
+    if [ -d "/app/dist/lib" ]; then \
+        cp -r /app/dist/lib/* /app/dist/server/lib/; \
+    elif [ -d "/app/lib" ]; then \
+        cp -r /app/lib/* /app/dist/server/lib/; \
+    fi && \
+    # Copy package files and node_modules
+    cp /app/package*.json ./ && \
+    cp -r /app/node_modules/ ./node_modules/ && \
+    # Verify the lib directory was copied
+    echo "Lib directory contents:" && \
+    find /app/dist/server/lib -type f 2>/dev/null || echo "No lib files found"
 
-# Verify build output structure and fix paths if needed
+# Verify build output structure
 RUN echo "Build output structure:" && \
     echo "Contents of /app/dist:" && ls -la /app/dist/ && \
-    # If server files are in /app/dist/client/server, move them to /app/dist/server
-    if [ -d "/app/dist/client/server" ]; then \
-        echo "Moving server files from /app/dist/client/server to /app/dist/server"; \
-        mv /app/dist/client/server /app/dist/; \
-    fi && \
-    echo "Contents of /app/dist/server:" && ls -la /app/dist/server/ 2>/dev/null || echo "No server directory found" && \
-    echo "Contents of /app/dist/server/server:" && ls -la /app/dist/server/server/ 2>/dev/null || echo "No server/server directory found"
+    echo "\nContents of /app/dist/server:" && ls -la /app/dist/server/ 2>/dev/null || echo "No server directory found" && \
+    echo "\nContents of /app/dist/server/lib:" && ls -la /app/dist/server/lib/ 2>/dev/null || echo "No lib directory found" && \
+    echo "\nContents of /app/dist/server/server:" && ls -la /app/dist/server/server/ 2>/dev/null || echo "No server/server directory found" && \
+    # Ensure required files exist
+    if [ ! -f "/app/dist/server/lib/presets/agents.js" ]; then \
+        echo "ERROR: Missing required file: /app/dist/server/lib/presets/agents.js"; \
+        echo "Searching for agents.js in build output..."; \
+        find /app/dist -name "agents.js" || echo "agents.js not found"; \
+        exit 1; \
+    fi
 
 # Set up worker files
 RUN echo "Setting up worker files..." && \
