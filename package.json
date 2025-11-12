@@ -3,22 +3,6 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "browser": {
-    "usb": false,
-    "@ledgerhq/hw-transport-node-hid": false,
-    "@ledgerhq/hw-transport-node-hid-singleton": false
-  },
-  "resolutions": {
-    "**/usb": "0.0.0"
-  },
-  "overrides": {
-    "usb": {
-      "usb": "0.0.0"
-    },
-    "@solana/wallet-adapter-wallets": {
-      "@solana/wallet-adapter-trezor": "0.0.0"
-    }
-  },
   "exports": "./dist/server/server/index.js",
   "main": "./dist/server/server/index.js",
   "types": "./dist/server/server/index.d.ts",
