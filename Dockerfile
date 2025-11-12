@@ -6,7 +6,7 @@ WORKDIR /app
 # Install build dependencies
 RUN apk add --no-cache python3 make g++
 
-# Copy package files and install all dependencies
+# Copy package files first for better layer caching
 COPY package*.json ./
 COPY tsconfig*.json ./
 
@@ -14,16 +14,20 @@ COPY tsconfig*.json ./
 RUN npm install -g typescript@5.3.3 && \
     npm install --save-dev @types/node@22.14.0 && \
     npm ci --legacy-peer-deps
+
 # Copy the rest of the application
 COPY . .
 
+# Clean any existing build artifacts
+RUN rm -rf dist node_modules/.vite
+
 # Build the application
 RUN echo "Building client..." && \
-    npm run build:client
+    NODE_OPTIONS=--max-old-space-size=4096 npm run build:client
 
 # Build server separately to handle any specific requirements
 RUN echo "Building server..." && \
-    npm run build:server && \
+    NODE_OPTIONS=--max-old-space-size=4096 npm run build:server && \
     npm run postbuild:server
 
 # ---- Production Stage ----
