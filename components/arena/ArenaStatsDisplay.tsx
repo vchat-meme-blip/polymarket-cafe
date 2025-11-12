@@ -1,9 +1,9 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import React, { useEffect, useState } from 'react';
-// FIX: Fix import for `useAgent` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
+import React, { useEffect, useState, useMemo } from 'react';
 import { useAgent } from '../../lib/state/index.js';
 import { useArenaStore } from '../../lib/state/arena';
 import styles from './Arena.module.css';
@@ -45,27 +45,28 @@ const StatPanel = ({ icon, label, value }: { icon: string; label: string; value:
 
 
 export default function ArenaStatsDisplay() {
-    const { availablePresets, availablePersonal } = useAgent();
     const { rooms, activeConversations, tradeHistory } = useArenaStore();
     
-    const totalAgents = availablePresets.length + availablePersonal.length;
-    const activeRooms = rooms.filter(r => r?.agentIds?.length > 0).length;
-    // Count rooms with recent activity (within the last 30 seconds) as "live conversations"
-    const liveConversations = Object.entries(activeConversations).filter(([roomId, timestamp]) => {
-        // Check if the room exists and has 2 agents
-        const room = rooms.find(r => r.id === roomId);
-        if (!room || !room.agentIds || room.agentIds.length !== 2) return false;
-        
-        // Consider a conversation "live" if there was activity in the last 30 seconds
-        return Date.now() - Number(timestamp) < 30000;
-    }).length;
+    const storefronts = useMemo(() => rooms.filter(r => r.isOwned), [rooms]);
+
+    const totalStorefronts = storefronts.length;
+    const activeStorefronts = storefronts.filter(r => r?.agentIds?.length > 0).length;
+    
+    const liveConversations = useMemo(() => {
+        return Object.entries(activeConversations).filter(([roomId, timestamp]) => {
+            const room = storefronts.find(r => r.id === roomId);
+            if (!room || !room.agentIds || room.agentIds.length !== 2) return false;
+            return Date.now() - Number(timestamp) < 30000;
+        }).length;
+    }, [activeConversations, storefronts]);
+
     const totalTrades = tradeHistory.length;
 
     return (
         <div className={styles.arenaStatsDisplay}>
-            <StatPanel icon="groups" label="Total Quants" value={totalAgents} />
-            <StatPanel icon="meeting_room" label="Active Rooms" value={activeRooms} />
-            <StatPanel icon="forum" label="Live Conversations" value={liveConversations} />
+            <StatPanel icon="store" label="Storefronts" value={totalStorefronts} />
+            <StatPanel icon="meeting_room" label="Active Stores" value={activeStorefronts} />
+            <StatPanel icon="forum" label="Live Chats" value={liveConversations} />
             <StatPanel icon="swap_horiz" label="Intel Trades" value={totalTrades} />
         </div>
     );

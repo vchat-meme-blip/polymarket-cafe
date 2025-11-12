@@ -173,8 +173,9 @@ class ApiService {
       });
   }
 
-  async purchaseRoom(details: { name: string }): Promise<{ room: Room }> {
-    return this.request<{ room: Room }>('/api/rooms/purchase', {
+  // FIX: Update signature to include all properties sent from the client and to match the API response.
+  async purchaseRoom(details: { name: string; roomBio: string; twitterUrl: string; isRevenuePublic: boolean; }): Promise<{ room: Room; user: User; }> {
+    return this.request<{ room: Room, user: User }>('/api/rooms/purchase', {
       method: 'POST',
       body: JSON.stringify(details),
     });

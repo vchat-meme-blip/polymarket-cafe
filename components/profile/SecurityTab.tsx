@@ -24,7 +24,7 @@ export default function SecurityTab() {
   const [walletInput, setWalletInput] = useState(receivingWalletAddress || '');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync wallet address with user settings when it changes
+  // Sync the connected wallet address to user settings whenever it changes.
   useEffect(() => {
     const syncWalletAddress = async () => {
       if (publicKey) {
@@ -43,10 +43,8 @@ export default function SecurityTab() {
   }, [publicKey]);
 
   function handleSignOut() {
-    // Clear local state first for immediate UI update
     _setHandle('');
     setIsSignedIn(false);
-    // No need to call server, bootstrap will handle next sign-in
   }
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -75,7 +73,7 @@ export default function SecurityTab() {
             future on-chain interactions.
           </p>
           <div className={styles.walletButtonContainer}>
-            <WalletMultiButton className={styles.connectWalletBtn} />
+            <WalletMultiButton />
           </div>
            {publicKey && (
                 <p className={styles.walletAddressDisplay} style={{marginTop: '12px', textAlign: 'center'}}>

@@ -1,3 +1,4 @@
+
 import { Router } from 'express';
 import mongoose, { Collection } from 'mongoose';
 import { TradeRecord, BettingIntel, MarketWatchlist } from '../../lib/types/shared.js';
@@ -762,7 +763,7 @@ router.post('/arena/recall-agent', (req, res) => {
 });
 
 router.post('/rooms/purchase', async (req, res) => {
-    const { name } = req.body;
+    const { name, roomBio, twitterUrl, isRevenuePublic } = req.body;
     const { userHandle } = res.locals;
     try {
         const newRoom: Partial<Room> = {
@@ -778,6 +779,9 @@ router.post('/rooms/purchase', async (req, res) => {
             vibe: 'General Chat ☕️',
             isOwned: true,
             ownerHandle: userHandle,
+            roomBio: roomBio || '',
+            twitterUrl: twitterUrl || '',
+            isRevenuePublic: isRevenuePublic || false,
             volumeSold: 0,
         };
         newRoom.id = (newRoom._id as ObjectId).toHexString();
