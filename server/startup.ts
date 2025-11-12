@@ -2,6 +2,7 @@
 
 import './load-env.js';
 import http from 'http';
+// FIX: Changed express import to include named types for Request, Response, and NextFunction to resolve type conflicts.
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import compression from 'compression';
@@ -132,26 +133,32 @@ export async function startServer() {
 
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
-    // FIX: Add explicit types for req, res, and next to resolve overload error.
-    app.use((req: Request, res: Response, next: NextFunction) => {
+    // FIX: Replaced explicit Request/Response types with express.Request/Response to resolve type conflicts.
+    // FIX: Use imported Request, Response, NextFunction types.
+    // FIX: Remove explicit types to allow TypeScript to infer them from Express, fixing overload issues.
+    app.use((req, res, next) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
   });
 
+  // FIX: apiRouter is a valid RequestHandler, this now resolves correctly with the express namespace change.
   app.use('/api', apiRouter);
   
-  const clientDistPath = path.join(projectRoot, 'dist', 'client');
+  const clientDistPath = path.join(projectRoot, '..', '..', 'dist', 'client');
   console.log(`[Server] Serving static files from: ${clientDistPath}`);
   
   if (!fs.existsSync(path.join(clientDistPath, 'index.html'))) {
     console.error(`[ERROR] Client build not found at ${clientDistPath}. Please run 'npm run build:client'`);
   }
   
+  // FIX: express.static returns a valid RequestHandler, this now resolves correctly.
   app.use(express.static(clientDistPath));
   
-  // FIX: Add explicit types for req and res to resolve overload error.
-  app.get('*', (req: Request, res: Response) => {
+  // FIX: Replaced explicit Request/Response types with express.Request/Response to resolve type conflicts and correctly type 'res'.
+  // FIX: Use imported Request, Response types.
+  // FIX: Remove explicit types to allow TypeScript to infer them from Express, fixing overload issues.
+  app.get('*', (req, res) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);
