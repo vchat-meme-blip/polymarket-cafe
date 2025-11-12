@@ -1,4 +1,5 @@
 
+
 /// <reference types="node" />
 
 import mongoose, { Collection, Document } from 'mongoose';
@@ -113,6 +114,22 @@ const connectDB = async () => {
       roomsCollection.createIndex({ id: 1 }, { unique: true }),
       agentInteractionsCollection.createIndex({ roomId: 1, timestamp: -1 })
     ]);
+
+    // Clear rooms on startup in development for a clean slate
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[DB Seeder] Development environment detected. Clearing storefronts...');
+      try {
+        const roomDeletion = await roomsCollection.deleteMany({ isOwned: true });
+        console.log(`[DB Seeder] Deleted ${roomDeletion.deletedCount} storefronts.`);
+        const userUpdate = await usersCollection.updateMany(
+          { ownedRoomId: { $exists: true } },
+          { $unset: { ownedRoomId: "" } }
+        );
+        console.log(`[DB Seeder] Reset ownedRoomId for ${userUpdate.modifiedCount} users.`);
+      } catch (err) {
+        console.error('[DB Seeder] Error clearing storefronts:', err);
+      }
+    }
 
     return mongoose.connection;
   } catch (error) {

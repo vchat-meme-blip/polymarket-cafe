@@ -2,12 +2,12 @@
 
 import './load-env.js';
 import http from 'http';
-// FIX: Changed express import to include named types for Request, Response, and NextFunction to resolve type conflicts.
-import express, { Request, Response, NextFunction } from 'express';
+import express from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
-import path from 'path';
+import path from 'node:path';
 import { fileURLToPath } from 'url';
 import { Worker } from 'worker_threads';
 import mongoose from 'mongoose';
@@ -24,7 +24,7 @@ import { usersCollection } from './db.js';
 // ES Modules compatible __filename and __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.join(__dirname, '..');
+const projectRoot = path.join(__dirname, '..', '..', '..');
 
 // Log the current file and directory for debugging
 console.log('Starting server from:', __filename);
@@ -133,32 +133,26 @@ export async function startServer() {
 
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
-    // FIX: Replaced explicit Request/Response types with express.Request/Response to resolve type conflicts.
-    // FIX: Use imported Request, Response, NextFunction types.
-    // FIX: Remove explicit types to allow TypeScript to infer them from Express, fixing overload issues.
-    app.use((req, res, next) => {
+    // FIX: Add explicit types for req, res, and next to resolve overload error.
+    app.use((req: Request, res: Response, next: NextFunction) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
   });
 
-  // FIX: apiRouter is a valid RequestHandler, this now resolves correctly with the express namespace change.
   app.use('/api', apiRouter);
   
-  const clientDistPath = path.join(projectRoot, '..', '..', 'dist', 'client');
+  const clientDistPath = path.join(projectRoot, 'dist', 'client');
   console.log(`[Server] Serving static files from: ${clientDistPath}`);
   
   if (!fs.existsSync(path.join(clientDistPath, 'index.html'))) {
     console.error(`[ERROR] Client build not found at ${clientDistPath}. Please run 'npm run build:client'`);
   }
   
-  // FIX: express.static returns a valid RequestHandler, this now resolves correctly.
   app.use(express.static(clientDistPath));
   
-  // FIX: Replaced explicit Request/Response types with express.Request/Response to resolve type conflicts and correctly type 'res'.
-  // FIX: Use imported Request, Response types.
-  // FIX: Remove explicit types to allow TypeScript to infer them from Express, fixing overload issues.
-  app.get('*', (req, res) => {
+  // FIX: Add explicit types for req and res to resolve overload error.
+  app.get('*', (req: Request, res: Response) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);
