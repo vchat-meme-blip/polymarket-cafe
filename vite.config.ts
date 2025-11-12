@@ -73,15 +73,6 @@ export default defineConfig(({ mode }) => {
             // Don't inline any files, keep them as separate files
             assetsInlineLimit: 0,
             rollupOptions: {
-                external: [
-                    '@solana/wallet-adapter-base',
-                    '@solana/wallet-adapter-react',
-                    '@solana/wallet-adapter-react-ui',
-                    '@solana/wallet-adapter-phantom',
-                    '@solana/wallet-adapter-solflare',
-                    '@solana/web3.js',
-                    '@solana/spl-token',
-                ],
                 output: {
                     // Ensure consistent chunk names
                     chunkFileNames: 'assets/js/[name]-[hash].js',
