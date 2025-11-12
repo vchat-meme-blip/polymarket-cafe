@@ -7,7 +7,7 @@ import React from 'react';
 import { useWalletStore } from '../../lib/state/wallet';
 // FIX: The 'Transaction' type is not exported from the wallet store. It is now imported from its correct source file 'lib/types/index.js'.
 import { Transaction } from '../../lib/types/index.js';
-import { formatDistanceToNow } from 'date-fns';
+import formatDistanceToNow from 'date-fns/formatDistanceToNow';
 import c from 'classnames';
 import styles from './Profile.module.css';
 
@@ -44,8 +44,7 @@ export default function TransactionHistory() {
   return (
     <div className={styles.transactionList}>
       {transactions.map(tx => (
-        // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
-        <TransactionItem tx={tx} />
+        <TransactionItem key={tx.id} tx={tx} />
       ))}
     </div>
   );

@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -9,7 +8,7 @@ import { useUI } from '../../lib/state/index.js';
 import { useAutonomyStore } from '../../lib/state/autonomy';
 import { AgentTask } from '../../lib/types/index.js';
 import styles from './TaskDetailModal.module.css';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 
 export default function TaskDetailModal({ task }: { task: AgentTask }) {
     const { closeTaskDetailModal } = useUI();

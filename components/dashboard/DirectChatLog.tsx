@@ -7,7 +7,7 @@ import React from 'react';
 import { useAgent, useUI, useUser } from '../../lib/state/index.js';
 import { USER_ID, useArenaStore } from '../../lib/state/arena';
 import c from 'classnames';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import { useEffect, useMemo, useRef } from 'react';
 import styles from './Dashboard.module.css';
 import { MarketIntel } from '../../lib/types/index.js';

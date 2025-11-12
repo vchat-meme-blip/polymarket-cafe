@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -10,7 +9,7 @@ import { Agent, BettingIntel, MarketWatchlist } from '../../lib/types/index.js';
 import { AVAILABLE_VOICES, PRESET_AGENTS, VoiceProfile } from '../../lib/presets/agents';
 import { apiService } from '../../lib/services/api.service.js';
 import { VrmModel } from '../agents/VrmAvatar';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import c from 'classnames';
 import styles from './Modals.module.css';
 import { Canvas } from '@react-three/fiber';

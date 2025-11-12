@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { useMemo, useEffect } from 'react';
-import { formatDistanceStrict } from 'date-fns';
+import formatDistanceStrict from 'date-fns/formatDistanceStrict';
 import Modal from '../Modal';
 // FIX: Fix imports for `useAgent` and `useUI` by changing the path from `../../lib/state` to `../../lib/state/index.js`.
 import { useAgent, useUI } from '../../lib/state/index.js';

@@ -1,5 +1,3 @@
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -173,7 +171,6 @@ class ApiService {
       });
   }
 
-  // FIX: Update signature to include all properties sent from the client and to match the API response.
   async purchaseRoom(details: { name: string; roomBio: string; twitterUrl: string; isRevenuePublic: boolean; }): Promise<{ room: Room; user: User; }> {
     return this.request<{ room: Room, user: User }>('/api/rooms/purchase', {
       method: 'POST',
@@ -188,8 +185,8 @@ class ApiService {
     });
   }
 
-  async deleteRoom(roomId: string): Promise<void> {
-    await this.request<void>(`/api/rooms/${roomId}`, {
+  async deleteRoom(roomId: string): Promise<User> {
+    return this.request<User>(`/api/rooms/${roomId}`, {
       method: 'DELETE',
     });
   }

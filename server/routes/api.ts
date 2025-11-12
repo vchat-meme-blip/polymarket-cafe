@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import mongoose, { Collection } from 'mongoose';
 import { TradeRecord, BettingIntel, MarketWatchlist } from '../../lib/types/shared.js';
@@ -28,6 +27,7 @@ import { createSystemInstructions } from '../../lib/prompts.js';
 import { ObjectId } from 'mongodb';
 import OpenAI from 'openai';
 import { Readable } from 'stream';
+// FIX: Changed date-fns imports to use named imports from the main package to resolve call signature errors.
 import { startOfToday, formatISO } from 'date-fns';
 import { seedDatabase } from '../db.js';
 import { UserDocument } from '../../lib/types/mongodb.js';
@@ -765,10 +765,17 @@ router.post('/arena/recall-agent', (req, res) => {
 router.post('/rooms/purchase', async (req, res) => {
     const { name, roomBio, twitterUrl, isRevenuePublic } = req.body;
     const { userHandle } = res.locals;
+    if (!userHandle) {
+        return res.status(401).json({ message: "User handle not found." });
+    }
     try {
-        const newRoom: Partial<Room> = {
-            _id: new ObjectId(),
-            id: '',
+        const user = await usersCollection.findOne({ handle: userHandle });
+        if (user && user.ownedRoomId) {
+            return res.status(400).json({ message: "User already owns a room." });
+        }
+
+        const newRoom: Room = {
+            id: new ObjectId().toHexString(),
             name,
             agentIds: [],
             hostId: null,
@@ -779,24 +786,32 @@ router.post('/rooms/purchase', async (req, res) => {
             vibe: 'General Chat ☕️',
             isOwned: true,
             ownerHandle: userHandle,
-            roomBio: roomBio || '',
-            twitterUrl: twitterUrl || '',
-            isRevenuePublic: isRevenuePublic || false,
+            roomBio,
+            twitterUrl,
+            isRevenuePublic,
             volumeSold: 0,
         };
-        newRoom.id = (newRoom._id as ObjectId).toHexString();
+        
         const result = await roomsCollection.insertOne(newRoom as any);
-        const userDoc = await usersCollection.findOneAndUpdate(
+        const userUpdateResult = await usersCollection.findOneAndUpdate(
             { handle: userHandle },
             { $set: { ownedRoomId: result.insertedId } },
             { returnDocument: 'after' }
         );
-        
-        const roomForPayload = { ...newRoom };
+
+        if (!userUpdateResult) {
+            // This case should ideally not happen if userHandle is present
+            throw new Error("Failed to update user with owned room ID.");
+        }
+
+        // The room object sent back to the client should have a string id
+        const roomForPayload = { ...newRoom, _id: result.insertedId.toHexString() };
         req.arenaWorker?.postMessage({ type: 'roomUpdated', payload: { room: roomForPayload } });
         
-        const user = userDoc ? toSharedUser(userDoc as UserDocument) : null;
-        res.status(201).json({ room: roomForPayload, user });
+        // Convert the updated user document to the shared type before sending
+        const updatedUser = toSharedUser(userUpdateResult as UserDocument);
+
+        res.status(201).json({ room: roomForPayload, user: updatedUser });
     } catch (error) {
         console.error('[API] Error purchasing room:', error);
         res.status(500).json({ message: "Failed to purchase room" });
@@ -831,10 +846,22 @@ router.delete('/rooms/:roomId', async (req, res) => {
         if (result.deletedCount === 0) {
             return res.status(404).json({ message: "Room not found or you are not the owner." });
         }
-        await usersCollection.updateOne({ handle: userHandle }, { $unset: { ownedRoomId: "" } });
+        const userUpdateResult = await usersCollection.findOneAndUpdate(
+            { handle: userHandle }, 
+            { $unset: { ownedRoomId: "" } },
+            { returnDocument: 'after' }
+        );
+
         req.arenaWorker?.postMessage({ type: 'roomDeleted', payload: { roomId } });
-        res.status(204).send();
+
+        if (!userUpdateResult) {
+            return res.status(404).json({ message: "User not found after room deletion." });
+        }
+
+        res.status(200).json(toSharedUser(userUpdateResult as UserDocument));
+
     } catch (error) {
+        console.error('[API] Error deleting room:', error);
         res.status(500).json({ message: "Failed to delete room" });
     }
 });

@@ -8,7 +8,7 @@ import Modal from '../Modal';
 import { useUI, useSystemLogStore, LogEntry } from '../../lib/state/index.js';
 // FIX: Add .js extension for ES module compatibility.
 import { apiService } from '../../lib/services/api.service.js';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import c from 'classnames';
 import styles from './Modals.module.css';
 
@@ -43,11 +43,12 @@ const StatDisplay = ({ label, value, icon, status }: { label: string; value: str
     </div>
 );
 
+// FIX: Define LOG_ICONS to be used in the ActivityFeed component.
 const LOG_ICONS: Record<LogEntry['type'], string> = {
-    move: 'open_with',
-    conversation: 'forum',
-    intel: 'database',
-    system: 'dns',
+  move: 'open_with',
+  conversation: 'forum',
+  intel: 'lightbulb',
+  system: 'dns',
 };
 
 const ActivityFeed = () => {

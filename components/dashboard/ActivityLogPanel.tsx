@@ -6,7 +6,7 @@ import React from 'react';
 import { useAutonomyStore } from '../../lib/state/autonomy.js';
 import { ActivityLogEntry } from '../../lib/types/index.js';
 import styles from './ActivityLogPanel.module.css';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 
 const LOG_ICONS: Record<ActivityLogEntry['type'], string> = {
     cafe: 'coffee',

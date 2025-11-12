@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -7,8 +6,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector, persist, createJSONStorage } from 'zustand/middleware';
 // FIX: Import types from canonical source
 import { Agent, Room, Interaction, TradeRecord } from '../types/index.js';
-// FIX: Fix import for `useAgent` by changing the path from `../state.js` to `../state/index.js`.
-import { useAgent } from '../state/index.js';
+import { useAgent, useUser } from '../state/index.js';
 import { useAutonomyStore } from './autonomy.js';
 
 // A unique identifier for the user in conversation logs.
@@ -44,7 +42,6 @@ export type ArenaState = {
   updateRoomFromSocket: (room: Room) => void;
   addRoom: (room: Room) => void;
   recordActivityInRoom: (roomId: string) => void;
-  // FIX: Add systemPaused to the syncWorldState signature.
   syncWorldState: (worldState: { rooms: Room[], agentLocations: Record<string, string | null>, thinkingAgents: string[], systemPaused?: boolean }) => void;
   recordTrade: (trade: TradeRecord) => void;
   setLastTradeDetails: (trade: TradeRecord | null) => void;
@@ -243,29 +240,44 @@ export const useArenaStore = create(
         },
 
         syncWorldState: (worldState) => set(state => {
-          // Preserve conversation history and other client-side state that isn't included in worldState
-          const mergedState = {
-            ...state,
-            rooms: worldState.rooms,
-            agentLocations: worldState.agentLocations,
-            thinkingAgents: new Set(worldState.thinkingAgents),
-            systemPaused: worldState.systemPaused || false,
-            // Track when the last sync happened
-            lastSyncTimestamp: Date.now()
-          };
-          
-          // Update activeConversations based on the latest room activity
-          // This ensures the UI shows the correct active conversations
-          const updatedActiveConversations = { ...state.activeConversations };
-          worldState.rooms.forEach(room => {
-            // If this room isn't in activeConversations or has newer activity, update it
-            if (!updatedActiveConversations[room.id!]) {
-              updatedActiveConversations[room.id!] = Date.now();
+            const { ownedRoomId } = useUser.getState();
+            const roomsFromServer = worldState.rooms;
+
+            // --- RACE CONDITION FIX ---
+            // If the user just created a room, it might exist in local state but not yet in the server's worldState.
+            // We must preserve this "optimistic" room to prevent it from disappearing from the UI.
+            if (ownedRoomId) {
+                const clientKnowsAboutOwnedRoom = state.rooms.some(r => r.id === ownedRoomId);
+                const serverKnowsAboutOwnedRoom = roomsFromServer.some(r => r.id === ownedRoomId);
+                
+                if (clientKnowsAboutOwnedRoom && !serverKnowsAboutOwnedRoom) {
+                    const optimisticRoom = state.rooms.find(r => r.id === ownedRoomId);
+                    if (optimisticRoom) {
+                        // Add the client's optimistic room to the server's list before updating.
+                        roomsFromServer.push(optimisticRoom);
+                        console.log(`[ArenaStore] Preserved optimistic storefront: ${ownedRoomId}`);
+                    }
+                }
             }
-          });
-          
-          mergedState.activeConversations = updatedActiveConversations;
-          return mergedState;
+
+            const mergedState = {
+                ...state,
+                rooms: roomsFromServer,
+                agentLocations: worldState.agentLocations,
+                thinkingAgents: new Set(worldState.thinkingAgents),
+                systemPaused: worldState.systemPaused || false,
+                lastSyncTimestamp: Date.now(),
+            };
+            
+            const updatedActiveConversations = { ...state.activeConversations };
+            worldState.rooms.forEach(room => {
+                if (!updatedActiveConversations[room.id!]) {
+                    updatedActiveConversations[room.id!] = Date.now();
+                }
+            });
+            
+            mergedState.activeConversations = updatedActiveConversations;
+            return mergedState;
         }),
         recordActivityInRoom: (roomId: string) => set(state => ({
           activeConversations: { ...state.activeConversations, [roomId]: Date.now() },
@@ -373,7 +385,6 @@ export const useArenaStore = create(
             }
             return value;
           },
-          // FIX: Cast `value` to `any` to safely access custom properties `dataType` and `value` during JSON deserialization, resolving TypeScript errors.
           reviver: (key, value) => {
             if (typeof value === 'object' && value !== null && (value as any).dataType === 'Set') {
               return new Set((value as any).value);

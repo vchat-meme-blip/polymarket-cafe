@@ -8,7 +8,7 @@ import { useAutonomyStore } from '../../lib/state/autonomy.js';
 import { apiService } from '../../lib/services/api.service.js';
 import styles from './AgentTasksPanel.module.css';
 import { AgentTask } from '../../lib/types/index.js';
-import { formatDistanceToNow } from 'date-fns';
+import formatDistanceToNow from 'date-fns/formatDistanceToNow';
 
 const TaskItem = ({ task }: { task: AgentTask }) => {
     const { openTaskDetailModal } = useUI();
