@@ -6,7 +6,8 @@ import { useAutonomyStore } from '../../lib/state/autonomy';
 import { useUI } from '../../lib/state/index.js';
 import { BettingIntel } from '../../lib/types/index.js';
 import styles from './Dashboard.module.css';
-import formatDistanceToNow from 'date-fns/formatDistanceToNow';
+// FIX: Changed to named import from date-fns to resolve module resolution error.
+import { formatDistanceToNow } from 'date-fns';
 
 const IntelItem = ({ intel }: { intel: BettingIntel }) => {
     const { setChatPrompt } = useUI();
@@ -25,7 +26,8 @@ const IntelItem = ({ intel }: { intel: BettingIntel }) => {
                     {intel.bountyId && <span className={`icon ${styles.bountyRewardIcon}`} title="From Bounty">military_tech</span>}
                 </div>
                 <span className={styles.intelBankItemTime}>
-                    {formatDistanceToNow(intel.createdAt, { addSuffix: true })}
+                    {/* FIX: Wrap timestamp in new Date() as required by date-fns function. */}
+                    {formatDistanceToNow(new Date(intel.createdAt), { addSuffix: true })}
                 </span>
             </div>
             <p className={styles.intelBankItemSummary}>

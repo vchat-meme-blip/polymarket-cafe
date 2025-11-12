@@ -7,7 +7,8 @@ import React from 'react';
 import { useWalletStore } from '../../lib/state/wallet';
 // FIX: The 'Transaction' type is not exported from the wallet store. It is now imported from its correct source file 'lib/types/index.js'.
 import { Transaction } from '../../lib/types/index.js';
-import formatDistanceToNow from 'date-fns/formatDistanceToNow';
+// FIX: Changed to named import from date-fns to resolve module resolution error.
+import { formatDistanceToNow } from 'date-fns';
 import c from 'classnames';
 import styles from './Profile.module.css';
 
@@ -18,7 +19,8 @@ const TransactionItem = ({ tx }: { tx: Transaction }) => {
       <div className={styles.txDetails}>
         <p className={styles.txDescription}>{tx.description}</p>
         <p className={styles.txTime}>
-          {formatDistanceToNow(tx.timestamp, { addSuffix: true })}
+          {/* FIX: Wrap timestamp in new Date() as required by date-fns function. */}
+          {formatDistanceToNow(new Date(tx.timestamp), { addSuffix: true })}
         </p>
       </div>
       <div

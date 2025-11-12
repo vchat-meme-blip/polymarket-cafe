@@ -9,7 +9,8 @@ import { Agent, BettingIntel, MarketWatchlist } from '../../lib/types/index.js';
 import { AVAILABLE_VOICES, PRESET_AGENTS, VoiceProfile } from '../../lib/presets/agents';
 import { apiService } from '../../lib/services/api.service.js';
 import { VrmModel } from '../agents/VrmAvatar';
-import format from 'date-fns/format';
+// FIX: Changed to default import from submodule to resolve module resolution error.
+import { format } from 'date-fns';
 import c from 'classnames';
 import styles from './Modals.module.css';
 import { Canvas } from '@react-three/fiber';
@@ -303,7 +304,8 @@ const LedgerAndReportTab = ({ agentId }: { agentId: string }) => {
                                     const buyer = allAgents.get(trade.toId);
                                     return (
                                         <tr key={trade.timestamp}>
-                                            <td>{format(trade.timestamp, 'MMM d, h:mm a')}</td>
+                                            {/* FIX: Wrap timestamp in new Date() as required by date-fns format function. */}
+                                            <td>{format(new Date(trade.timestamp), 'MMM d, h:mm a')}</td>
                                             <td className={styles.tokenCell}>{`Intel on ${trade.market}`}</td>
                                             <td className={styles.priceCell}>{trade.price.toLocaleString()} BOX</td>
                                             <td>{buyer?.name || 'Unknown'}</td>
@@ -339,7 +341,8 @@ const LedgerAndReportTab = ({ agentId }: { agentId: string }) => {
                                 
                                 return (
                                     <tr key={trade.timestamp}>
-                                        <td>{format(trade.timestamp, 'MMM d, h:mm a')}</td>
+                                        {/* FIX: Wrap timestamp in new Date() as required by date-fns format function. */}
+                                        <td>{format(new Date(trade.timestamp), 'MMM d, h:mm a')}</td>
                                         <td>
                                             <span className={isBuy ? styles.actionBuy : styles.actionSell}>
                                                 {isBuy ? 'BUY' : 'SELL'}

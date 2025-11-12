@@ -57,9 +57,8 @@ function App() {
   const { availablePersonal } = useAgent();
   const { hasCompletedOnboarding } = useUser();
   // Explicitly type the signIn function to include the isNewUser parameter
-  const { signIn, _setHandle } = useUser() as {
+  const { signIn } = useUser() as {
     signIn: (handle: string, isNewUser?: boolean) => Promise<void>;
-    _setHandle: (handle: string) => void;
   };
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   useCafeSocket(); // Initialize the cafe socket connection
@@ -77,8 +76,8 @@ function App() {
           }
         } catch (error) {
            console.error("Bootstrap failed, user might not exist on server. Clearing local state.", error);
-          // If bootstrap fails (e.g., user deleted on server), log them out locally.
-          _setHandle('');
+          // If bootstrap fails (e.g., user deleted on server), reset all local user state.
+          useUser.getState().reset();
           setIsSignedIn(false);
         }
       }
@@ -90,7 +89,7 @@ function App() {
     return () => {
       socketService.disconnect();
     }
-  }, [_setHandle, setIsSignedIn]);
+  }, [setIsSignedIn]);
 
   // Auto-open onboarding for new users with zero personal agents
   useEffect(() => {

@@ -6,7 +6,8 @@ import React from 'react';
 import { useAutonomyStore } from '../../lib/state/autonomy.js';
 import { ActivityLogEntry } from '../../lib/types/index.js';
 import styles from './ActivityLogPanel.module.css';
-import format from 'date-fns/format';
+// FIX: Changed to default import from submodule to resolve module resolution error.
+import { format } from 'date-fns';
 
 const LOG_ICONS: Record<ActivityLogEntry['type'], string> = {
     cafe: 'coffee',
@@ -22,7 +23,8 @@ const ActivityItem = ({ log }: { log: ActivityLogEntry }) => {
             <div className={styles.activityHeader}>
                 <span className={`icon ${styles.activityIcon} ${styles[log.type]}`}>{LOG_ICONS[log.type]}</span>
                 <span className={styles.activityType}>{log.type}</span>
-                <span className={styles.activityTimestamp}>{format(log.timestamp, 'HH:mm:ss')}</span>
+                {/* FIX: Wrap timestamp in new Date() as required by date-fns format function. */}
+                <span className={styles.activityTimestamp}>{format(new Date(log.timestamp), 'HH:mm:ss')}</span>
             </div>
             <p className={styles.activityDescription}>
                 {log.message}

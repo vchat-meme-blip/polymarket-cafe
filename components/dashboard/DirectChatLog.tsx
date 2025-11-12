@@ -7,7 +7,8 @@ import React from 'react';
 import { useAgent, useUI, useUser } from '../../lib/state/index.js';
 import { USER_ID, useArenaStore } from '../../lib/state/arena';
 import c from 'classnames';
-import format from 'date-fns/format';
+// FIX: Changed to default import from submodule to resolve module resolution error.
+import { format } from 'date-fns';
 import { useEffect, useMemo, useRef } from 'react';
 import styles from './Dashboard.module.css';
 import { MarketIntel } from '../../lib/types/index.js';
@@ -104,7 +105,7 @@ export default function DirectChatLog() {
                     [styles.agent]: msg.agentId !== USER_ID,
                     })}
                     aria-label={`Message from ${msg.agentName} at ${format(
-                    msg.timestamp,
+                    new Date(msg.timestamp),
                     'p',
                     )}`}
                 >
@@ -116,7 +117,8 @@ export default function DirectChatLog() {
                     <div className={styles.messageContent}>
                         <div className={styles.messageHeader}>
                             <span className={styles.messageName}>{msg.agentName}</span>
-                            <span className={styles.messageTime}>{format(msg.timestamp, 'p')}</span>
+                            {/* FIX: Wrap timestamp in new Date() as required by date-fns format function. */}
+                            <span className={styles.messageTime}>{format(new Date(msg.timestamp), 'p')}</span>
                         </div>
                         <div className={styles.messageBubble}>
                             <MarkdownRenderer text={msg.text} />

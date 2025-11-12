@@ -3,6 +3,7 @@
 import './load-env.js';
 import http from 'http';
 import express from 'express';
+// FIX: Add explicit types for req, res, and next to resolve overload error.
 import type { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import compression from 'compression';

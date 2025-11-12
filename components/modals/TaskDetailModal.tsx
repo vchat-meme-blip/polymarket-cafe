@@ -8,7 +8,8 @@ import { useUI } from '../../lib/state/index.js';
 import { useAutonomyStore } from '../../lib/state/autonomy';
 import { AgentTask } from '../../lib/types/index.js';
 import styles from './TaskDetailModal.module.css';
-import format from 'date-fns/format';
+// FIX: Changed to default import from submodule to resolve module resolution error.
+import { format } from 'date-fns';
 
 export default function TaskDetailModal({ task }: { task: AgentTask }) {
     const { closeTaskDetailModal } = useUI();
@@ -79,7 +80,8 @@ export default function TaskDetailModal({ task }: { task: AgentTask }) {
                                     <li key={update.timestamp}>
                                         <span className={styles.timestamp}>
                                             {typeof update.timestamp === 'number' && !isNaN(update.timestamp)
-                                                ? format(update.timestamp, 'MMM d, HH:mm:ss') + ':'
+                                                // FIX: Wrap timestamp in new Date() as required by date-fns format function.
+                                                ? format(new Date(update.timestamp), 'MMM d, HH:mm:ss') + ':'
                                                 : 'A moment ago:'}
                                         </span>
                                         <span className={styles.message}>{update.message}</span>

@@ -8,7 +8,8 @@ import Modal from '../Modal';
 import { useUI, useSystemLogStore, LogEntry } from '../../lib/state/index.js';
 // FIX: Add .js extension for ES module compatibility.
 import { apiService } from '../../lib/services/api.service.js';
-import format from 'date-fns/format';
+// FIX: Changed to default import from submodule to resolve module resolution error.
+import { format } from 'date-fns';
 import c from 'classnames';
 import styles from './Modals.module.css';
 
@@ -73,7 +74,8 @@ const ActivityFeed = () => {
                             <div className={styles.activityHeader}>
                                 <span className={c("icon", styles.activityIcon, styles[log.type])}>{LOG_ICONS[log.type]}</span>
                                 <span className={styles.activityType}>{log.type}</span>
-                                <span className={styles.activityTimestamp}>{format(log.timestamp, 'HH:mm:ss')}</span>
+                                {/* FIX: Wrap timestamp in new Date() as required by date-fns format function. */}
+                                <span className={styles.activityTimestamp}>{format(new Date(log.timestamp), 'HH:mm:ss')}</span>
                             </div>
                             <p className={styles.activityDescription}>{log.message}</p>
                         </div>

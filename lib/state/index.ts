@@ -22,6 +22,29 @@ import { apiService } from '../services/api.service.js';
  */
 export type { User } from '../types/index.js';
 
+const initialUserState: User = {
+  name: '',
+  info: '',
+  handle: '',
+  hasCompletedOnboarding: false,
+  lastSeen: null,
+  userApiKey: null,
+  solanaWalletAddress: null,
+  createdAt: 0,
+  updatedAt: 0,
+  phone: '',
+  notificationSettings: {
+    agentResearch: true,
+    agentTrades: true,
+    newMarkets: false,
+    agentEngagements: true,
+    autonomyCafe: true,
+    autonomyEngage: true,
+    autonomyResearch: true,
+  },
+  isAutonomyEnabled: true,
+};
+
 export const useUser = create(
   persist<{
     signIn: (handle: string, isNewUser?: boolean) => Promise<void>;
@@ -35,29 +58,11 @@ export const useUser = create(
     completeOnboarding: () => void;
     setLastSeen: (timestamp: Date | null) => void;
     _setHandle: (handle: string) => void;
+    reset: () => void;
   } & User
   >(
     (set, get) => ({
-      // Default values
-      name: '',
-      info: '',
-      handle: '',
-      hasCompletedOnboarding: false,
-      lastSeen: null,
-      userApiKey: null,
-      solanaWalletAddress: null,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      phone: '',
-      notificationSettings: {
-        agentResearch: true,
-        agentTrades: true,
-        newMarkets: false,
-        agentEngagements: true,
-        autonomyCafe: true,
-        autonomyEngage: true,
-        autonomyResearch: true,
-      },
+      ...initialUserState,
       
       signIn: async (handle: string, isNewUser: boolean = false) => {
         const handleWithAt = handle.startsWith('@') ? handle : `@${handle}`;
@@ -175,7 +180,8 @@ export const useUser = create(
   setInfo: (info: string) => set({ info }),
   completeOnboarding: () => set({ hasCompletedOnboarding: true }),
   setLastSeen: (timestamp: Date | null) => set({ lastSeen: timestamp ? timestamp.getTime() : null }),
-  _setHandle: (handle: string) => set({ handle })
+  _setHandle: (handle: string) => set({ handle }),
+  reset: () => set(initialUserState),
 }),
 {
   name: 'quants-user-storage',

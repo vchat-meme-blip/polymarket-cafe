@@ -1,50 +1,55 @@
 /// <reference types="node" />
-// Load environment variables first
-import { config } from 'dotenv';
-import path from 'path';
 
-// Load .env file from project root
-const envPath = path.resolve(process.cwd(), '.env.local');
-config({ path: envPath });
-console.log(`Loading environment from: ${envPath}`);
-
-import connectDB, { seedDatabase, db } from '../db.js';
-import mongoose, { Connection } from 'mongoose';
+import '../server/load-env.js';
+// FIX: Corrected import to use `db` which is the exported mongoose instance.
+import connectDB, { seedDatabase, db, roomsCollection, usersCollection } from '../server/db.js';
 
 async function resetDatabase() {
-  try {
-    console.log('Connecting to database...');
-    const connection = await connectDB();
-    if (!connection || !connection.db) {
-      throw new Error('Failed to connect to the database');
-    }
-    const db = connection.db;
-    
-    // Get all collection names
-    const collections = await db.listCollections().toArray();
-    const collectionNames = collections
-      .map((c: { name: string }) => c.name)
-      .filter((name: string) => name !== 'system.views');
-    
-    console.log('Dropping collections:', collectionNames);
-    
-    // Drop each collection
-    for (const collectionName of collectionNames) {
-      try {
-        await db.collection(collectionName).drop();
-        console.log(`Dropped collection: ${collectionName}`);
-      } catch (err) {
-        console.error(`Error dropping collection ${collectionName}:`, (err as Error).message);
-      }
-    }
-    
-    console.log('Database reset complete!');
-    process.exit(0);
-  } catch (error) {
-    console.error('Error resetting database:', error);
+  // CRITICAL SAFETY CHECK: Prevent running in a production environment unless explicitly forced.
+  if (process.env.NODE_ENV === 'production' && process.env.FORCE_RESET !== 'true') {
+    console.error('---------------------------------------------------------------');
+    console.error('FATAL: ATTEMPTING TO RESET DATABASE IN PRODUCTION MODE!');
+    console.error('This is a destructive operation. To proceed, you must set');
+    console.error('the environment variable FORCE_RESET=true.');
+    console.error('Example: FORCE_RESET=true npm run reset-db');
+    console.error('---------------------------------------------------------------');
     process.exit(1);
+  }
+
+  try {
+    await connectDB();
+    console.log('Connecting to database...');
+
+    if (db.connection.db) {
+      console.log('Clearing storefronts and user ownership...');
+
+      // 1. Delete all owned rooms (storefronts)
+      const roomDeletion = await roomsCollection.deleteMany({ isOwned: true });
+      console.log(`- Deleted ${roomDeletion.deletedCount} storefronts.`);
+
+      // 2. Unset the ownedRoomId for all users
+      const userUpdate = await usersCollection.updateMany(
+        { ownedRoomId: { $exists: true } },
+        { $unset: { ownedRoomId: "" } }
+      );
+      console.log(`- Reset ownedRoomId for ${userUpdate.modifiedCount} users.`);
+      
+      console.log('Database collections cleared!');
+    } else {
+      console.warn('No database connection found to clear collections.');
+    }
+
+    console.log('Re-seeding initial data (MCP agents)...');
+    await seedDatabase();
+
+    console.log('Database reset and re-seeded successfully!');
+  } catch (error) {
+    console.error('Error during database reset:', error);
+    process.exit(1);
+  } finally {
+    await db.connection.close();
+    console.log('Database connection closed.');
   }
 }
 
-// Run the reset
 resetDatabase();

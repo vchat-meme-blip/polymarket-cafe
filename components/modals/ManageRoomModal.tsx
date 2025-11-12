@@ -12,7 +12,9 @@ import styles from './Modals.module.css';
 
 export default function ManageRoomModal() {
     const { closeManageRoomModal, addToast, openShareRoomModal, setView, setInitialArenaFocus } = useUI();
+    // FIX: Destructure state from useUser() and static methods from useUser itself.
     const { ownedRoomId } = useUser();
+    const { setState: setUserState } = useUser;
     const { rooms } = useArenaStore();
     const { availablePersonal, availablePresets } = useAgent();
 
@@ -69,7 +71,8 @@ export default function ManageRoomModal() {
         }
         setIsDeleting(true);
         try {
-            await apiService.deleteRoom(room.id);
+            const updatedUser = await apiService.deleteRoom(room.id);
+            setUserState(updatedUser);
             addToast({ type: 'system', message: 'Storefront deleted successfully.' });
             closeManageRoomModal();
         } catch (error) {
