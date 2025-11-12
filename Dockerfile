@@ -4,7 +4,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache make g++
+RUN apk add --no-cache python3 make g++
 
 # Copy package files and install all dependencies
 COPY package*.json ./
@@ -12,7 +12,7 @@ COPY tsconfig*.json ./
 
 # Install dependencies and development tools
 RUN npm install -g typescript@5.3.3 && \
-    npm install --save-dev @types/node@22.14.0 @rollup/rollup-linux-x64-musl && \
+    npm install --save-dev @types/node@22.14.0 && \
     npm ci --legacy-peer-deps
 # Copy the rest of the application
 COPY . .
