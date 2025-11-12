@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -21,7 +20,7 @@ import '@react-three/fiber';
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import { StrictMode } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
@@ -31,17 +30,6 @@ import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
 import App from './App';
-import WalletContextProvider from './components/providers/WalletContext';
-
-// Default to devnet if not specified
-const network = WalletAdapterNetwork.Devnet;
-const endpoint = process.env.VITE_SOLANA_RPC || clusterApiUrl(network);
-
-// Initialize browser wallet adapters
-const wallets = [
-  new PhantomWalletAdapter(),
-  new SolflareWalletAdapter()
-];
 
 // Import wallet modal styles
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -50,16 +38,34 @@ const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
+const MainApp = () => {
+    // Default to devnet if not specified
+    const network = WalletAdapterNetwork.Devnet;
+    const endpoint = useMemo(() => process.env.VITE_SOLANA_RPC || clusterApiUrl(network), [network]);
+
+    // Memoize the wallet adapters to prevent re-renders, per library best practices.
+    const wallets = useMemo(
+        () => [
+            new PhantomWalletAdapter(),
+            new SolflareWalletAdapter()
+        ],
+        []
+    );
+
+    return (
+        <ConnectionProvider endpoint={endpoint}>
+            <WalletProvider wallets={wallets} autoConnect>
+                <WalletModalProvider>
+                    <App />
+                </WalletModalProvider>
+            </WalletProvider>
+        </ConnectionProvider>
+    );
+};
+
+
 root.render(
   <StrictMode>
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
-          <WalletContextProvider>
-            <App />
-          </WalletContextProvider>
-        </WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+    <MainApp />
   </StrictMode>
 );

@@ -4,7 +4,8 @@
 */
 import { useUI, useUser } from '../../lib/state/index.js';
 import React, { useState, useEffect } from 'react';
-import { useWalletConnection } from '../../src/hooks/useWalletConnection';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import styles from './Profile.module.css';
 
 export default function SecurityTab() {
@@ -17,14 +18,7 @@ export default function SecurityTab() {
     _setHandle,
   } = useUser();
   
-  const {
-    connect,
-    disconnect,
-    connected,
-    connecting,
-    publicKey,
-    error: walletError
-  } = useWalletConnection();
+  const { publicKey } = useWallet();
   
   const [apiKeyInput, setApiKeyInput] = useState(userApiKey || '');
   const [walletInput, setWalletInput] = useState(receivingWalletAddress || '');
@@ -33,7 +27,7 @@ export default function SecurityTab() {
   // Sync wallet address with user settings when it changes
   useEffect(() => {
     const syncWalletAddress = async () => {
-      if (connected && publicKey) {
+      if (publicKey) {
         try {
           await updateUserSettings({ 
             solanaWalletAddress: publicKey.toString() 
@@ -45,7 +39,8 @@ export default function SecurityTab() {
     };
     
     syncWalletAddress();
-  }, [connected, publicKey, updateUserSettings]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publicKey]);
 
   function handleSignOut() {
     // Clear local state first for immediate UI update
@@ -53,22 +48,6 @@ export default function SecurityTab() {
     setIsSignedIn(false);
     // No need to call server, bootstrap will handle next sign-in
   }
-
-  const handleConnectWallet = async () => {
-    try {
-      await connect();
-    } catch (err) {
-      console.error('Failed to connect wallet:', err);
-    }
-  };
-
-  const handleDisconnectWallet = async () => {
-    try {
-      await disconnect();
-    } catch (err) {
-      console.error('Failed to disconnect wallet:', err);
-    }
-  };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,49 +70,18 @@ export default function SecurityTab() {
       <form onSubmit={handleSaveSettings}>
         <div className={styles.securitySection}>
           <h4>Wallet Connection</h4>
-          {walletError && (
-            <div className={styles.errorMessage} style={{ marginBottom: '12px' }}>
-              {walletError.message}
-            </div>
-          )}
-          
-          {connected && publicKey ? (
-            <div>
-              <p className={styles.walletAddressDisplay}>
-                {`${publicKey.toString().slice(0, 6)}...${publicKey.toString().slice(-4)}`}
-              </p>
-              <button 
-                type="button" 
-                className="button" 
-                onClick={handleDisconnectWallet} 
-                disabled={connecting}
-              >
-                <span className="icon">link_off</span>
-                {connecting ? 'Disconnecting...' : 'Disconnect Wallet'}
-              </button>
-            </div>
-          ) : (
-            <div>
-              <p className={styles.stepHint} style={{ marginBottom: '12px' }}>
-                Connect your Solana wallet to serve as your unique user ID and for
-                future on-chain interactions.
-              </p>
-              <div className={styles.walletButtonContainer}>
-                <button 
-                  type="button"
-                  className={`button primary ${styles.connectWalletBtn}`} 
-                  onClick={handleConnectWallet} 
-                  disabled={connecting}
-                  aria-label={connecting ? 'Connecting...' : 'Connect Wallet'}
-                >
-                  <span className="icon">account_balance_wallet</span>
-                  <span className={styles.walletButtonText}>
-                    {connecting ? 'Connecting...' : 'Connect Wallet'}
-                  </span>
-                </button>
-              </div>
-            </div>
-          )}
+          <p className={styles.stepHint} style={{ marginBottom: '12px' }}>
+            Connect your Solana wallet to serve as your unique user ID and for
+            future on-chain interactions.
+          </p>
+          <div className={styles.walletButtonContainer}>
+            <WalletMultiButton className={styles.connectWalletBtn} />
+          </div>
+           {publicKey && (
+                <p className={styles.walletAddressDisplay} style={{marginTop: '12px', textAlign: 'center'}}>
+                    Connected: {publicKey.toBase58()}
+                </p>
+            )}
         </div>
 
         <div className={styles.securitySection}>
