@@ -66,13 +66,13 @@ const ProfileTab = ({ agent, onUpdate, onSave }: { agent: Partial<Agent>, onUpda
                 <div className={styles.previewRenderer}>
                     <div style={{ position: 'relative', width: '100%', height: '300px' }}>
                         <Canvas
-                            camera={{ position: [0, 1.0, 2.5], fov: 40 }}
+                            camera={{ position: [0, 0.5, 2.5], fov: 40 }}
                             gl={{ antialias: true, alpha: true }}
                             shadows
                         >
                             <ambientLight intensity={1.5} />
                             <directionalLight position={[3, 1, 2]} intensity={2} castShadow />
-                            <group position={[0, -1.0, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0.2 : (0.2 + Math.PI), 0]} scale={1.0}>
+                            <group position={[0, -1.2, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0.2 : (0.2 + Math.PI), 0]} scale={1.0}>
                                 <VrmModel 
                                     modelUrl={agent.modelUrl || ''} 
                                     isSpeaking={false}
@@ -362,143 +362,62 @@ const LedgerAndReportTab = ({ agentId }: { agentId: string }) => {
     );
 };
 
-const IntelBriefingTab = ({ agent, onUpdate }: { agent: Partial<Agent>, onUpdate: (updates: Partial<Agent>) => void }) => {
-    const { addToast } = useUI();
-    const [isSavingIntel, setIsSavingIntel] = useState(false);
-    const [isSavingWatchlist, setIsSavingWatchlist] = useState(false);
-
-    // State for BettingIntel form
-    const [market, setMarket] = useState('');
-    const [content, setContent] = useState('');
-    const [source, setSource] = useState('');
-    const [isIntelTradable, setIsIntelTradable] = useState(false);
+const IntelBankTab = ({ agent }: { agent: Partial<Agent> }) => {
+    const { intelBank } = useAutonomyStore();
+    const { availablePersonal, availablePresets } = useAgent();
+    const allAgents = useMemo(() => new Map([...availablePersonal, ...availablePresets].map(a => [a.id, a])), [availablePersonal, availablePresets]);
+    const { openIntelDossier } = useUI();
     
-    // State for MarketWatchlist form
-    const [watchlistName, setWatchlistName] = useState('');
-    const [watchlistMarkets, setWatchlistMarkets] = useState('');
-    const [watchlistPrice, setWatchlistPrice] = useState(50);
-
     const agentIntel = useMemo(() => {
-        return useAutonomyStore.getState().intelBank
+        return intelBank
             .filter(i => (i as any).ownerHandle === agent.ownerHandle)
             .sort((a, b) => b.createdAt - a.createdAt);
-    }, [agent.ownerHandle]);
+    }, [intelBank, agent.ownerHandle]);
 
-    const handleIntelSubmit = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!market.trim() || !content.trim()) {
-            addToast({ type: 'error', message: 'Market and Intel content are required.' });
-            return;
-        }
-        setIsSavingIntel(true);
-        try {
-            await apiService.addBettingIntel(agent.id!, {
-                market,
-                content,
-                sourceDescription: source,
-                isTradable: isIntelTradable,
-            });
-            addToast({ type: 'system', message: 'Intel successfully briefed to agent.' });
-            setMarket('');
-            setContent('');
-            setSource('');
-            setIsIntelTradable(false);
-        } catch (error) {
-            console.error("Failed to save intel", error);
-            addToast({ type: 'error', message: 'Failed to save intel. Please try again.' });
-        } finally {
-            setIsSavingIntel(false);
-        }
-    };
-    
-    const handleWatchlistSubmit = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!watchlistName.trim() || !watchlistMarkets.trim()) {
-            addToast({ type: 'error', message: 'Watchlist name and markets are required.' });
-            return;
-        }
-        setIsSavingWatchlist(true);
-        try {
-            const newWatchlist: Omit<MarketWatchlist, 'id' | 'createdAt'> = {
-                name: watchlistName,
-                markets: watchlistMarkets.split(',').map(m => m.trim()).filter(Boolean),
-                isTradable: true,
-                price: watchlistPrice
-            };
-            const { watchlist: savedWatchlist } = await apiService.addMarketWatchlist(agent.id!, newWatchlist);
-            onUpdate({ marketWatchlists: [...(agent.marketWatchlists || []), savedWatchlist] });
-            addToast({ type: 'system', message: 'Watchlist created successfully.' });
-            setWatchlistName('');
-            setWatchlistMarkets('');
-            setWatchlistPrice(50);
-        } catch (error) {
-            console.error("Failed to save watchlist", error);
-            addToast({ type: 'error', message: 'Failed to save watchlist.' });
-        } finally {
-            setIsSavingWatchlist(false);
-        }
-    };
-
-    const handleDeleteWatchlist = async (watchlistId: string) => {
-        if (!window.confirm("Are you sure you want to delete this watchlist?")) return;
-        try {
-            await apiService.deleteMarketWatchlist(agent.id!, watchlistId);
-            onUpdate({ marketWatchlists: agent.marketWatchlists?.filter(w => w.id !== watchlistId) });
-            addToast({ type: 'system', message: 'Watchlist deleted.' });
-        } catch (error) {
-            console.error("Failed to delete watchlist", error);
-            addToast({ type: 'error', message: 'Failed to delete watchlist.' });
-        }
-    };
+    const groupedIntel = useMemo(() => {
+        return agentIntel.reduce((acc, intel) => {
+            const sourceAgentId = intel.sourceAgentId;
+            let sourceName = 'Autonomous Research';
+            if (sourceAgentId) {
+                const sourceAgent = allAgents.get(sourceAgentId);
+                sourceName = sourceAgent ? `Purchased from ${sourceAgent.name}` : 'Purchased';
+            }
+            if (!acc[sourceName]) {
+                acc[sourceName] = [];
+            }
+            acc[sourceName].push(intel);
+            return acc;
+        }, {} as Record<string, BettingIntel[]>);
+    }, [agentIntel, allAgents]);
 
     return (
         <div className={styles.intelBriefingContainer}>
-            <h4>Manage Tradable Watchlists</h4>
-            <p>Create and price market watchlists for your agent to sell in their storefront.</p>
-            <form onSubmit={handleWatchlistSubmit} className={styles.intelBriefingForm}>
-                <label>
-                    <span>Watchlist Name</span>
-                    <input type="text" placeholder="e.g., 'Q4 Tech Earnings Plays'" value={watchlistName} onChange={(e) => setWatchlistName(e.target.value)} disabled={isSavingWatchlist} />
-                </label>
-                <label>
-                    <span>Market Slugs (comma-separated)</span>
-                    <textarea rows={3} placeholder="e.g., trump-wins-2024, btc-70k-eoy" value={watchlistMarkets} onChange={(e) => setWatchlistMarkets(e.target.value)} disabled={isSavingWatchlist}></textarea>
-                </label>
-                <label>
-                    <span>Price (BOX)</span>
-                    <input type="number" value={watchlistPrice} onChange={(e) => setWatchlistPrice(Number(e.target.value))} min="1" disabled={isSavingWatchlist} />
-                </label>
-                <button type="submit" className="button primary" disabled={isSavingWatchlist}>
-                    {isSavingWatchlist ? 'Saving...' : 'Create Watchlist'}
-                </button>
-            </form>
-
-            <div className={styles.intelBriefingDivider}></div>
-            <h4>Agent's Watchlists ({agent.marketWatchlists?.length || 0})</h4>
-             <div className={styles.intelOwnedList}>
-                {agent.marketWatchlists && agent.marketWatchlists.length > 0 ? (
-                    agent.marketWatchlists.map(list => (
-                        <div key={list.id} className={styles.intelOwnedItem}>
-                            <div className={styles.intelOwnedHeader}>
-                                <strong>{list.name}</strong>
-                                <button onClick={() => handleDeleteWatchlist(list.id)} className={styles.deleteButton} title="Delete Watchlist">
-                                    <span className="icon">delete</span>
-                                </button>
+            {Object.entries(groupedIntel).map(([sourceName, intelItems]) => (
+                <div key={sourceName}>
+                    <h4>{sourceName}</h4>
+                    <div className={styles.intelOwnedList}>
+                        {intelItems.map(intel => (
+                            <div key={intel.id} className={`${styles.intelOwnedItem} ${styles.clickable}`} onClick={() => openIntelDossier(intel)}>
+                                <div className={styles.intelOwnedHeader}>
+                                    <strong>{intel.market}</strong>
+                                    <span>{format(new Date(intel.createdAt), 'MMM d')}</span>
+                                </div>
+                                <p>{intel.content.substring(0, 100)}...</p>
+                                <div className={styles.intelOwnedStats}>
+                                    {intel.pricePaid && <span>Paid: {intel.pricePaid} BOX</span>}
+                                    <span className={intel.pnlGenerated.amount >= 0 ? styles.positive : styles.negative}>
+                                        PNL: ${intel.pnlGenerated.amount.toFixed(2)}
+                                    </span>
+                                </div>
                             </div>
-                            <p>{list.markets.join(', ')}</p>
-                            <div className={styles.intelOwnedStats}>
-                                <span>Price: {list.price} BOX</span>
-                            </div>
-                        </div>
-                    ))
-                ) : (
-                    <p className={styles.emptyLedger}>No watchlists created yet.</p>
-                )}
-            </div>
-            
-             <div className={styles.intelBriefingDivider}></div>
-             <h4>Brief with Alpha Snippet</h4>
-             {/* ...existing BettingIntel form... */}
+                        ))}
+                    </div>
+                    <div className={styles.intelBriefingDivider}></div>
+                </div>
+            ))}
+            {agentIntel.length === 0 && (
+                 <p className={styles.emptyLedger}>This agent's intel bank is empty.</p>
+            )}
         </div>
     );
 };
@@ -566,13 +485,13 @@ export default function AgentDossierModal({ agentId }: { agentId: string }) {
                 </div>
                 <div className={styles.modalTabs}>
                     <button className={c(styles.tabButton, { [styles.active]: activeTab === 'profile' })} onClick={() => setActiveTab('profile')}>Profile</button>
-                    <button className={c(styles.tabButton, { [styles.active]: activeTab === 'intel' })} onClick={() => setActiveTab('intel')}>Intel Briefing</button>
+                    <button className={c(styles.tabButton, { [styles.active]: activeTab === 'intel' })} onClick={() => setActiveTab('intel')}>Intel Bank</button>
                     <button className={c(styles.tabButton, { [styles.active]: activeTab === 'operations' })} onClick={() => setActiveTab('operations')}>Operations</button>
                     <button className={c(styles.tabButton, { [styles.active]: activeTab === 'activity' })} onClick={() => setActiveTab('activity')} disabled={isCreatingAgentInDossier}>Ledger & Report</button>
                 </div>
                 <div className={styles.modalContent}>
                     {activeTab === 'profile' && <ProfileTab agent={formData as Agent} onUpdate={(updates) => setFormData(prev => prev ? {...prev, ...updates} : null)} onSave={handleSave} />}
-                    {activeTab === 'intel' && <IntelBriefingTab agent={formData} onUpdate={onUpdate} />}
+                    {activeTab === 'intel' && <IntelBankTab agent={formData} />}
                     {activeTab === 'operations' && <OperationsTab agent={formData} onUpdate={(updates) => setFormData(prev => prev ? {...prev, ...updates} : null)} />}
                     {activeTab === 'activity' && <LedgerAndReportTab agentId={formData.id!} />}
                 </div>

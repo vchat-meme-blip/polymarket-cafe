@@ -41,6 +41,7 @@ import VisitStorefrontModal from './components/modals/VisitStorefrontModal.js';
 import CreateTaskModal from './components/modals/CreateTaskModal';
 import TaskDetailModal from './components/modals/TaskDetailModal';
 import PaywallModal from './components/modals/PaywallModal';
+import IntelDossierModal from './components/dashboard/IntelDossierModal.js';
 
 /**
  * Main application component.
@@ -52,7 +53,7 @@ function App() {
     agentDossierId, showAboutPage, showOnboarding, showProfileView, 
     openOnboarding, setIsSignedIn, showCreateRoomModal, showManageRoomModal,
     showShareRoomModal, shareModalData, marketDetailModalData, showVisitStorefrontModal,
-    showAutonomyModal, showCreateTaskModal, taskDetailModalData
+    showAutonomyModal, showCreateTaskModal, taskDetailModalData, showIntelDossierModal
   } = useUI();
   const { availablePersonal } = useAgent();
   const { hasCompletedOnboarding } = useUser();
@@ -132,6 +133,7 @@ function App() {
       {showVisitStorefrontModal && <VisitStorefrontModal />}
       {showShareRoomModal && shareModalData && <ShareRoomModal data={shareModalData} />}
       {marketDetailModalData && <MarketDetailModal market={marketDetailModalData} />}
+      {showIntelDossierModal && <IntelDossierModal />}
       <PaywallModal />
       <ToastContainer />
     </>

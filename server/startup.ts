@@ -140,18 +140,11 @@ export async function startServer() {
 
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
-    // FIX: Use namespace-qualified express types to avoid global type conflicts.
+    // FIX: Use fully qualified Express types to resolve overload errors and type conflicts.
     app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
-  });
-
-  // RESTORED: This loop is the heartbeat of the autonomous server-side simulation.
-  workers.forEach(({ instance, tickInterval }) => {
-    tickIntervals.push(setInterval(() => {
-        instance.postMessage({ type: 'tick' });
-    }, tickInterval));
   });
 
   app.use('/api', apiRouter);
@@ -165,7 +158,7 @@ export async function startServer() {
   
   app.use(express.static(clientDistPath));
   
-  // FIX: Use namespace-qualified express types to resolve global type conflicts.
+  // FIX: Use fully qualified Express types to resolve overload errors and type conflicts.
   app.get('*', (req: express.Request, res: express.Response) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
