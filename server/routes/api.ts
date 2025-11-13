@@ -97,8 +97,21 @@ router.post('/system/reset-database', async (req, res) => {
 router.get('/bootstrap/:handle', async (req, res) => {
   try {
     const handle = req.params.handle;
-    const user = await usersCollection.findOne({ handle });
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const userDoc = await usersCollection.findOne({ handle });
+    if (!userDoc) return res.status(404).json({ message: 'User not found' });
+
+    // Self-healing: Check if the user's owned room still exists.
+    if (userDoc.ownedRoomId) {
+        const roomExists = await roomsCollection.findOne({ _id: userDoc.ownedRoomId });
+        if (!roomExists) {
+            console.warn(`[Bootstrap] Stale ownedRoomId (${userDoc.ownedRoomId}) found for user ${handle}. Clearing.`);
+            // Update the DB to fix the inconsistency
+            await usersCollection.updateOne({ _id: userDoc._id }, { $unset: { ownedRoomId: "" } });
+            // Remove from the object we're about to send to the client
+            delete (userDoc as any).ownedRoomId;
+        }
+    }
+    const user = userDoc;
 
     const agents = await agentsCollection.find({ ownerHandle: handle }).toArray();
     const presets = await agentsCollection.find({ ownerHandle: { $exists: false } }).toArray();
