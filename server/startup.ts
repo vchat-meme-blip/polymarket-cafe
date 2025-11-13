@@ -2,9 +2,8 @@
 
 import './load-env.js';
 import http from 'http';
-// FIX: Changed to default import and use explicit express types to resolve type conflicts with global DOM types.
-// FIX: Alias express types to avoid conflicts with global DOM types.
-import express, { Request as ExpressRequest, Response as ExpressResponse, NextFunction as ExpressNextFunction } from 'express';
+// FIX: Changed to a default import and using namespace-qualified types to resolve conflicts with global DOM types.
+import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -22,6 +21,21 @@ import fs from 'fs';
 import { ApiKeyManager } from './services/apiKey.service.js';
 import { usersCollection } from './db.js';
 
+// Add global declaration to extend Express.Request with worker properties.
+declare global {
+  namespace Express {
+    interface Request {
+      arenaWorker?: import('worker_threads').Worker;
+      autonomyWorker?: import('worker_threads').Worker;
+      dashboardWorker?: import('worker_threads').Worker;
+      marketWatcherWorker?: import('worker_threads').Worker;
+      resolutionWorker?: import('worker_threads').Worker;
+      monitoringWorker?: import('worker_threads').Worker;
+    }
+  }
+}
+
+
 // ES Modules compatible __filename and __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,8 +52,7 @@ export async function startServer() {
   await connectDB();
   await seedDatabase();
 
-  // FIX: Explicitly type `app` as `express.Express` to resolve type conflicts.
-  const app: express.Express = express();
+  const app = express();
   const server = http.createServer(app);
   const apiKeyManager = new ApiKeyManager();
 
@@ -71,7 +84,6 @@ export async function startServer() {
   const monitoringWorker = createWorker('./workers/monitoring.worker.js');
   workers.push({ name: 'Monitoring', instance: monitoringWorker, tickInterval: 5 * 60000 });
 
-  // FIX: Moved workerMessageHandler before its usage to fix hoisting issues.
   const workerMessageHandler = (worker: Worker, workerName: string) => async (message: any) => {
     switch (message.type) {
       case 'socketEmit':
@@ -128,8 +140,8 @@ export async function startServer() {
 
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
-    // FIX: Added explicit Express types to resolve handler overload errors.
-    app.use((req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => {
+    // FIX: Use namespace-qualified express types to avoid global type conflicts.
+    app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
@@ -153,8 +165,8 @@ export async function startServer() {
   
   app.use(express.static(clientDistPath));
   
-  // FIX: Added explicit Express types to resolve handler overload errors.
-  app.get('*', (req: ExpressRequest, res: ExpressResponse) => {
+  // FIX: Use namespace-qualified express types to resolve global type conflicts.
+  app.get('*', (req: express.Request, res: express.Response) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);

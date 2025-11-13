@@ -6,8 +6,6 @@ import {
   usersCollection, 
   agentsCollection,
   betsCollection,
-  // FIX: `bountiesCollection` is not exported from db.js and appears to be deprecated.
-  // bountiesCollection,
   tradeHistoryCollection,
   transactionsCollection,
   bettingIntelCollection,
@@ -17,7 +15,6 @@ import {
   activityLogCollection,
   agentInteractionsCollection,
 } from '../db.js';
-import { PRESET_AGENTS } from '../../lib/presets/agents.js';
 import { aiService } from '../services/ai.service.js';
 import { elevenLabsService } from '../services/elevenlabs.service.js';
 import { cafeMusicService } from '../services/cafeMusic.service.js';
@@ -26,11 +23,9 @@ import { kalshiService } from '../services/kalshi.service.js';
 import { leaderboardService } from '../services/leaderboard.service.js';
 import { Agent, User, Interaction, Room, MarketIntel, AgentMode, Bet, AgentTask, toSharedUser, Transaction } from '../../lib/types/index.js';
 import { createSystemInstructions } from '../../lib/prompts.js';
-// FIX: Add WithId to import to correctly type documents returned from MongoDB queries.
 import { ObjectId, WithId } from 'mongodb';
 import OpenAI from 'openai';
 import { Readable } from 'stream';
-// FIX: Changed date-fns imports to use named imports from the main package to resolve call signature errors.
 import { startOfToday, formatISO } from 'date-fns';
 import { seedDatabase } from '../db.js';
 import { UserDocument, TransactionDocument } from '../../lib/types/mongodb.js';
@@ -41,7 +36,6 @@ declare global {
     interface Request {
       arenaWorker?: import('worker_threads').Worker;
       autonomyWorker?: import('worker_threads').Worker;
-      // FIX: Added missing worker types to the Express Request interface for type safety.
       dashboardWorker?: import('worker_threads').Worker;
       marketWatcherWorker?: import('worker_threads').Worker;
       resolutionWorker?: import('worker_threads').Worker;
@@ -103,18 +97,20 @@ router.get('/bootstrap/:handle', async (req, res) => {
     const userDoc = await usersCollection.findOne({ handle });
     if (!userDoc) return res.status(404).json({ message: 'User not found' });
 
+    const userObject = { ...userDoc };
+
     // Self-healing: Check if the user's owned room still exists.
-    if (userDoc.ownedRoomId) {
-        const roomExists = await roomsCollection.findOne({ _id: userDoc.ownedRoomId });
+    if (userObject.ownedRoomId) {
+        const roomExists = await roomsCollection.findOne({ _id: userObject.ownedRoomId });
         if (!roomExists) {
-            console.warn(`[Bootstrap] Stale ownedRoomId (${userDoc.ownedRoomId}) found for user ${handle}. Clearing.`);
+            console.warn(`[Bootstrap] Stale ownedRoomId (${userObject.ownedRoomId}) found for user ${handle}. Clearing.`);
             // Update the DB to fix the inconsistency
-            await usersCollection.updateOne({ _id: userDoc._id }, { $set: { ownedRoomId: null } });
-            // Set property to null on the object we're about to send to the client
-            userDoc.ownedRoomId = null;
+            await usersCollection.updateOne({ _id: userObject._id }, { $set: { ownedRoomId: null } });
+            // Set property to null on the mutable copy we're about to send to the client
+            (userObject as any).ownedRoomId = null;
         }
     }
-    const user = userDoc;
+    const user = userObject;
 
     const agents = await agentsCollection.find({ ownerHandle: handle }).toArray();
     const presets = await agentsCollection.find({ ownerHandle: { $exists: false } }).toArray();
@@ -130,7 +126,6 @@ router.get('/bootstrap/:handle', async (req, res) => {
     
     // --- Wallet Data ---
     const transactions = await transactionsCollection.find({ ownerHandle: handle }).toArray();
-    // FIX: Correctly type the `tx` parameter in the reduce function to `WithId<TransactionDocument>` to match the type returned by `find().toArray()`.
     const balance = transactions.reduce((acc: number, tx: WithId<TransactionDocument>) => {
         if (['receive', 'claim', 'stipend'].includes(tx.type)) {
             return acc + tx.amount;
@@ -138,12 +133,11 @@ router.get('/bootstrap/:handle', async (req, res) => {
             return acc - tx.amount;
         }
         return acc;
-    }, 0); // Start with 0
+    }, 0);
 
     const wallet = { transactions, balance };
 
     // --- Arena Data ---
-    // Fetch all interactions involving any of the user's personal agents
     const allInteractions = await agentInteractionsCollection.find({ 
         $or: [
             { "agentId": { "$in": agents.map(a => a.id) } },

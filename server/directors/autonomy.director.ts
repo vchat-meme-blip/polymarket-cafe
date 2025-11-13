@@ -1,8 +1,5 @@
 
-
-
-
-import { agentsCollection, usersCollection, betsCollection, bettingIntelCollection } from '../db.js';
+import { agentsCollection, usersCollection, betsCollection, bettingIntelCollection, activityLogCollection } from '../db.js';
 import { ObjectId } from 'mongodb';
 import type { Agent, User, ActivityLogEntry, AgentTask, MarketIntel } from '../../lib/types/shared.js';
 import type { BettingIntelDocument } from '../../lib/types/mongodb.js';
@@ -110,7 +107,7 @@ export class AutonomyDirector {
         }
     }
 
-    private _logActivity(agent: Agent, type: ActivityLogEntry['type'], message: string, triggeredNotification: boolean = false) {
+    private async _logActivity(agent: Agent, type: ActivityLogEntry['type'], message: string, triggeredNotification: boolean = false) {
         if (!agent.ownerHandle) return;
 
         const logEntry: ActivityLogEntry = {
@@ -123,6 +120,12 @@ export class AutonomyDirector {
             triggeredNotification,
         };
         
+        try {
+            await activityLogCollection.insertOne(logEntry as any);
+        } catch (dbError) {
+            console.error(`[AutonomyDirector] Failed to save activity log to DB for agent ${agent.id}:`, dbError);
+        }
+
         this.emitToMain?.({
             type: 'socketEmit',
             event: 'newActivityLog',
@@ -160,22 +163,22 @@ export class AutonomyDirector {
                 this.emitToMain?.({
                     type: 'forwardToWorker',
                     worker: 'arena',
-                    message: { type: 'moveAgentToCafe', payload: { agentId: fullAgent.id } }
+                    message: { type: 'visitRandomStorefront', payload: { agentId: fullAgent.id } }
                 });
                 const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyCafe', message: `${fullAgent.name} is heading to the Café.` });
-                this._logActivity(fullAgent, 'cafe', message, notified.sent);
+                await this._logActivity(fullAgent, 'cafe', message, notified.sent);
                 this.handleNotificationFailure(notified, ownerHandle);
             } else if (actionRoll < 0.9) { 
                 if (!fullAgent.isProactive) return; 
                 const message = `Reviewing recent activity to find an insight for ${user.handle}.`;
                 const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyEngage', message: `${fullAgent.name} is formulating a new suggestion for you.` });
-                this._logActivity(fullAgent, 'engagement', message, notified.sent);
+                await this._logActivity(fullAgent, 'engagement', message, notified.sent);
                 this.handleNotificationFailure(notified, ownerHandle);
                 await this.proactiveEngagement(user, fullAgent);
             } else { 
                 const message = `Starting autonomous deep research on a trending market.`;
                 const notified = await notificationService.logAndSendNotification({ userId: ownerHandle, type: 'autonomyResearch', message: `${fullAgent.name} is starting a new research task.` });
-                this._logActivity(fullAgent, 'research', message, notified.sent);
+                await this._logActivity(fullAgent, 'research', message, notified.sent);
                 this.handleNotificationFailure(notified, ownerHandle);
                 await this.startResearch(fullAgent.id); 
             }
@@ -199,7 +202,7 @@ export class AutonomyDirector {
 
         this.setAgentBusy(agent.id, true);
         try {
-            this._logActivity(agent, 'research', 'Manual research task started.');
+            await this._logActivity(agent, 'research', 'Manual research task started.');
 
             const newIntel = await alphaService.discoverAndAnalyzeMarkets(agent);
             if (newIntel && agent.ownerHandle) {
@@ -212,7 +215,7 @@ export class AutonomyDirector {
                         type: 'agentResearch',
                         message: `🔬 Your agent, ${agent.name}, has new intel on "${savedIntel.market}".`,
                     });
-                    this._logActivity(agent, 'research', successMessage, notified.sent);
+                    await this._logActivity(agent, 'research', successMessage, notified.sent);
                     this.handleNotificationFailure(notified, ownerHandle);
                     this.emitToMain?.({ type: 'socketEmit', event: 'newIntel', payload: { intel: savedIntel }, room: agent.ownerHandle });
                 }
@@ -225,7 +228,7 @@ export class AutonomyDirector {
     }
 
     private async executeTask(agent: Agent, task: AgentTask) {
-        this._logActivity(agent, 'system', `Starting task: "${task.objective}"`);
+        await this._logActivity(agent, 'system', `Starting task: "${task.objective}"`);
 
         const initialUpdate = {
             $set: {
@@ -277,7 +280,7 @@ export class AutonomyDirector {
         const finalTaskForEmit = { ...updatedTaskForEmit_Initial, status: 'completed' as const, updatedAt: Date.now(), result, sources: result.sources, updates: [...updatedTaskForEmit_Initial.updates, { timestamp: Date.now(), message: 'Task completed.' }] };
         this.emitToMain?.({ type: 'socketEmit', event: 'taskUpdated', payload: finalTaskForEmit, room: agent.ownerHandle });
 
-        this._logActivity(agent, 'system', `Task completed: "${task.objective}"`);
+        await this._logActivity(agent, 'system', `Task completed: "${task.objective}"`);
     }
 
     private handleNotificationFailure(status: { sent: boolean, reason?: string }, userHandle: string) {
@@ -309,7 +312,7 @@ export class AutonomyDirector {
             engagementType = 'Reviewing the current betting portfolio.';
             await this.reviewPortfolio(user, agent);
         }
-        this._logActivity(agent, 'engagement', `Performing proactive engagement: ${engagementType}`);
+        await this._logActivity(agent, 'engagement', `Performing proactive engagement: ${engagementType}`);
     }
 
     private async checkTrendingMarkets(user: User, agent: Agent) {
@@ -321,7 +324,7 @@ export class AutonomyDirector {
         
         const message = await this.generateProactiveMessage(agent, prompt);
         if (message) {
-            this._logActivity(agent, 'engagement', `Sent proactive message about trending market "${interestingMarket.title}".`);
+            await this._logActivity(agent, 'engagement', `Sent proactive message about trending market "${interestingMarket.title}".`);
             this.sendProactiveMessage(user.handle!, agent, message, [interestingMarket]);
         }
     }
@@ -338,7 +341,7 @@ export class AutonomyDirector {
 
         const message = await this.generateProactiveMessage(agent, prompt);
         if (message) {
-            this._logActivity(agent, 'engagement', `Sent proactive message reviewing intel on "${intel.market}".`);
+            await this._logActivity(agent, 'engagement', `Sent proactive message reviewing intel on "${intel.market}".`);
             
             // Try to find the associated market to send with the message
             const { markets } = await polymarketService.searchMarkets(intel.market, undefined, 1, 1);
@@ -357,7 +360,7 @@ export class AutonomyDirector {
         
         const message = await this.generateProactiveMessage(agent, prompt);
         if (message) {
-            this._logActivity(agent, 'engagement', `Sent proactive message reviewing a bet on market ID ${betToReview.marketId}.`);
+            await this._logActivity(agent, 'engagement', `Sent proactive message reviewing a bet on market ID ${betToReview.marketId}.`);
             this.sendProactiveMessage(user.handle!, agent, message);
         }
     }
@@ -425,7 +428,6 @@ export class AutonomyDirector {
             rawResearchData: intel.rawResearchData || [],
             pnlGenerated: intel.pnlGenerated || { amount: 0, currency: 'USD' },
             toShared(): BettingIntel {
-// FIX: Add missing properties `price`, `sellerWalletAddress`, and `network` to the returned object to conform to the `BettingIntel` type.
                 return {
                     id: this._id.toHexString(),
                     ownerAgentId: this.ownerAgentId.toHexString(),
