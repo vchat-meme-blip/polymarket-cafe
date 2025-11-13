@@ -1,8 +1,8 @@
 /// <reference types="node" />
 
-import '../server/load-env.js';
-// FIX: Corrected import to use `db` which is the exported mongoose instance.
-import connectDB, { seedDatabase, db, roomsCollection, usersCollection } from '../server/db.js';
+import '../load-env.js';
+// FIX: Corrected import to use `db` which is the exported mongoose instance and fixed the relative path.
+import connectDB, { seedDatabase, db, roomsCollection, usersCollection } from '../db.js';
 
 async function resetDatabase() {
   // CRITICAL SAFETY CHECK: Prevent running in a production environment unless explicitly forced.

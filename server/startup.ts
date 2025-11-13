@@ -25,11 +25,9 @@ import { usersCollection } from './db.js';
 // ES Modules compatible __filename and __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.join(__dirname, '..', '..', '..');
 
 // Log the current file and directory for debugging
 console.log('Starting server from:', __filename);
-console.log('Project root:', projectRoot);
 
 export async function startServer() {
   if (!process.env.MONGODB_URI) {
@@ -143,7 +141,7 @@ export async function startServer() {
 
   app.use('/api', apiRouter);
   
-  const clientDistPath = path.join(projectRoot, 'dist', 'client');
+  const clientDistPath = path.resolve(__dirname, '..', '..', 'client');
   console.log(`[Server] Serving static files from: ${clientDistPath}`);
   
   if (!fs.existsSync(path.join(clientDistPath, 'index.html'))) {
