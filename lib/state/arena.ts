@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -163,40 +164,56 @@ export const useArenaStore = create(
         hydrate: (data) => set(state => {
             if (!data) return state;
 
-            const newState: Partial<ArenaState> = {};
+            const newState: Partial<Pick<ArenaState, 'tradeHistory' | 'agentConversations' | 'rooms'>> = {};
+
+            if (data.rooms) {
+                newState.rooms = data.rooms;
+            }
             if (data.tradeHistory) {
                 newState.tradeHistory = data.tradeHistory;
             }
 
             if (data.conversations) {
                 const newConversations: ArenaState['agentConversations'] = {};
+                const personalAgents = useAgent.getState().availablePersonal;
+                const personalAgentIds = new Set(personalAgents.map(a => a.id));
+
                 for (const interaction of data.conversations) {
-                    const [p1, p2] = (interaction.roomId || '').startsWith('dm_')
-                        ? (interaction.roomId.replace('dm_', '').split('_'))
-                        : [interaction.agentId, 'unknown']; // Fallback for arena chats without clear pairs in this context
-                    
-                    if (p1 && p2) {
-                        if (!newConversations[p1]) newConversations[p1] = {};
-                        if (!newConversations[p2]) newConversations[p2] = {};
-                        if (!newConversations[p1][p2]) newConversations[p1][p2] = [];
-                        if (!newConversations[p2][p1]) newConversations[p2][p1] = [];
-                        
-                        newConversations[p1][p2].push(interaction);
+                    // Direct messages with the user
+                    if (interaction.roomId && interaction.roomId.startsWith('dm_')) {
+                        const parts = interaction.roomId.replace('dm_', '').split('_');
+                        const agentId = parts.find(p => p !== USER_ID);
+                        if (agentId) {
+                            if (!newConversations[agentId]) newConversations[agentId] = {};
+                            if (!newConversations[agentId][USER_ID]) newConversations[agentId][USER_ID] = [];
+                            newConversations[agentId][USER_ID].push(interaction);
+                        }
+                    } 
+                    // Arena conversations
+                    else if (interaction.roomId && state.rooms) {
+                        const room = state.rooms.find(r => r.id === interaction.roomId);
+                        if (room && room.agentIds.length === 2) {
+                            const [p1, p2] = room.agentIds;
+                             if (!newConversations[p1]) newConversations[p1] = {};
+                            if (!newConversations[p2]) newConversations[p2] = {};
+                            if (!newConversations[p1][p2]) newConversations[p1][p2] = [];
+                            newConversations[p1][p2].push(interaction);
+                        }
                     }
                 }
+                
                 // Ensure symmetry and sort by timestamp
-                 for (const agent1Id in newConversations) {
+                for (const agent1Id in newConversations) {
                     for (const agent2Id in newConversations[agent1Id]) {
                         const sorted = newConversations[agent1Id][agent2Id].sort((a, b) => a.timestamp - b.timestamp);
                         newConversations[agent1Id][agent2Id] = sorted;
-                        if (newConversations[agent2Id]) {
-                             newConversations[agent2Id][agent1Id] = sorted;
-                        }
+                        if (!newConversations[agent2Id]) newConversations[agent2Id] = {};
+                        newConversations[agent2Id][agent1Id] = sorted;
                     }
                 }
                 newState.agentConversations = newConversations;
             }
-
+            
             return { ...state, ...newState };
         }),
 

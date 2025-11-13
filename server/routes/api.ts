@@ -119,12 +119,12 @@ router.get('/bootstrap/:handle', async (req, res) => {
     const agents = await agentsCollection.find({ ownerHandle: handle }).toArray();
     const presets = await agentsCollection.find({ ownerHandle: { $exists: false } }).toArray();
     
-    const agentIds = agents.map(a => a.id);
+    const agentObjectIds = agents.map(a => a._id);
     
     // --- Autonomy Data ---
     const autonomy = { 
         intel: await bettingIntelCollection.find({ ownerHandle: handle }).toArray(),
-        activityLog: await activityLogCollection.find({ agentId: { $in: agentIds } }).sort({ timestamp: -1 }).limit(100).toArray(),
+        activityLog: await activityLogCollection.find({ agentId: { $in: agents.map(a => a.id) } }).sort({ timestamp: -1 }).limit(100).toArray(),
         tasks: agents.flatMap(a => (a as any).tasks || [])
     };
     
@@ -138,18 +138,24 @@ router.get('/bootstrap/:handle', async (req, res) => {
             return acc - tx.amount;
         }
         return acc;
-    }, 1000); // Start with a base of 1000 if not claimed
+    }, 0); // Start with 0
 
     const wallet = { transactions, balance };
 
     // --- Arena Data ---
-    const allAgentIds = [...agents.map(a => a.id), ...presets.map(p => p.id)];
-    // Fetch all interactions involving the user's agents. This is a simplification; a real app might need more targeted queries.
-    const allInteractions = await agentInteractionsCollection.find({ "agentId": { "$in": [...agentIds, 'user'] } }).toArray();
-    // FIX: Convert string agent IDs to ObjectIds for the `$in` query to match the `fromId` and `toId` schema types in `tradeHistoryCollection`.
-    const tradeHistory = await tradeHistoryCollection.find({ $or: [{ fromId: { $in: agentIds.map(id => new ObjectId(id)) } }, { toId: { $in: agentIds.map(id => new ObjectId(id)) } }] }).toArray();
+    // Fetch all interactions involving any of the user's personal agents
+    const allInteractions = await agentInteractionsCollection.find({ 
+        $or: [
+            { "agentId": { "$in": agents.map(a => a.id) } },
+            { "roomId": { "$in": agents.map(a => `dm_${a.id}_user`) } },
+            { "roomId": { "$in": agents.map(a => `dm_user_${a.id}`) } }
+        ]
+     }).toArray();
+    const tradeHistory = await tradeHistoryCollection.find({ $or: [{ fromId: { $in: agentObjectIds } }, { toId: { $in: agentObjectIds } }] }).toArray();
+    const allRooms = await roomsCollection.find({}).toArray();
 
     const arena = {
+        rooms: allRooms,
         conversations: allInteractions,
         tradeHistory: tradeHistory,
     };
@@ -658,7 +664,7 @@ router.post('/ai/direct-message', async (req, res) => {
         const agentMessage = await aiService.getDirectMessageResponse(agent as any, user as any, message, history, apiKey);
         
         // Persist conversation
-        const participants = [agent.id, userHandle].sort();
+        const participants = [agent.id, 'user'].sort();
         const roomId = `dm_${participants[0]}_${participants[1]}`;
 
         const userTurn: Interaction = {

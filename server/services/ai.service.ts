@@ -97,6 +97,19 @@ const agentTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 
 
 class AiService {
+  private async retry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+    try {
+        return await fn();
+    } catch (error) {
+        if (error instanceof OpenAI.APIError && error.status === 429 && retries > 1) {
+            console.warn(`[AiService] Rate limit hit. Retrying in ${delay / 1000}s...`);
+            await new Promise(res => setTimeout(res, delay));
+            return this.retry(fn, retries - 1, delay * 2);
+        }
+        throw error;
+    }
+  }
+
   async getDirectMessageResponse(
     agent: Agent,
     user: User,
@@ -145,12 +158,14 @@ class AiService {
     ];
 
     try {
-      const response = await openai.chat.completions.create({
+      const createCompletion = () => openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: messages,
         tools: agentTools,
         tool_choice: 'auto',
       });
+      
+      const response = await this.retry(createCompletion);
 
       const responseMessage = response.choices[0].message;
       const toolCalls = responseMessage.tool_calls;
@@ -186,11 +201,12 @@ class AiService {
             content: JSON.stringify(functionResponse),
           });
         }
-
-        const secondResponse = await openai.chat.completions.create({
+        
+        const createSecondCompletion = () => openai.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: messages,
         });
+        const secondResponse = await this.retry(createSecondCompletion);
 
         return {
             agentId: agent.id,
@@ -325,12 +341,13 @@ class AiService {
     }
 
     try {
-      const completion = await openai.chat.completions.create({
+      const createCompletion = () => openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: messages,
         tools: tools,
         tool_choice: 'auto',
       });
+      const completion = await this.retry(createCompletion);
       
       const choice = completion.choices[0];
       const toolCalls = choice.message.tool_calls;
@@ -376,10 +393,11 @@ Description: "${market.description}"
 
 Return ONLY the search query.`;
       
-      const queryGenCompletion = await openai.chat.completions.create({
+      const createQueryCompletion = () => openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [{ role: 'user', content: queryGenPrompt }],
       });
+      const queryGenCompletion = await this.retry(createQueryCompletion);
       const searchQuery = queryGenCompletion.choices[0].message.content?.trim();
       if (!searchQuery) {
         console.warn(`[AiService] Could not generate search query for market: ${market.title}`);
@@ -409,10 +427,11 @@ Research Material:
 ${researchContext}
       `;
       
-      const summaryCompletion = await openai.chat.completions.create({
+      const createSummaryCompletion = () => openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [{ role: 'user', content: summaryPrompt }],
       });
+      const summaryCompletion = await this.retry(createSummaryCompletion);
       
       const intelContent = summaryCompletion.choices[0].message.content?.trim();
       if (!intelContent) {
@@ -454,13 +473,14 @@ ${researchContext}
     `;
 
     try {
-      const completion = await openai.chat.completions.create({
+      const createCompletion = () => openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
       });
+      const completion = await this.retry(createCompletion);
       return completion.choices[0].message.content?.trim() ?? null;
     } catch (error) {
       console.error(`[AiService] OpenAI completion failed for intel generation on "${market.title}":`, error);
@@ -498,13 +518,14 @@ ${researchContext}
     }
     
     try {
-      const completion = await openai.chat.completions.create({
+      const createCompletion = () => openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
         ],
       });
+      const completion = await this.retry(createCompletion);
       return completion.choices[0].message.content?.trim() ?? "I'm not sure what to make of this one.";
     } catch (error) {
         console.error(`[AiService] analyzeMarket failed for ${agent.name}:`, error);
@@ -563,7 +584,7 @@ ${researchContext}
     `;
 
     try {
-      const completion = await openai.chat.completions.create({
+      const createCompletion = () => openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [
             { role: 'system', content: systemPrompt },
@@ -571,6 +592,7 @@ ${researchContext}
         ],
         response_format: { type: "json_object" }
       });
+      const completion = await this.retry(createCompletion);
       
       const responseContent = completion.choices[0].message.content;
       if (!responseContent) throw new Error("Empty response from AI");
@@ -611,10 +633,11 @@ ${researchContext}
     `;
 
     try {
-      const completion = await openai.chat.completions.create({
+      const createCompletion = () => openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
       });
+      const completion = await this.retry(createCompletion);
       return completion.choices[0].message.content?.trim() ?? null;
     } catch (error) {
        console.error(`[AiService] Failed to generate daily summary:`, error);
@@ -640,10 +663,11 @@ ${researchContext}
     `;
 
     try {
-        const completion = await openai.chat.completions.create({
+        const createCompletion = () => openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [{ role: 'user', content: prompt }],
         });
+        const completion = await this.retry(createCompletion);
         return completion.choices[0].message.content?.trim() ?? null;
     } catch (error) {
         console.error(`[AiService] Failed to generate proactive engagement message for ${agent.name}:`, error);

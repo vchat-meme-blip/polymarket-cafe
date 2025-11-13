@@ -42,7 +42,7 @@ export const useWalletStore = create<WalletState>(
         // FIX: Update balance based on transaction type.
         set(state => {
             let newBalance = state.balance;
-            if (['receive', 'stipend'].includes(newTransaction.type)) {
+            if (['receive', 'stipend', 'claim'].includes(newTransaction.type)) {
                 newBalance += newTransaction.amount;
             } else if (['send', 'room_purchase', 'escrow'].includes(newTransaction.type)) {
                 newBalance -= newTransaction.amount;

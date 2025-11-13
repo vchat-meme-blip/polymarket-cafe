@@ -49,7 +49,7 @@ export const useAutonomyStore = create<AutonomyState>((set, get) => ({
   researchIntelCooldown: 1000 * 60 * 2, // 2 minutes
 
   hydrate: (data) => set({
-      intelBank: data.intel,
+      intelBank: data.intel || [],
       activityLog: data.activityLog || [],
       tasks: data.tasks || [],
   }),

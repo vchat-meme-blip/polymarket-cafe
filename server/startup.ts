@@ -3,7 +3,8 @@
 import './load-env.js';
 import http from 'http';
 // FIX: Changed to default import and use explicit express types to resolve type conflicts with global DOM types.
-import express from 'express';
+// FIX: Alias express types to avoid conflicts with global DOM types.
+import express, { Request as ExpressRequest, Response as ExpressResponse, NextFunction as ExpressNextFunction } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -128,7 +129,7 @@ export async function startServer() {
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
     // FIX: Added explicit Express types to resolve handler overload errors.
-    app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    app.use((req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
@@ -153,7 +154,7 @@ export async function startServer() {
   app.use(express.static(clientDistPath));
   
   // FIX: Added explicit Express types to resolve handler overload errors.
-  app.get('*', (req: express.Request, res: express.Response) => {
+  app.get('*', (req: ExpressRequest, res: ExpressResponse) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);
