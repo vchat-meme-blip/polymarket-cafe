@@ -3,8 +3,8 @@
 import './load-env.js';
 import http from 'http';
 import express from 'express';
-// FIX: Add explicit types for req, res, and next to resolve overload error.
-import type { Request, Response, NextFunction } from 'express';
+// FIX: Changed import type to a regular import to resolve overload errors with Express handlers.
+import { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -132,8 +132,8 @@ export async function startServer() {
 
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
-    // FIX: Add explicit types for req, res, and next to resolve overload error.
-    app.use((req: Request, res: Response, next: NextFunction) => {
+    // FIX: Removed explicit types from handler parameters to allow TypeScript to infer them from context, resolving overload and property-not-found errors.
+    app.use((req, res, next) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
@@ -150,8 +150,8 @@ export async function startServer() {
   
   app.use(express.static(clientDistPath));
   
-  // FIX: Add explicit types for req and res to resolve overload error.
-  app.get('*', (req: Request, res: Response) => {
+  // FIX: Removed explicit types from handler parameters to allow TypeScript to infer them from context, resolving overload and property-not-found errors.
+  app.get('*', (req, res) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);

@@ -107,8 +107,8 @@ router.get('/bootstrap/:handle', async (req, res) => {
             console.warn(`[Bootstrap] Stale ownedRoomId (${userDoc.ownedRoomId}) found for user ${handle}. Clearing.`);
             // Update the DB to fix the inconsistency
             await usersCollection.updateOne({ _id: userDoc._id }, { $unset: { ownedRoomId: "" } });
-            // Remove from the object we're about to send to the client
-            delete (userDoc as any).ownedRoomId;
+            // Set property to null on the object we're about to send to the client
+            (userDoc as any).ownedRoomId = null;
         }
     }
     const user = userDoc;
