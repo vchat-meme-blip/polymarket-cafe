@@ -2,6 +2,7 @@
 
 import './load-env.js';
 import http from 'http';
+// FIX: Changed to default import and use explicit express types to resolve type conflicts with global DOM types.
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
@@ -36,7 +37,8 @@ export async function startServer() {
   await connectDB();
   await seedDatabase();
 
-  const app = express();
+  // FIX: Explicitly type `app` as `express.Express` to resolve type conflicts.
+  const app: express.Express = express();
   const server = http.createServer(app);
   const apiKeyManager = new ApiKeyManager();
 
@@ -68,7 +70,7 @@ export async function startServer() {
   const monitoringWorker = createWorker('./workers/monitoring.worker.js');
   workers.push({ name: 'Monitoring', instance: monitoringWorker, tickInterval: 5 * 60000 });
 
-  // FIX: Moved workerMessageHandler before its usage to fix hoisting issue and resolve middleware type errors.
+  // FIX: Moved workerMessageHandler before its usage to fix hoisting issues.
   const workerMessageHandler = (worker: Worker, workerName: string) => async (message: any) => {
     switch (message.type) {
       case 'socketEmit':
@@ -125,17 +127,19 @@ export async function startServer() {
 
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
-    app.use((req, res, next) => {
+    // FIX: Added explicit Express types to resolve handler overload errors.
+    app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
   });
 
-  tickIntervals.push(...workers.map(({ instance, tickInterval }) => {
-    return setInterval(() => {
+  // RESTORED: This loop is the heartbeat of the autonomous server-side simulation.
+  workers.forEach(({ instance, tickInterval }) => {
+    tickIntervals.push(setInterval(() => {
         instance.postMessage({ type: 'tick' });
-    }, tickInterval);
-  }));
+    }, tickInterval));
+  });
 
   app.use('/api', apiRouter);
   
@@ -148,7 +152,8 @@ export async function startServer() {
   
   app.use(express.static(clientDistPath));
   
-  app.get('*', (req, res) => {
+  // FIX: Added explicit Express types to resolve handler overload errors.
+  app.get('*', (req: express.Request, res: express.Response) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);
