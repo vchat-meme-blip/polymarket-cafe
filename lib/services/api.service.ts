@@ -50,6 +50,7 @@ class ApiService {
       });
       useAutonomyStore.getState().hydrate(data.autonomy);
       useWalletStore.getState().hydrate(data.wallet);
+      useArenaStore.getState().hydrate(data.arena);
 
       return { success: true };
   }

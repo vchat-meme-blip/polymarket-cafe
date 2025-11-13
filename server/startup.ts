@@ -3,8 +3,6 @@
 import './load-env.js';
 import http from 'http';
 import express from 'express';
-// FIX: Changed import type to a regular import to resolve overload errors with Express handlers.
-import { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -70,12 +68,7 @@ export async function startServer() {
   const monitoringWorker = createWorker('./workers/monitoring.worker.js');
   workers.push({ name: 'Monitoring', instance: monitoringWorker, tickInterval: 5 * 60000 });
 
-  workers.forEach(({ instance, tickInterval }) => {
-    tickIntervals.push(setInterval(() => {
-        instance.postMessage({ type: 'tick' });
-    }, tickInterval));
-  });
-
+  // FIX: Moved workerMessageHandler before its usage to fix hoisting issue and resolve middleware type errors.
   const workerMessageHandler = (worker: Worker, workerName: string) => async (message: any) => {
     switch (message.type) {
       case 'socketEmit':
@@ -132,12 +125,17 @@ export async function startServer() {
 
   workers.forEach(({ instance, name }) => {
     instance.on('message', workerMessageHandler(instance, name));
-    // FIX: Removed explicit types from handler parameters to allow TypeScript to infer them from context, resolving overload and property-not-found errors.
     app.use((req, res, next) => {
       (req as any)[`${name.toLowerCase()}Worker`] = instance;
       next();
     });
   });
+
+  tickIntervals.push(...workers.map(({ instance, tickInterval }) => {
+    return setInterval(() => {
+        instance.postMessage({ type: 'tick' });
+    }, tickInterval);
+  }));
 
   app.use('/api', apiRouter);
   
@@ -150,7 +148,6 @@ export async function startServer() {
   
   app.use(express.static(clientDistPath));
   
-  // FIX: Removed explicit types from handler parameters to allow TypeScript to infer them from context, resolving overload and property-not-found errors.
   app.get('*', (req, res) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {

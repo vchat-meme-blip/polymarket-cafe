@@ -72,7 +72,7 @@ const ProfileTab = ({ agent, onUpdate, onSave }: { agent: Partial<Agent>, onUpda
                         >
                             <ambientLight intensity={1.5} />
                             <directionalLight position={[3, 1, 2]} intensity={2} castShadow />
-                            <group position={[0, -0.8, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0.2 : (0.2 + Math.PI), 0]} scale={1.0}>
+                            <group position={[0, -1.0, 0]} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0.2 : (0.2 + Math.PI), 0]} scale={1.0}>
                                 <VrmModel 
                                     modelUrl={agent.modelUrl || ''} 
                                     isSpeaking={false}

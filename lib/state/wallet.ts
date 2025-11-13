@@ -7,6 +7,7 @@ import { Transaction } from '../types/index.js';
 
 interface ServerHydrationData {
     transactions: Transaction[];
+    balance: number;
 }
 
 // FIX: Add `balance` and `claimInitialTokens` to the WalletState type.
@@ -24,7 +25,10 @@ export const useWalletStore = create<WalletState>(
       balance: 0,
       transactions: [],
 
-      hydrate: (data) => set({ transactions: data.transactions || [] }),
+      hydrate: (data) => set({ 
+          transactions: data.transactions || [],
+          balance: data.balance || 0,
+      }),
 
       addTransaction: (
         transaction: Omit<Transaction, 'id' | 'timestamp'>,

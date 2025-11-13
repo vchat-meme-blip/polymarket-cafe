@@ -16,6 +16,7 @@ export const USER_ID = 'user';
 interface ServerHydrationData {
     rooms: Room[];
     conversations: Interaction[];
+    tradeHistory: TradeRecord[];
 }
 
 export type ArenaState = {
@@ -32,7 +33,7 @@ export type ArenaState = {
   tradeHistory: TradeRecord[];
   lastTradeDetails: TradeRecord | null;
   systemPaused: boolean;
-  hydrate: (data?: ServerHydrationData) => void;
+  hydrate: (data?: Partial<ServerHydrationData>) => void;
   // Actions initiated by client UI
   moveAgentToRoom: (agentId: string, roomId: string) => void;
   removeAgentFromRoom: (agentId: string) => void;
@@ -160,32 +161,43 @@ export const useArenaStore = create(
         systemPaused: false,
 
         hydrate: (data) => set(state => {
-          if (!data || !Array.isArray(data.rooms)) {
-            return state;
-          }
+            if (!data) return state;
 
-          const newState = { ...state, ...data };
+            const newState: Partial<ArenaState> = {};
+            if (data.tradeHistory) {
+                newState.tradeHistory = data.tradeHistory;
+            }
 
-          const agentLocations: Record<string, string | null> = {};
-          const agentReputations: Record<string, number> = {};
-          
-          const allAgents = [...useAgent.getState().availablePersonal, ...useAgent.getState().availablePresets];
-          allAgents.forEach((agent: Agent) => {
-              agentLocations[agent.id] = null;
-              agentReputations[agent.id] = agent.reputation || 100;
-          });
-          
-          data.rooms.forEach(room => {
-            room.agentIds.forEach(agentId => {
-              agentLocations[agentId] = room.id;
-            });
-          });
+            if (data.conversations) {
+                const newConversations: ArenaState['agentConversations'] = {};
+                for (const interaction of data.conversations) {
+                    const [p1, p2] = (interaction.roomId || '').startsWith('dm_')
+                        ? (interaction.roomId.replace('dm_', '').split('_'))
+                        : [interaction.agentId, 'unknown']; // Fallback for arena chats without clear pairs in this context
+                    
+                    if (p1 && p2) {
+                        if (!newConversations[p1]) newConversations[p1] = {};
+                        if (!newConversations[p2]) newConversations[p2] = {};
+                        if (!newConversations[p1][p2]) newConversations[p1][p2] = [];
+                        if (!newConversations[p2][p1]) newConversations[p2][p1] = [];
+                        
+                        newConversations[p1][p2].push(interaction);
+                    }
+                }
+                // Ensure symmetry and sort by timestamp
+                 for (const agent1Id in newConversations) {
+                    for (const agent2Id in newConversations[agent1Id]) {
+                        const sorted = newConversations[agent1Id][agent2Id].sort((a, b) => a.timestamp - b.timestamp);
+                        newConversations[agent1Id][agent2Id] = sorted;
+                        if (newConversations[agent2Id]) {
+                             newConversations[agent2Id][agent1Id] = sorted;
+                        }
+                    }
+                }
+                newState.agentConversations = newConversations;
+            }
 
-          return { 
-            ...newState, 
-            agentLocations, 
-            agentReputations 
-          };
+            return { ...state, ...newState };
         }),
 
         moveAgentToRoom: (agentId, roomId) => {

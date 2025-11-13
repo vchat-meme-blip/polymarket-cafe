@@ -98,7 +98,7 @@ export default function AgentsView() {
             <directionalLight position={[3, 5, 2]} intensity={2} castShadow />
             {/* Adjusted positioning to properly center the model in the card */}
             <group position={[0, -1.0, 0]} scale={1.2} rotation={[0, agent.modelUrl?.includes('war_boudica') ? 0 : Math.PI, 0]}>
-              <VrmModel modelUrl={agent.modelUrl || ''} isSpeaking={false} />
+              <VrmModel modelUrl={agent.modelUrl || ''} isSpeaking={false} disableAutoGrounding={true} verticalOffset={0.2} />
             </group>
             <OrbitControls makeDefault enableZoom={false} enablePan={false} target={[0, 1.0, 0]} />
           </View>

@@ -1,3 +1,4 @@
+
 import { Router } from 'express';
 import mongoose, { Collection } from 'mongoose';
 import { TradeRecord, BettingIntel, MarketWatchlist } from '../../lib/types/shared.js';
@@ -14,6 +15,7 @@ import {
   dailySummariesCollection,
   marketWatchlistsCollection,
   activityLogCollection,
+  agentInteractionsCollection,
 } from '../db.js';
 import { PRESET_AGENTS } from '../../lib/presets/agents.js';
 import { aiService } from '../services/ai.service.js';
@@ -22,15 +24,16 @@ import { cafeMusicService } from '../services/cafeMusic.service.js';
 import { polymarketService } from '../services/polymarket.service.js';
 import { kalshiService } from '../services/kalshi.service.js';
 import { leaderboardService } from '../services/leaderboard.service.js';
-import { Agent, User, Interaction, Room, MarketIntel, AgentMode, Bet, AgentTask, toSharedUser } from '../../lib/types/index.js';
+import { Agent, User, Interaction, Room, MarketIntel, AgentMode, Bet, AgentTask, toSharedUser, Transaction } from '../../lib/types/index.js';
 import { createSystemInstructions } from '../../lib/prompts.js';
-import { ObjectId } from 'mongodb';
+// FIX: Add WithId to import to correctly type documents returned from MongoDB queries.
+import { ObjectId, WithId } from 'mongodb';
 import OpenAI from 'openai';
 import { Readable } from 'stream';
 // FIX: Changed date-fns imports to use named imports from the main package to resolve call signature errors.
 import { startOfToday, formatISO } from 'date-fns';
 import { seedDatabase } from '../db.js';
-import { UserDocument } from '../../lib/types/mongodb.js';
+import { UserDocument, TransactionDocument } from '../../lib/types/mongodb.js';
 
 // Add global declaration to extend Express.Request with worker properties.
 declare global {
@@ -106,9 +109,9 @@ router.get('/bootstrap/:handle', async (req, res) => {
         if (!roomExists) {
             console.warn(`[Bootstrap] Stale ownedRoomId (${userDoc.ownedRoomId}) found for user ${handle}. Clearing.`);
             // Update the DB to fix the inconsistency
-            await usersCollection.updateOne({ _id: userDoc._id }, { $unset: { ownedRoomId: "" } });
+            await usersCollection.updateOne({ _id: userDoc._id }, { $set: { ownedRoomId: null } });
             // Set property to null on the object we're about to send to the client
-            (userDoc as any).ownedRoomId = null;
+            userDoc.ownedRoomId = null;
         }
     }
     const user = userDoc;
@@ -116,28 +119,40 @@ router.get('/bootstrap/:handle', async (req, res) => {
     const agents = await agentsCollection.find({ ownerHandle: handle }).toArray();
     const presets = await agentsCollection.find({ ownerHandle: { $exists: false } }).toArray();
     
-    // Fetch tasks for the user's agents
-    const agentIds = agents.map(a => a._id);
-    const agentsWithTasks = await agentsCollection.find({ _id: { $in: agentIds } }).toArray();
-    const tasksByAgent = agentsWithTasks.reduce((acc, agent) => {
-        acc[agent._id.toString()] = (agent as any).tasks || [];
-        return acc;
-    }, {} as Record<string, AgentTask[]>);
+    const agentIds = agents.map(a => a.id);
     
-    agents.forEach(agent => {
-        (agent as any).tasks = tasksByAgent[agent._id.toString()] || [];
-    });
-
-    const agentStringIds = agents.map(a => a.id);
-    
+    // --- Autonomy Data ---
     const autonomy = { 
-        // FIX: Return an empty array for bounties as the collection is deprecated.
-        bounties: [], 
         intel: await bettingIntelCollection.find({ ownerHandle: handle }).toArray(),
-        activityLog: await activityLogCollection.find({ agentId: { $in: agentStringIds } }).sort({ timestamp: -1 }).limit(100).toArray(),
+        activityLog: await activityLogCollection.find({ agentId: { $in: agentIds } }).sort({ timestamp: -1 }).limit(100).toArray(),
         tasks: agents.flatMap(a => (a as any).tasks || [])
     };
-    const wallet = { transactions: await transactionsCollection.find({ ownerHandle: handle }).toArray() };
+    
+    // --- Wallet Data ---
+    const transactions = await transactionsCollection.find({ ownerHandle: handle }).toArray();
+    // FIX: Correctly type the `tx` parameter in the reduce function to `WithId<TransactionDocument>` to match the type returned by `find().toArray()`.
+    const balance = transactions.reduce((acc: number, tx: WithId<TransactionDocument>) => {
+        if (['receive', 'claim', 'stipend'].includes(tx.type)) {
+            return acc + tx.amount;
+        } else if (['send', 'room_purchase', 'escrow'].includes(tx.type)) {
+            return acc - tx.amount;
+        }
+        return acc;
+    }, 1000); // Start with a base of 1000 if not claimed
+
+    const wallet = { transactions, balance };
+
+    // --- Arena Data ---
+    const allAgentIds = [...agents.map(a => a.id), ...presets.map(p => p.id)];
+    // Fetch all interactions involving the user's agents. This is a simplification; a real app might need more targeted queries.
+    const allInteractions = await agentInteractionsCollection.find({ "agentId": { "$in": [...agentIds, 'user'] } }).toArray();
+    // FIX: Convert string agent IDs to ObjectIds for the `$in` query to match the `fromId` and `toId` schema types in `tradeHistoryCollection`.
+    const tradeHistory = await tradeHistoryCollection.find({ $or: [{ fromId: { $in: agentIds.map(id => new ObjectId(id)) } }, { toId: { $in: agentIds.map(id => new ObjectId(id)) } }] }).toArray();
+
+    const arena = {
+        conversations: allInteractions,
+        tradeHistory: tradeHistory,
+    };
 
     const sanitize = (doc: any) => ({ ...doc, id: doc._id.toString(), _id: doc._id.toString() });
 
@@ -146,7 +161,8 @@ router.get('/bootstrap/:handle', async (req, res) => {
         agents: agents.map(sanitize),
         presets: presets.map(sanitize), 
         autonomy, 
-        wallet 
+        wallet,
+        arena,
     });
   } catch (error) {
     console.error('[API] Error during bootstrap:', error);
@@ -640,6 +656,21 @@ router.post('/ai/direct-message', async (req, res) => {
         }
 
         const agentMessage = await aiService.getDirectMessageResponse(agent as any, user as any, message, history, apiKey);
+        
+        // Persist conversation
+        const participants = [agent.id, userHandle].sort();
+        const roomId = `dm_${participants[0]}_${participants[1]}`;
+
+        const userTurn: Interaction = {
+            agentId: 'user',
+            agentName: user.name || user.handle,
+            text: message,
+            timestamp: Date.now() - 1, // Ensure user message is slightly before agent response
+            roomId
+        };
+        const agentTurn: Interaction = { ...agentMessage, roomId };
+
+        await agentInteractionsCollection.insertMany([userTurn as any, agentTurn as any]);
         
         res.json({ agentMessage });
 
