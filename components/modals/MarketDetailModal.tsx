@@ -1,21 +1,26 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 import { useEffect, useState } from 'react';
 import Modal from '../Modal';
-import { useUI, useAgent } from '../../lib/state/index.js';
+import { useUI, useAgent, useUser } from '../../lib/state/index.js';
 import { apiService } from '../../lib/services/api.service.js';
 import { MarketIntel } from '../../lib/types/index.js';
 import styles from './Modals.module.css';
+import c from 'classnames';
 
 export default function MarketDetailModal({ market }: { market: MarketIntel }) {
     const { closeMarketDetailModal } = useUI();
     const { current: agent } = useAgent();
+    const { bookmarkedMarketIds, toggleBookmark } = useUser();
     const [analysis, setAnalysis] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [comments, setComments] = useState<any[]>([]);
     const [isLoadingComments, setIsLoadingComments] = useState(true);
+    
+    const isBookmarked = bookmarkedMarketIds?.includes(market.id);
 
     useEffect(() => {
         const fetchCommentsAndAnalysis = async () => {
@@ -27,31 +32,22 @@ export default function MarketDetailModal({ market }: { market: MarketIntel }) {
             if (market.platform === 'Polymarket') {
                 const marketNumericId = market.id.replace('polymarket-', '');
                 
-                // Step 1: Try to fetch market-specific comments
                 try {
                     const marketComments = await apiService.request<any[]>(`/api/markets/${marketNumericId}/comments`);
                     if (marketComments && marketComments.length > 0) {
                         fetchedComments = marketComments;
-                    } else {
-                        // Step 2: Fallback to event-specific comments if no market comments are found
-                        if (market.eventId) {
-                            try {
-                                const eventComments = await apiService.request<any[]>(`/api/markets/comments/${market.eventId}`);
-                                fetchedComments = eventComments || [];
-                            } catch (eventError) {
-                                console.error("Failed to fetch fallback event comments.", eventError);
-                            }
-                        }
+                    } else if (market.eventId) {
+                        const eventComments = await apiService.request<any[]>(`/api/markets/comments/${market.eventId}`);
+                        fetchedComments = eventComments || [];
                     }
-                } catch (marketError) {
-                    console.error("Failed to fetch market-specific comments, trying event comments.", marketError);
-                    // Fallback to event comments on error as well
+                } catch (error) {
+                    console.error("Failed to fetch comments, trying event fallback.", error);
                     if (market.eventId) {
                         try {
                             const eventComments = await apiService.request<any[]>(`/api/markets/comments/${market.eventId}`);
                             fetchedComments = eventComments || [];
                         } catch (eventError) {
-                            console.error("Failed to fetch fallback event comments after initial error.", eventError);
+                             console.error("Failed to fetch fallback event comments.", eventError);
                         }
                     }
                 }
@@ -60,7 +56,6 @@ export default function MarketDetailModal({ market }: { market: MarketIntel }) {
             setComments(fetchedComments);
             setIsLoadingComments(false);
 
-            // Then fetch analysis, passing the comments
             try {
                 const response = await apiService.request<{ analysis: string }>('/api/ai/analyze-market', {
                     method: 'POST',
@@ -80,7 +75,6 @@ export default function MarketDetailModal({ market }: { market: MarketIntel }) {
     const eventUrl = (market.platform === 'Polymarket' && market.eventSlug)
         ? `https://polymarket.com/event/${market.eventSlug}`
         : null;
-
 
     return (
         <Modal onClose={closeMarketDetailModal}>
@@ -142,13 +136,17 @@ export default function MarketDetailModal({ market }: { market: MarketIntel }) {
                                 </div>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                            <a href={market.marketUrl} target="_blank" rel="noopener noreferrer" className="button primary" style={{flex: 1, justifyContent: 'center' }}>
-                                View Market
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '24px' }}>
+                            <a href={market.marketUrl} target="_blank" rel="noopener noreferrer" className="button primary" style={{width: '100%', justifyContent: 'center' }}>
+                                View on {market.platform}
                             </a>
+                             <button className={c("button secondary", {[styles.bookmarked]: isBookmarked})} style={{width: '100%', justifyContent: 'center'}} onClick={() => toggleBookmark(market.id, !isBookmarked)}>
+                                <span className="icon">{isBookmarked ? 'bookmark' : 'bookmark_border'}</span>
+                                {isBookmarked ? 'Bookmarked' : 'Bookmark Market'}
+                            </button>
                             {eventUrl && (
-                                <a href={eventUrl} target="_blank" rel="noopener noreferrer" className="button secondary" style={{flex: 1, justifyContent: 'center' }}>
-                                    View Event
+                                <a href={eventUrl} target="_blank" rel="noopener noreferrer" className="button secondary" style={{width: '100%', justifyContent: 'center' }}>
+                                    View Event Page
                                 </a>
                             )}
                         </div>

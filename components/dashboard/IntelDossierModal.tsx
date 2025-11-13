@@ -8,7 +8,7 @@ import styles from '../modals/Modals.module.css';
 import { BettingIntel } from '../../lib/types/index.js';
 
 export default function IntelDossierModal() {
-    const { showIntelDossierModal, closeIntelDossier, setChatPrompt } = useUI();
+    const { showIntelDossierModal, closeIntelDossier, setChatPrompt, setView } = useUI();
 
     if (!showIntelDossierModal) {
         return null;
@@ -19,6 +19,7 @@ export default function IntelDossierModal() {
     const handleDiscuss = () => {
         setChatPrompt(`Let's talk about the intel on "${intel.market}". What's your take on it?`);
         closeIntelDossier();
+        setView('dashboard');
     };
 
     return (

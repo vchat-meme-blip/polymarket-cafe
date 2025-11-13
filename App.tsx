@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -42,6 +43,7 @@ import CreateTaskModal from './components/modals/CreateTaskModal';
 import TaskDetailModal from './components/modals/TaskDetailModal';
 import PaywallModal from './components/modals/PaywallModal';
 import IntelDossierModal from './components/dashboard/IntelDossierModal.js';
+import NewMarketsModal from './components/modals/NewMarketsModal.js';
 
 /**
  * Main application component.
@@ -53,7 +55,8 @@ function App() {
     agentDossierId, showAboutPage, showOnboarding, showProfileView, 
     openOnboarding, setIsSignedIn, showCreateRoomModal, showManageRoomModal,
     showShareRoomModal, shareModalData, marketDetailModalData, showVisitStorefrontModal,
-    showAutonomyModal, showCreateTaskModal, taskDetailModalData, showIntelDossierModal
+    showAutonomyModal, showCreateTaskModal, taskDetailModalData, showIntelDossierModal,
+    showNewMarketsModal
   } = useUI();
   const { availablePersonal } = useAgent();
   const { hasCompletedOnboarding } = useUser();
@@ -134,6 +137,7 @@ function App() {
       {showShareRoomModal && shareModalData && <ShareRoomModal data={shareModalData} />}
       {marketDetailModalData && <MarketDetailModal market={marketDetailModalData} />}
       {showIntelDossierModal && <IntelDossierModal />}
+      {showNewMarketsModal && <NewMarketsModal />}
       <PaywallModal />
       <ToastContainer />
     </>

@@ -1,5 +1,4 @@
 
-
 /// <reference types="node" />
 
 import mongoose, { Collection, Document } from 'mongoose';
@@ -59,6 +58,7 @@ export let marketWatchlistsCollection: Collection<Document>;
 export let dailySummariesCollection: Collection<DailySummaryDocument>;
 export let notificationsCollection: Collection<NotificationDocument>;
 export let agentInteractionsCollection: Collection<Interaction>;
+export let newMarketsCacheCollection: Collection<Document>;
 
 
 // Helper function to convert MongoDB document to plain object
@@ -104,6 +104,7 @@ const connectDB = async () => {
     dailySummariesCollection = mongoose.connection.collection<DailySummaryDocument>('dailySummaries');
     notificationsCollection = mongoose.connection.collection<NotificationDocument>('notifications');
     agentInteractionsCollection = mongoose.connection.collection<Interaction>('agent_interactions');
+    newMarketsCacheCollection = mongoose.connection.collection<Document>('new_markets_cache');
 
 
     // Create indexes
@@ -112,7 +113,8 @@ const connectDB = async () => {
       agentsCollection.createIndex({ id: 1 }, { unique: true }),
       agentsCollection.createIndex({ ownerHandle: 1 }),
       roomsCollection.createIndex({ id: 1 }, { unique: true }),
-      agentInteractionsCollection.createIndex({ roomId: 1, timestamp: -1 })
+      agentInteractionsCollection.createIndex({ roomId: 1, timestamp: -1 }),
+      newMarketsCacheCollection.createIndex({ detectedAt: -1 }),
     ]);
 
     // Clear rooms on startup in development for a clean slate

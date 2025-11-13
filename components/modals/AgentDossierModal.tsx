@@ -368,53 +368,67 @@ const IntelBankTab = ({ agent }: { agent: Partial<Agent> }) => {
     const allAgents = useMemo(() => new Map([...availablePersonal, ...availablePresets].map(a => [a.id, a])), [availablePersonal, availablePresets]);
     const { openIntelDossier } = useUI();
     
+    const [filter, setFilter] = useState('All');
+
     const agentIntel = useMemo(() => {
         return intelBank
             .filter(i => (i as any).ownerHandle === agent.ownerHandle)
             .sort((a, b) => b.createdAt - a.createdAt);
     }, [intelBank, agent.ownerHandle]);
 
-    const groupedIntel = useMemo(() => {
-        return agentIntel.reduce((acc, intel) => {
-            const sourceAgentId = intel.sourceAgentId;
-            let sourceName = 'Autonomous Research';
-            if (sourceAgentId) {
-                const sourceAgent = allAgents.get(sourceAgentId);
-                sourceName = sourceAgent ? `Purchased from ${sourceAgent.name}` : 'Purchased';
+    const intelSources = useMemo(() => {
+        const sources = new Set<string>(['All', 'Autonomous Research']);
+        agentIntel.forEach(intel => {
+            if (intel.sourceAgentId) {
+                const sourceAgent = allAgents.get(intel.sourceAgentId);
+                if (sourceAgent) {
+                    sources.add(`Purchased from ${sourceAgent.name}`);
+                }
             }
-            if (!acc[sourceName]) {
-                acc[sourceName] = [];
-            }
-            acc[sourceName].push(intel);
-            return acc;
-        }, {} as Record<string, BettingIntel[]>);
+        });
+        return Array.from(sources);
     }, [agentIntel, allAgents]);
+
+    const filteredIntel = useMemo(() => {
+        if (filter === 'All') {
+            return agentIntel;
+        }
+        if (filter === 'Autonomous Research') {
+            return agentIntel.filter(i => !i.sourceAgentId);
+        }
+        if (filter.startsWith('Purchased from')) {
+            const agentName = filter.replace('Purchased from ', '');
+            const sourceAgent = [...allAgents.values()].find(a => a.name === agentName);
+            return agentIntel.filter(i => i.sourceAgentId === sourceAgent?.id);
+        }
+        return [];
+    }, [agentIntel, filter, allAgents]);
 
     return (
         <div className={styles.intelBriefingContainer}>
-            {Object.entries(groupedIntel).map(([sourceName, intelItems]) => (
-                <div key={sourceName}>
-                    <h4>{sourceName}</h4>
-                    <div className={styles.intelOwnedList}>
-                        {intelItems.map(intel => (
-                            <div key={intel.id} className={`${styles.intelOwnedItem} ${styles.clickable}`} onClick={() => openIntelDossier(intel)}>
-                                <div className={styles.intelOwnedHeader}>
-                                    <strong>{intel.market}</strong>
-                                    <span>{format(new Date(intel.createdAt), 'MMM d')}</span>
-                                </div>
-                                <p>{intel.content.substring(0, 100)}...</p>
-                                <div className={styles.intelOwnedStats}>
-                                    {intel.pricePaid && <span>Paid: {intel.pricePaid} BOX</span>}
-                                    <span className={intel.pnlGenerated.amount >= 0 ? styles.positive : styles.negative}>
-                                        PNL: ${intel.pnlGenerated.amount.toFixed(2)}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
+             <div className={styles.intelFilter}>
+                <label htmlFor="intel-source-filter">Filter by source:</label>
+                <select id="intel-source-filter" value={filter} onChange={e => setFilter(e.target.value)}>
+                    {intelSources.map(source => <option key={source} value={source}>{source}</option>)}
+                </select>
+            </div>
+            <div className={styles.intelOwnedList}>
+                {filteredIntel.map(intel => (
+                    <div key={intel.id} className={`${styles.intelOwnedItem} ${styles.clickable}`} onClick={() => openIntelDossier(intel)}>
+                        <div className={styles.intelOwnedHeader}>
+                            <strong>{intel.market}</strong>
+                            <span>{format(new Date(intel.createdAt), 'MMM d')}</span>
+                        </div>
+                        <p>{intel.content.substring(0, 100)}...</p>
+                        <div className={styles.intelOwnedStats}>
+                            {intel.pricePaid && <span>Paid: {intel.pricePaid} BOX</span>}
+                            <span className={intel.pnlGenerated.amount >= 0 ? styles.positive : styles.negative}>
+                                PNL: ${intel.pnlGenerated.amount.toFixed(2)}
+                            </span>
+                        </div>
                     </div>
-                    <div className={styles.intelBriefingDivider}></div>
-                </div>
-            ))}
+                ))}
+            </div>
             {agentIntel.length === 0 && (
                  <p className={styles.emptyLedger}>This agent's intel bank is empty.</p>
             )}
@@ -424,12 +438,18 @@ const IntelBankTab = ({ agent }: { agent: Partial<Agent> }) => {
 
 
 export default function AgentDossierModal({ agentId }: { agentId: string }) {
-    const { closeAgentDossier, isCreatingAgentInDossier } = useUI();
+    const { closeAgentDossier, isCreatingAgentInDossier, dossierInitialTab } = useUI();
     const { availablePersonal, addAgent, update } = useAgent();
     const { handle } = useUser();
     
     const [activeTab, setActiveTab] = useState<DossierTab>('profile');
     const [isSaving, setIsSaving] = useState(false);
+    
+    useEffect(() => {
+        if (dossierInitialTab) {
+            setActiveTab(dossierInitialTab);
+        }
+    }, [dossierInitialTab]);
 
     const initialAgentData = useMemo(() => {
         return availablePersonal.find(a => a.id === agentId) || 

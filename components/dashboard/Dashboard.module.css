@@ -34,6 +34,29 @@
 	100% { background-position: 0% 50%; }
 }
 
+/* NEW: Intel Bank Button */
+.intelBankButton {
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    z-index: 3;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 99px;
+    padding: 10px 16px;
+    color: white;
+    font-weight: 500;
+}
+.intelBankButton:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+.intelBankButton .icon {
+    font-size: 20px;
+}
+
+
 .agentDisplay {
     position: absolute;
     inset: 0;
@@ -783,6 +806,9 @@
 
 /* Tablet and Desktop */
 @media (min-width: 768px) {
+    .intelBankButton {
+        padding: 10px 16px;
+    }
     .dashboardGrid {
         flex-direction: row;
         padding: 16px;

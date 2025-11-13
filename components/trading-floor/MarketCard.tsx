@@ -1,16 +1,28 @@
+
 import React from 'react';
-import { useUI } from '../../lib/state/index.js';
+import { useUI, useUser } from '../../lib/state/index.js';
 import styles from './PredictionHub.module.css';
 import { MarketIntel } from '../../lib/types/index.js';
+import c from 'classnames';
 
 export default function MarketCard({ market, onSelect }: { market: MarketIntel, onSelect: (market: MarketIntel) => void }) {
     const isBinary = market.outcomes.length === 2 && market.outcomes.some(o => o.name === 'Yes') && market.outcomes.some(o => o.name === 'No');
+    const { bookmarkedMarketIds, toggleBookmark } = useUser();
+    const isBookmarked = bookmarkedMarketIds?.includes(market.id);
+
+    const handleBookmarkClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        toggleBookmark(market.id, !isBookmarked);
+    };
 
     return (
         <div className={styles.marketCard} onClick={() => onSelect(market)}>
             <div className={styles.marketHeader}>
                 {market.imageUrl && <img src={market.imageUrl} alt="" className={styles.marketImage} />}
                 <p className={styles.marketTitle}>{market.title}</p>
+                <button onClick={handleBookmarkClick} className={c(styles.bookmarkButton, {[styles.bookmarked]: isBookmarked})} title={isBookmarked ? 'Remove bookmark' : 'Bookmark market'}>
+                    <span className="icon">{isBookmarked ? 'bookmark' : 'bookmark_border'}</span>
+                </button>
             </div>
             <div className={styles.marketBody}>
                 {isBinary ? (

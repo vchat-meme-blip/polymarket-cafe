@@ -41,6 +41,7 @@ const initialUserState: User = {
     autonomyEngage: true,
     autonomyResearch: true,
   },
+  bookmarkedMarketIds: [],
   isAutonomyEnabled: true,
 };
 
@@ -54,6 +55,7 @@ export const useUser = create<
     setInfo: (info: string) => void;
     updateNotificationSettings: (settings: { phone?: string; notificationSettings?: NotificationSettings }) => Promise<void>;
     updateUserSettings: (settings: Partial<User>) => Promise<void>;
+    toggleBookmark: (marketId: string, bookmarked: boolean) => Promise<void>;
     completeOnboarding: () => void;
     setLastSeen: (timestamp: Date | null) => void;
     _setHandle: (handle: string) => void;
@@ -176,6 +178,26 @@ export const useUser = create<
     }
   },
   
+  toggleBookmark: async (marketId: string, bookmarked: boolean) => {
+    const originalBookmarks = get().bookmarkedMarketIds || [];
+    const optimisticBookmarks = bookmarked
+        ? [...originalBookmarks, marketId]
+        : originalBookmarks.filter(id => id !== marketId);
+
+    set({ bookmarkedMarketIds: optimisticBookmarks });
+
+    try {
+        await apiService.request('/api/users/bookmarks', {
+            method: 'PUT',
+            body: JSON.stringify({ marketId, bookmarked }),
+        });
+    } catch (error) {
+        console.error('Failed to update bookmark:', error);
+        set({ bookmarkedMarketIds: originalBookmarks }); // Revert on error
+        useUI.getState().addToast({ type: 'error', message: 'Failed to update bookmark.' });
+    }
+  },
+
   setName: (name: string) => set({ name }),
   setInfo: (info: string) => set({ info }),
   completeOnboarding: () => set({ hasCompletedOnboarding: true }),
@@ -347,6 +369,8 @@ export type BetSlipProposal = {
   market: MarketIntel;
 };
 
+type DossierTab = 'profile' | 'intel' | 'operations' | 'activity';
+
 
 export const useUI = create<{
   isMobileNavOpen: boolean;
@@ -355,7 +379,8 @@ export const useUI = create<{
   setShowProfileView: (show: boolean) => void;
   agentDossierId: string | null;
   isCreatingAgentInDossier: boolean;
-  openAgentDossier: (agentId: string, isCreating?: boolean) => void;
+  dossierInitialTab: DossierTab | null;
+  openAgentDossier: (agentId: string, isCreating?: boolean, initialTab?: DossierTab) => void;
   closeAgentDossier: () => void;
   isSignedIn: boolean;
   setIsSignedIn: (signedIn: boolean) => void;
@@ -425,6 +450,9 @@ export const useUI = create<{
   closeTaskDetailModal: () => void;
   gesture: { animationUrl: string; triggerKey: number } | null;
   triggerGesture: (animationName: string) => void;
+  showNewMarketsModal: boolean;
+  openNewMarketsModal: () => void;
+  closeNewMarketsModal: () => void;
 }>(set => ({
   isMobileNavOpen: true,
   toggleMobileNav: () => set(state => ({ isMobileNavOpen: !state.isMobileNavOpen })),
@@ -432,8 +460,9 @@ export const useUI = create<{
   setShowProfileView: (show: boolean) => set({ showProfileView: show }),
   agentDossierId: null,
   isCreatingAgentInDossier: false,
-  openAgentDossier: (agentId: string, isCreating = false) => set({ agentDossierId: agentId, isCreatingAgentInDossier: isCreating }),
-  closeAgentDossier: () => set({ agentDossierId: null, isCreatingAgentInDossier: false }),
+  dossierInitialTab: null,
+  openAgentDossier: (agentId: string, isCreating = false, initialTab) => set({ agentDossierId: agentId, isCreatingAgentInDossier: isCreating, dossierInitialTab: initialTab || 'profile' }),
+  closeAgentDossier: () => set({ agentDossierId: null, isCreatingAgentInDossier: false, dossierInitialTab: null }),
   isSignedIn: false,
   setIsSignedIn: (signedIn: boolean) => set({ isSignedIn: signedIn }),
   view: 'dashboard',
@@ -514,6 +543,9 @@ export const useUI = create<{
       console.warn(`[triggerGesture] Invalid animation name: ${animationName}`);
     }
   },
+  showNewMarketsModal: false,
+  openNewMarketsModal: () => set({ showNewMarketsModal: true }),
+  closeNewMarketsModal: () => set({ showNewMarketsModal: false }),
 }));
 
 /**

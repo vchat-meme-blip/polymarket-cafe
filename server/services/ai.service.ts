@@ -8,7 +8,7 @@ const { Types } = mongoose;
 
 import { Agent, Interaction, MarketIntel, Room, TradeRecord, BettingIntel, User, AgentTask } from '../../lib/types/index.js';
 import { apiKeyProvider } from './apiKey.provider.js';
-import { agentsCollection, bettingIntelCollection, notificationsCollection, usersCollection } from '../db.js';
+import { agentsCollection, bettingIntelCollection, notificationsCollection, usersCollection, newMarketsCacheCollection } from '../db.js';
 import { polymarketService } from './polymarket.service.js';
 import { kalshiService } from './kalshi.service.js';
 import { firecrawlService } from './firecrawl.service.js';
@@ -34,31 +34,29 @@ const agentTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     {
         type: 'function',
         function: {
-            name: 'open_market_detail',
-            description: 'Opens the detailed view for a specific market to show the user more information.',
+            name: 'propose_bet',
+            description: "Propose a single, actionable bet to the user. This will display a formal bet slip in the user's UI.",
             parameters: {
                 type: 'object',
                 properties: {
-                    marketId: { type: 'string', description: 'The unique ID of the market to open, e.g., "polymarket-12345".' },
+                    marketId: { type: 'string', description: 'The unique ID of the market for the bet.' },
+                    outcome: { type: 'string', description: "The outcome to bet on, typically 'Yes' or 'No'." },
+                    amount: { type: 'number', description: 'The suggested bet amount in USD.' },
+                    price: { type: 'number', description: 'The odds for the suggested outcome (from 0 to 1).' },
+                    analysis: { type: 'string', description: 'Your detailed reasoning for this bet suggestion. This will be shown to the user.' },
+                    sourceIntelId: { type: 'string', description: 'The ID of the intel from your knowledge base that influenced this decision, if any.' },
                 },
-                required: ['marketId'],
+                required: ['marketId', 'outcome', 'amount', 'price', 'analysis'],
             },
-        },
+        }
     },
     {
         type: 'function',
         function: {
-            name: 'calculate_payout',
-            description: 'Calculates the potential profit for a bet given the odds and amount.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    price: { type: 'number', description: 'The price or odds of the outcome, from 0 to 1.' },
-                    amount: { type: 'number', description: 'The amount of the bet in USD.' },
-                },
-                required: ['price', 'amount'],
-            },
-        },
+            name: 'get_new_markets',
+            description: "Retrieves a list of the most recently discovered 'Breaking' markets that the system has found.",
+            parameters: { type: 'object', properties: {} }
+        }
     },
     {
         type: 'function',
@@ -98,13 +96,17 @@ const agentTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 
 class AiService {
   private async retry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+    let apiKey: string | null = null;
     try {
         return await fn();
     } catch (error) {
         if (error instanceof OpenAI.APIError && error.status === 429 && retries > 1) {
             console.warn(`[AiService] Rate limit hit. Retrying in ${delay / 1000}s...`);
+            if (apiKey) {
+              apiKeyProvider.reportRateLimit(apiKey, 60); // Report rate limit before retry
+            }
             await new Promise(res => setTimeout(res, delay));
-            return this.retry(fn, retries - 1, delay * 2);
+            return this.retry<T>(fn, retries - 1, delay * 2);
         }
         throw error;
     }
@@ -118,7 +120,9 @@ class AiService {
     apiKey: string
   ): Promise<Interaction> {
     const openai = new OpenAI({ apiKey });
-    const systemPrompt = createSystemInstructions(agent, user, false);
+
+    const agentIntelBank = await bettingIntelCollection.find({ ownerHandle: agent.ownerHandle }).toArray();
+    const systemPrompt = createSystemInstructions(agent, user, false, agentIntelBank as any[]);
 
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemPrompt },
@@ -126,10 +130,8 @@ class AiService {
         const role: 'assistant' | 'user' = turn.agentId === agent.id ? 'assistant' : 'user';
         
         if (role === 'assistant' && turn.tool_calls && turn.tool_calls.length > 0) {
-            // Reformat tool_calls for OpenAI API
             const formattedToolCalls = turn.tool_calls.map(tc => ({
                 id: tc.id,
-                // FIX: Add `as const` to hardcoded 'function' type string to ensure it is inferred as a literal type, not a generic string. This resolves the type error when constructing tool call objects for the OpenAI API.
                 type: 'function' as const,
                 function: {
                     name: tc.function.name,
@@ -182,6 +184,10 @@ class AiService {
           if (functionName === 'search_markets') {
             const { markets } = await polymarketService.searchMarkets(functionArgs.query, functionArgs.category);
             functionResponse = { markets: markets.slice(0, 5) };
+          } else if (functionName === 'get_new_markets') {
+            const newMarkets = await newMarketsCacheCollection.find({}).sort({ detectedAt: -1 }).limit(10).toArray();
+            // FIX: Cast 'm' to 'any' to access properties not defined on the base 'Document' type.
+            functionResponse = { new_markets: newMarkets.map(m => ({ title: (m as any).title, url: (m as any).marketUrl })) };
           } else if (functionName === 'calculate_payout') {
             const profit = (functionArgs.amount / functionArgs.price) - functionArgs.amount;
             functionResponse = { profit: profit.toFixed(2) };
@@ -240,107 +246,107 @@ class AiService {
     room: Room,
     initialPrompt?: string
   ): Promise<{ text: string; endConversation: boolean; toolCalls?: OpenAI.Chat.Completions.ChatCompletionMessageToolCall[] }> {
-    const apiKey = await apiKeyProvider.getKeyForAgent(currentAgent.id);
-    if (!apiKey) {
-      console.error(`[AiService] No API key for agent ${currentAgent.name}, ending conversation.`);
-      return { text: "I have to go.", endConversation: true };
-    }
-    const openai = new OpenAI({ apiKey });
-
-    const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [{
-        type: 'function',
-        function: {
-            name: 'end_conversation',
-            description: 'End the current conversation if it has reached a natural conclusion or is going nowhere.',
-            parameters: { type: 'object', properties: {} }
-        }
-    }];
-    
-    let systemPrompt = `You are ${currentAgent.name}. Your personality: "${currentAgent.personality}". Your goals: "${currentAgent.instructions}". You are talking to ${otherAgent.name}. Their personality: "${otherAgent.personality}". 
-    
-    IMPORTANT: Your primary goal is to have a natural, multi-turn conversation. DO NOT use the 'end_conversation' tool unless at least 3-4 exchanges have occurred or the other agent is unresponsive. Keep your responses concise and in character.`;
-    
-    systemPrompt += `\nYou are in a room with the vibe: '${room.vibe}'. Your personal topics of interest are: ${currentAgent.topics.join(', ')}. You are on the lookout for intel related to your wishlist: ${currentAgent.wishlist.join(', ')}. Try to steer the conversation towards these topics if it feels natural.`;
-
-    if (room.rules && room.rules.length > 0) {
-        systemPrompt += ` The room rules are: ${room.rules.join(', ')}.`;
-    }
-
+    let apiKey: string | null = null;
     try {
-        if (room.isOwned && room.hostId) {
-            const isHost = room.hostId === currentAgent.id;
-            const host = isHost ? currentAgent : otherAgent;
-            const guest = isHost ? otherAgent : currentAgent;
-            
-            if (isHost) {
-                const hostTradableIntel = await bettingIntelCollection.find({ 
-                    ownerAgentId: new Types.ObjectId(host.id), 
-                    isTradable: true 
-                }).toArray();
-                if (hostTradableIntel.length > 0) {
-                    systemPrompt += ` This is your owned intel storefront. Your primary goal is to monetize your betting intel by selling it to ${guest.name}. You have the following intel to sell: ${hostTradableIntel.map(i => `(ID: ${i._id}) on ${i.market}`).join(', ')}. Use the 'create_intel_offer' tool to make a formal offer.`;
-                    tools.push({
-                        type: 'function',
-                        function: {
-                            name: 'create_intel_offer',
-                            description: "Create a formal, tradable offer for a piece of your intel.",
-                            parameters: {
-                                type: 'object',
-                                properties: {
-                                    intel_id: { type: 'string', description: 'The ID of the intel you want to sell.' },
-                                    price: { type: 'number', description: 'The price you are asking for in BOX tokens.' },
-                                },
-                                required: ['intel_id', 'price'],
-                            }
-                        }
-                    });
-                } else {
-                    systemPrompt += ` This is your owned intel storefront, but you currently have no tradable intel. Your goal is to engage ${guest.name} in conversation to learn what they're looking for.`;
-                }
-            } else { // Is Guest
-                systemPrompt += ` You are in an intel storefront hosted by ${host.name}. Their purpose is to sell betting intel.`;
-                if (room.activeOffer) {
-                    systemPrompt += ` There is an active offer on the table for intel on "${room.activeOffer.market}" for ${room.activeOffer.price} BOX. You can choose to accept it using the 'accept_offer' tool, or continue negotiating.`;
-                    tools.push({
-                        type: 'function',
-                        function: {
-                            name: 'accept_offer',
-                            description: 'Accept the currently active intel offer in the room.',
-                            parameters: {
-                                type: 'object',
-                                properties: {
-                                    offer_id: { type: 'string', description: 'The ID of the intel being offered (e.g., the intelId from the offer).' }
-                                },
-                            }
-                        }
-                    });
-                }
-            }
-        }
-    } catch (dbError) {
-        console.error('[AiService] Database error during prompt construction:', dbError);
-        // Fallback to a simpler prompt if DB fails
-        systemPrompt = `You are ${currentAgent.name}. Your personality: "${currentAgent.personality}". You are talking to ${otherAgent.name}. Their personality: "${otherAgent.personality}". Keep your responses concise and in character. A database error occurred, so you cannot access your intel right now.`;
-    }
+      apiKey = await apiKeyProvider.getKeyForAgent(currentAgent.id);
+      if (!apiKey) {
+        console.error(`[AiService] No API key for agent ${currentAgent.name}, ending conversation.`);
+        return { text: "I have to go.", endConversation: true };
+      }
+      const openai = new OpenAI({ apiKey });
+
+      const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [{
+          type: 'function',
+          function: {
+              name: 'end_conversation',
+              description: 'End the current conversation if it has reached a natural conclusion or is going nowhere.',
+              parameters: { type: 'object', properties: {} }
+          }
+      }];
+      
+      let systemPrompt = `You are ${currentAgent.name}. Your personality: "${currentAgent.personality}". Your goals: "${currentAgent.instructions}". You are talking to ${otherAgent.name}. Their personality: "${otherAgent.personality}". 
+      
+      IMPORTANT: Your primary goal is to have a natural, multi-turn conversation. DO NOT use the 'end_conversation' tool unless at least 3-4 exchanges have occurred or the other agent is unresponsive. Keep your responses concise and in character.`;
+      
+      systemPrompt += `\nYou are in a room with the vibe: '${room.vibe}'. Your personal topics of interest are: ${currentAgent.topics.join(', ')}. You are on the lookout for intel related to your wishlist: ${currentAgent.wishlist.join(', ')}. Try to steer the conversation towards these topics if it feels natural.`;
+
+      if (room.rules && room.rules.length > 0) {
+          systemPrompt += ` The room rules are: ${room.rules.join(', ')}.`;
+      }
+
+      try {
+          if (room.isOwned && room.hostId) {
+              const isHost = room.hostId === currentAgent.id;
+              const host = isHost ? currentAgent : otherAgent;
+              const guest = isHost ? otherAgent : currentAgent;
+              
+              if (isHost) {
+                  const hostTradableIntel = await bettingIntelCollection.find({ 
+                      ownerAgentId: new Types.ObjectId(host.id), 
+                      isTradable: true 
+                  }).toArray();
+                  if (hostTradableIntel.length > 0) {
+                      systemPrompt += ` This is your owned intel storefront. Your primary goal is to monetize your betting intel by selling it to ${guest.name}. You have the following intel to sell: ${hostTradableIntel.map(i => `(ID: ${i._id}) on ${i.market}`).join(', ')}. Use the 'create_intel_offer' tool to make a formal offer.`;
+                      tools.push({
+                          type: 'function',
+                          function: {
+                              name: 'create_intel_offer',
+                              description: "Create a formal, tradable offer for a piece of your intel.",
+                              parameters: {
+                                  type: 'object',
+                                  properties: {
+                                      intel_id: { type: 'string', description: 'The ID of the intel you want to sell.' },
+                                      price: { type: 'number', description: 'The price you are asking for in BOX tokens.' },
+                                  },
+                                  required: ['intel_id', 'price'],
+                              }
+                          }
+                      });
+                  } else {
+                      systemPrompt += ` This is your owned intel storefront, but you currently have no tradable intel. Your goal is to engage ${guest.name} in conversation to learn what they're looking for.`;
+                  }
+              } else { // Is Guest
+                  systemPrompt += ` You are in an intel storefront hosted by ${host.name}. Their purpose is to sell betting intel.`;
+                  if (room.activeOffer) {
+                      systemPrompt += ` There is an active offer on the table for intel on "${room.activeOffer.market}" for ${room.activeOffer.price} BOX. You can choose to accept it using the 'accept_offer' tool, or continue negotiating.`;
+                      tools.push({
+                          type: 'function',
+                          function: {
+                              name: 'accept_offer',
+                              description: 'Accept the currently active intel offer in the room.',
+                              parameters: {
+                                  type: 'object',
+                                  properties: {
+                                      offer_id: { type: 'string', description: 'The ID of the intel being offered (e.g., the intelId from the offer).' }
+                                  },
+                              }
+                          }
+                      });
+                  }
+              }
+          }
+      } catch (dbError) {
+          console.error('[AiService] Database error during prompt construction:', dbError);
+          systemPrompt = `You are ${currentAgent.name}. Your personality: "${currentAgent.personality}". You are talking to ${otherAgent.name}. Their personality: "${otherAgent.personality}". Keep your responses concise and in character. A database error occurred, so you cannot access your intel right now.`;
+      }
 
 
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-        { role: 'system', content: systemPrompt },
-    ];
-    
-    history.forEach(turn => {
-        messages.push({
-            role: turn.agentId === currentAgent.id ? 'assistant' : 'user',
-            name: turn.agentName.replace(/\s+/g, '_'),
-            content: turn.text,
-        });
-    });
+      const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+          { role: 'system', content: systemPrompt },
+      ];
+      
+      history.forEach(turn => {
+          messages.push({
+              role: turn.agentId === currentAgent.id ? 'assistant' : 'user',
+              name: turn.agentName.replace(/\s+/g, '_'),
+              content: turn.text,
+          });
+      });
 
-    if (history.length === 0 && initialPrompt) {
-        messages.push({ role: 'user', name: otherAgent.name.replace(/\s+/g, '_'), content: initialPrompt });
-    }
+      if (history.length === 0 && initialPrompt) {
+          messages.push({ role: 'user', name: otherAgent.name.replace(/\s+/g, '_'), content: initialPrompt });
+      }
 
-    try {
       const createCompletion = () => openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: messages,
@@ -378,14 +384,15 @@ class AiService {
       return null;
     }
 
-    const apiKey = await apiKeyProvider.getKeyForAgent('system-research');
-    if (!apiKey) {
-      console.error(`[AiService] No system API key for autonomous research.`);
-      return null;
-    }
-    const openai = new OpenAI({ apiKey });
-
+    let apiKey: string | null = null;
     try {
+      apiKey = await apiKeyProvider.getKeyForAgent('system-research');
+      if (!apiKey) {
+        console.error(`[AiService] No system API key for autonomous research.`);
+        return null;
+      }
+      const openai = new OpenAI({ apiKey });
+
       const queryGenPrompt = `You are an expert financial analyst. Generate a concise, effective search query to find the most relevant, recent information about the following prediction market. The query should be suitable for a web search engine.
 
 Market: "${market.title}"
@@ -456,23 +463,24 @@ ${researchContext}
   }
 
   async generateIntelForMarket(agent: Agent, market: MarketIntel): Promise<string | null> {
-    const apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
-    if (!apiKey) {
-      console.error(`[AiService] No API key for agent ${agent.name} for intel generation.`);
-      return null;
-    }
-    const openai = new OpenAI({ apiKey });
-
-    const systemPrompt = `You are ${agent.name}, an expert prediction market analyst with this personality: "${agent.personality}".`;
-    const userPrompt = `Analyze the following prediction market and provide a concise, actionable piece of "alpha" or a contrarian insight. Your response should be a single, insightful sentence.
-    
-    Market: "${market.title}"
-    Yes Odds: ${Math.round(market.odds.yes * 100)}¢
-    No Odds: ${Math.round(market.odds.no * 100)}¢
-    Platform: ${market.platform}
-    `;
-
+    let apiKey: string | null = null;
     try {
+      apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
+      if (!apiKey) {
+        console.error(`[AiService] No API key for agent ${agent.name} for intel generation.`);
+        return null;
+      }
+      const openai = new OpenAI({ apiKey });
+
+      const systemPrompt = `You are ${agent.name}, an expert prediction market analyst with this personality: "${agent.personality}".`;
+      const userPrompt = `Analyze the following prediction market and provide a concise, actionable piece of "alpha" or a contrarian insight. Your response should be a single, insightful sentence.
+      
+      Market: "${market.title}"
+      Yes Odds: ${Math.round(market.odds.yes * 100)}¢
+      No Odds: ${Math.round(market.odds.no * 100)}¢
+      Platform: ${market.platform}
+      `;
+
       const createCompletion = () => openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [
@@ -492,32 +500,33 @@ ${researchContext}
   }
   
   async analyzeMarket(agent: Agent, market: MarketIntel, comments?: any[]): Promise<string> {
-    const apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
-    if (!apiKey) throw new Error("API key not available for this agent.");
-
-    const openai = new OpenAI({ apiKey });
-    
-    const firecrawlData = firecrawlService.isConfigured() ? await firecrawlService.search(market.title) : [];
-    const researchContext = firecrawlData.length > 0
-        ? `\n\nHere is some real-time web research on this topic:\n` + firecrawlData.map(r => `Source: ${r.title}\nContent: ${r.markdown.slice(0, 1500)}...`).join('\n\n')
-        : '';
-
-    const systemPrompt = `You are ${agent.name}, an AI copilot for prediction markets. Your personality is: "${agent.personality}".`;
-    let userPrompt = `My user is looking at the following market. Provide a brief, in-character analysis (2-3 sentences) based on all the data provided.
-    
-    Market: "${market.title}"
-    Description: ${market.description}
-    Yes Odds: ${Math.round(market.odds.yes * 100)}¢
-    Ends At: ${new Date(market.endsAt).toLocaleString()}
-    ${researchContext}
-    `;
-
-    if (comments && comments.length > 0) {
-        const commentSnippets = comments.slice(0, 5).map(c => `- ${c.profile.pseudonym}: "${c.body}"`).join('\n');
-        userPrompt += `\n\nAlso consider the latest public sentiment from user comments:\n${commentSnippets}\nSummarize the general sentiment and factor it into your final analysis.`;
-    }
-    
+    let apiKey: string | null = null;
     try {
+      apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
+      if (!apiKey) throw new Error("API key not available for this agent.");
+
+      const openai = new OpenAI({ apiKey });
+      
+      const firecrawlData = firecrawlService.isConfigured() ? await firecrawlService.search(market.title) : [];
+      const researchContext = firecrawlData.length > 0
+          ? `\n\nHere is some real-time web research on this topic:\n` + firecrawlData.map(r => `Source: ${r.title}\nContent: ${r.markdown.slice(0, 1500)}...`).join('\n\n')
+          : '';
+
+      const systemPrompt = `You are ${agent.name}, an AI copilot for prediction markets. Your personality is: "${agent.personality}".`;
+      let userPrompt = `My user is looking at the following market. Provide a brief, in-character analysis (2-3 sentences) based on all the data provided.
+      
+      Market: "${market.title}"
+      Description: ${market.description}
+      Yes Odds: ${Math.round(market.odds.yes * 100)}¢
+      Ends At: ${new Date(market.endsAt).toLocaleString()}
+      ${researchContext}
+      `;
+
+      if (comments && comments.length > 0) {
+          const commentSnippets = comments.slice(0, 5).map(c => `- ${c.profile.pseudonym}: "${c.body}"`).join('\n');
+          userPrompt += `\n\nAlso consider the latest public sentiment from user comments:\n${commentSnippets}\nSummarize the general sentiment and factor it into your final analysis.`;
+      }
+      
       const createCompletion = () => openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [
@@ -537,74 +546,78 @@ ${researchContext}
   }
 
   async suggestBet(query: string, agentId: string) {
-    const agent = await agentsCollection.findOne({ id: agentId });
-    if (!agent) throw new Error("Agent not found");
-
-    const apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
-    if (!apiKey) throw new Error("API key not available for this agent.");
-
-    const openai = new OpenAI({ apiKey });
-    
-    const [polymarketResults, kalshiResults, agentIntel] = await Promise.all([
-        polymarketService.searchMarkets(query),
-        kalshiService.searchMarkets(query),
-        bettingIntelCollection.find({ ownerAgentId: new Types.ObjectId(agentId) }).toArray()
-    ]);
-
-    const markets: MarketIntel[] = [...polymarketResults.markets, ...kalshiResults];
-
-    const systemPrompt = `
-      You are ${agent.name}, an AI copilot for prediction markets.
-      Your personality: "${agent.personality}".
-
-      Analyze the user's query and the provided market data. Provide a single, actionable bet suggestion.
-      If the suggestion is based on intel you have, you MUST include the "sourceIntelId".
-      
-      Respond in JSON format with the following structure:
-      {
-        "analysis": "Your detailed reasoning for the suggestion, in character.",
-        "suggestion": {
-            "marketId": "The ID of the market you are recommending a bet on.",
-            "outcome": "'yes' or 'no'.",
-            "amount": A suggested bet amount in USD (e.g., 100),
-            "price": The odds for the suggested outcome (0-1),
-            "sourceIntelId": "The ID of the intel from your knowledge base that influenced this decision, if any."
-        }
-      }
-    `;
-
-    const userPrompt = `
-      User query: "${query}"
-
-      Available Markets:
-      ${JSON.stringify(markets.slice(0, 10), null, 2)}
-
-      Your Private Intel:
-      ${JSON.stringify(agentIntel, null, 2)}
-    `;
-
+    let apiKey: string | null = null;
     try {
+      const agent = await agentsCollection.findOne({ id: agentId });
+      if (!agent) throw new Error("Agent not found");
+
+      apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
+      if (!apiKey) throw new Error("API key not available for this agent.");
+
+      const openai = new OpenAI({ apiKey });
+      
+      const [polymarketResults, kalshiResults, agentIntel] = await Promise.all([
+          polymarketService.searchMarkets(query),
+          kalshiService.searchMarkets(query),
+          bettingIntelCollection.find({ ownerAgentId: new Types.ObjectId(agentId) }).toArray()
+      ]);
+
+      // FIX: Correctly access 'markets' property from polymarketResults and concatenate with kalshiResults array.
+      const markets: MarketIntel[] = [...polymarketResults.markets, ...kalshiResults];
+
+      const systemPrompt = `
+        You are ${agent.name}, an AI copilot for prediction markets.
+        Your personality: "${agent.personality}".
+
+        Analyze the user's query and the provided market data. Provide a single, actionable bet suggestion.
+        If the suggestion is based on intel you have, you MUST include the "sourceIntelId".
+        
+        You MUST use the "propose_bet" tool to formalize your suggestion.
+      `;
+
+      const userPrompt = `
+        User query: "${query}"
+
+        Available Markets:
+        ${JSON.stringify(markets.slice(0, 10), null, 2)}
+
+        Your Private Intel:
+        ${JSON.stringify(agentIntel, null, 2)}
+      `;
+
       const createCompletion = () => openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
         ],
-        response_format: { type: "json_object" }
+        tools: agentTools,
+        tool_choice: { type: 'function', function: { name: 'propose_bet' } },
       });
       const completion = await this.retry(createCompletion);
       
-      const responseContent = completion.choices[0].message.content;
-      if (!responseContent) throw new Error("Empty response from AI");
+      const toolCall = completion.choices[0].message.tool_calls?.[0];
+      // FIX: Add a type guard to ensure toolCall is a function call before accessing its 'function' property.
+      if (!toolCall || toolCall.type !== 'function' || toolCall.function.name !== 'propose_bet') {
+        throw new Error("AI did not propose a bet using the required tool.");
+      }
 
-      const parsedResponse = JSON.parse(responseContent);
+      // FIX: Safely access 'function' property after the type guard.
+      const betArgs = JSON.parse(toolCall.function.arguments);
       
-      parsedResponse.markets = markets.slice(0, 5);
-      
-      return parsedResponse;
+      return {
+        analysis: betArgs.analysis,
+        suggestion: {
+          marketId: betArgs.marketId,
+          outcome: betArgs.outcome,
+          amount: betArgs.amount,
+          price: betArgs.price,
+          sourceIntelId: betArgs.sourceIntelId,
+        }
+      };
 
     } catch (error) {
-      console.error(`[AiService] suggestBet failed for ${agent.name}:`, error);
+      console.error(`[AiService] suggestBet failed for agent ID ${agentId}:`, error);
        if (error instanceof OpenAI.APIError && error.status === 429 && apiKey) {
             apiKeyProvider.reportRateLimit(apiKey, 30);
         }
@@ -613,26 +626,27 @@ ${researchContext}
   }
   
   async generateDailySummary(activities: { trades: TradeRecord[], intel: BettingIntel[] }): Promise<string | null> {
-    const apiKey = await apiKeyProvider.getKeyForAgent('system-summary');
-    if (!apiKey) {
-      console.error(`[AiService] No API key available for generating daily summary.`);
-      return null;
-    }
-    const openai = new OpenAI({ apiKey });
-    
-    const prompt = `
-      You are an assistant who summarizes an AI agent's daily activity.
-      Based on the following recent trades and authored intel, write a short, one-paragraph summary of the agent's day.
-      Focus on key activities and outcomes. Be concise and write in a professional, report-like tone.
-
-      Recent Trades:
-      ${activities.trades.length > 0 ? JSON.stringify(activities.trades) : "No trades today."}
-
-      Recent Authored Intel:
-      ${activities.intel.length > 0 ? JSON.stringify(activities.intel.map(i => ({ market: i.market, content: i.content }))) : "No new intel authored today."}
-    `;
-
+    let apiKey: string | null = null;
     try {
+      apiKey = await apiKeyProvider.getKeyForAgent('system-summary');
+      if (!apiKey) {
+        console.error(`[AiService] No API key available for generating daily summary.`);
+        return null;
+      }
+      const openai = new OpenAI({ apiKey });
+      
+      const prompt = `
+        You are an assistant who summarizes an AI agent's daily activity.
+        Based on the following recent trades and authored intel, write a short, one-paragraph summary of the agent's day.
+        Focus on key activities and outcomes. Be concise and write in a professional, report-like tone.
+
+        Recent Trades:
+        ${activities.trades.length > 0 ? JSON.stringify(activities.trades) : "No trades today."}
+
+        Recent Authored Intel:
+        ${activities.intel.length > 0 ? JSON.stringify(activities.intel.map(i => ({ market: i.market, content: i.content }))) : "No new intel authored today."}
+      `;
+
       const createCompletion = () => openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
@@ -649,11 +663,13 @@ ${researchContext}
   }
 
   async generateProactiveEngagementMessage(agent: Agent, intel: BettingIntel): Promise<string | null> {
-    const apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
-    if (!apiKey) return null;
+    let apiKey: string | null = null;
+    try {
+        apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
+        if (!apiKey) return null;
 
-    const openai = new OpenAI({ apiKey });
-    const prompt = `You are ${agent.name}, an AI agent with this personality: "${agent.personality}".
+        const openai = new OpenAI({ apiKey });
+        const prompt = `You are ${agent.name}, an AI agent with this personality: "${agent.personality}".
     You recently found this piece of intel: "${intel.content}" regarding the market "${intel.market}".
     
     Formulate a short, engaging question or thought to send to your user based on this intel.
@@ -662,7 +678,6 @@ ${researchContext}
     Example: "Just a thought on that ETH market: have you considered the impact of the recent staking numbers?"
     `;
 
-    try {
         const createCompletion = () => openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [{ role: 'user', content: prompt }],
@@ -675,6 +690,61 @@ ${researchContext}
             apiKeyProvider.reportRateLimit(apiKey, 60);
         }
         return null;
+    }
+  }
+
+   async researchTopic(agent: Agent, topic: string): Promise<{ summary: string; sources: { title: string; url: string; }[] } | null> {
+    if (!firecrawlService.isConfigured()) {
+      console.warn(`[AiService] Research skipped for ${agent.name}: Firecrawl service not configured.`);
+      return { summary: "Research could not be performed because the web scraping service is not configured on the server.", sources: [] };
+    }
+
+    const apiKey = await apiKeyProvider.getKeyForAgent('system-research');
+    if (!apiKey) {
+      console.error(`[AiService] No system API key available for research task on topic: "${topic}".`);
+      return { summary: "Research could not be performed because no server API keys are available at the moment.", sources: [] };
+    }
+    const openai = new OpenAI({ apiKey });
+
+    try {
+      const searchResults = await firecrawlService.search(topic);
+      const scrapedData = searchResults.filter(r => r.markdown && r.url);
+
+      if (scrapedData.length === 0) {
+        return { summary: `I couldn't find any relevant web results for "${topic}".`, sources: [] };
+      }
+      
+      const researchContext = scrapedData.map(result => `## Source: ${result.url}\n${result.markdown}`).join('\n\n---\n\n');
+
+      const summaryPrompt = `You are ${agent.name}, an expert analyst. Your personality: "${agent.personality}".
+Analyze the provided research material about "${topic}".
+Synthesize all the information into a concise, actionable summary. Your response should be a well-structured report.
+
+Research Material:
+${researchContext.slice(0, 15000)}
+      `;
+      
+      const summaryCompletion = await openai.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        messages: [{ role: 'user', content: summaryPrompt }],
+      });
+      
+      const summary = summaryCompletion.choices[0].message.content?.trim();
+      if (!summary) {
+        return { summary: 'The AI failed to generate a summary from the research material.', sources: scrapedData.map(r => ({ title: r.title || 'Untitled', url: r.url })) };
+      }
+
+      return {
+        summary,
+        sources: scrapedData.map(r => ({ title: r.title || 'Untitled', url: r.url })),
+      };
+
+    } catch (error) {
+      console.error(`[AiService] Research process failed for topic "${topic}":`, error);
+      if (error instanceof OpenAI.APIError && error.status === 429 && apiKey) {
+           apiKeyProvider.reportRateLimit(apiKey, 60);
+      }
+      return { summary: `An error occurred during the research process: ${error instanceof Error ? error.message : 'Unknown error'}.`, sources: [] };
     }
   }
 }

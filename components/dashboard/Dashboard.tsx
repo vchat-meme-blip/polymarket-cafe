@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -12,19 +13,20 @@ import { useAgent, useUI } from '../../lib/state/index.js';
 import FirstAgentPrompt from '../onboarding/FirstAgentPrompt';
 import ControlTray from '../console/control-tray/ControlTray.js';
 import BetSlipPanel from './BetSlipPanel';
-import WatchlistPanel from './WatchlistPanel';
+import BookmarksPanel from './BookmarksPanel.js';
 import ArbitragePanel from './ArbitragePanel';
 import LiquidityPanel from '../trading-floor/LiquidityPanel.js';
 import OperationsCenter from './OperationsCenter';
 
-type DashboardTab = 'betSlip' | 'markets' | 'intel' | 'watchlists' | 'arbitrage' | 'liquidity';
+type DashboardTab = 'betSlip' | 'markets' | 'bookmarks' | 'arbitrage' | 'liquidity' | 'newMarkets';
 
 /**
  * The main dashboard view that aggregates various components into a single layout.
  * It shows the main agent interaction view and a sidebar with auxiliary information.
  */
 export default function Dashboard() {
-  const { availablePersonal } = useAgent();
+  const { availablePersonal, current: currentAgent } = useAgent();
+  const { openAgentDossier, openNewMarketsModal } = useUI();
   const [activeTab, setActiveTab] = useState<DashboardTab>('betSlip');
 
   // If the user has no personal agents created yet, show a prompt to guide them to onboarding.
@@ -36,11 +38,8 @@ export default function Dashboard() {
     switch (activeTab) {
       case 'markets':
         return <PredictionSidebar />;
-      case 'intel':
-        // This is now part of OperationsCenter, but kept here for the market-related tab panel
-        return <div>Intel discovery happens in the market explorer.</div>;
-      case 'watchlists':
-        return <WatchlistPanel />;
+      case 'bookmarks':
+        return <BookmarksPanel />;
       case 'arbitrage':
         return <ArbitragePanel />;
       case 'liquidity':
@@ -54,6 +53,9 @@ export default function Dashboard() {
   return (
     <div className={styles.dashboardGrid}>
       <div className={styles.dashboardMain}>
+        <button className={styles.intelBankButton} onClick={() => openAgentDossier(currentAgent.id, false, 'intel')}>
+          <span className="icon">database</span> Intel Bank
+        </button>
         <div className={styles.agentDisplay}>
           <KeynoteCompanion />
         </div>
@@ -85,11 +87,18 @@ export default function Dashboard() {
                     Markets
                 </button>
                 <button 
-                    className={c(styles.tabButton, {[styles.active]: activeTab === 'watchlists'})}
-                    onClick={() => setActiveTab('watchlists')}
-                    title="Manage your market and wallet watchlists"
+                    className={c(styles.tabButton, {[styles.active]: activeTab === 'bookmarks'})}
+                    onClick={() => setActiveTab('bookmarks')}
+                    title="Manage your bookmarked markets"
                 >
-                    Watchlists
+                    Bookmarks
+                </button>
+                 <button 
+                    className={c(styles.tabButton, {[styles.active]: activeTab === 'newMarkets'})}
+                    onClick={openNewMarketsModal}
+                    title="View recently discovered markets"
+                >
+                    New Markets
                 </button>
                 <button 
                     className={c(styles.tabButton, {[styles.active]: activeTab === 'liquidity'})}
