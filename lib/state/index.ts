@@ -111,6 +111,7 @@ export const useUser = create<
             await apiService.bootstrap(handleWithAt);
             
             console.log(`[Auth] Setting isSignedIn to true for existing user ${handleWithAt}`);
+            useUI.getState().setIsSignedIn(true);
             
             console.log(`[Auth] Existing user login completed for ${handleWithAt} in ${Date.now() - startTime}ms`);
           }
