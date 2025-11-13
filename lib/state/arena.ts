@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { create } from 'zustand';
-import { subscribeWithSelector, persist, createJSONStorage } from 'zustand/middleware';
+import { subscribeWithSelector } from 'zustand/middleware';
 // FIX: Import types from canonical source
 import { Agent, Room, Interaction, TradeRecord } from '../types/index.js';
 import { useAgent, useUser } from '../state/index.js';
@@ -143,8 +143,7 @@ const _moveAgent = (
 };
 
 export const useArenaStore = create(
-  subscribeWithSelector(
-    persist<ArenaState>(
+  subscribeWithSelector<ArenaState>(
       (set, get) => ({
         rooms: [],
         agentLocations: {},
@@ -373,26 +372,5 @@ export const useArenaStore = create(
           }
         },
       }),
-      {
-        name: 'quants-arena-storage',
-        storage: createJSONStorage(() => localStorage, {
-          replacer: (key, value) => {
-            if (value instanceof Set) {
-              return {
-                dataType: 'Set',
-                value: Array.from(value),
-              };
-            }
-            return value;
-          },
-          reviver: (key, value) => {
-            if (typeof value === 'object' && value !== null && (value as any).dataType === 'Set') {
-              return new Set((value as any).value);
-            }
-            return value;
-          },
-        }),
-      },
-    ),
   ),
 );

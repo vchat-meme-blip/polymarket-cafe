@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { Transaction } from '../types/index.js';
 
 interface ServerHydrationData {
@@ -19,8 +18,7 @@ export type WalletState = {
   claimInitialTokens: () => void;
 };
 
-export const useWalletStore = create(
-  persist<WalletState>(
+export const useWalletStore = create<WalletState>(
     (set, get) => ({
       // FIX: Initialize balance, which was missing.
       balance: 0,
@@ -73,9 +71,4 @@ export const useWalletStore = create(
         });
       },
     }),
-    {
-      name: 'quants-wallet-storage',
-      storage: createJSONStorage(() => localStorage),
-    },
-  ),
 );

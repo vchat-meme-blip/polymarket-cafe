@@ -12,7 +12,6 @@ export * from './wallet.js';
 
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { PRESET_AGENTS, DEFAULT_VRM_URL, AVAILABLE_VOICES } from '../presets/agents.js';
 import type { BettingIntel, Agent, User, Bet, MarketIntel, Room, AgentMode, NotificationSettings, AgentTask } from '../types/index.js';
 import { apiService } from '../services/api.service.js';
@@ -45,8 +44,8 @@ const initialUserState: User = {
   isAutonomyEnabled: true,
 };
 
-export const useUser = create(
-  persist<{
+export const useUser = create<
+  {
     signIn: (handle: string, isNewUser?: boolean) => Promise<void>;
     connectWallet: (address: string) => Promise<{ success: boolean, address?: string }>;
     disconnectWallet: () => Promise<{ success: boolean }>;
@@ -182,31 +181,6 @@ export const useUser = create(
   setLastSeen: (timestamp: Date | null) => set({ lastSeen: timestamp ? timestamp.getTime() : null }),
   _setHandle: (handle: string) => set({ handle }),
   reset: () => set(initialUserState),
-}),
-{
-  name: 'quants-user-storage',
-  storage: createJSONStorage(() => ({
-    getItem: (name) => {
-      const str = localStorage.getItem(name);
-      if (!str) return null;
-      const parsed = JSON.parse(str);
-      return JSON.stringify({
-        ...parsed,
-        state: {
-          ...parsed.state,
-          lastSeen: parsed.state.lastSeen ? new Date(parsed.state.lastSeen).getTime() : null,
-          createdAt: new Date(parsed.state.createdAt).getTime(),
-          updatedAt: new Date(parsed.state.updatedAt).getTime()
-        }
-      });
-    },
-    setItem: (name, value) => {
-      localStorage.setItem(name, value);
-    },
-    removeItem: (name) => {
-      localStorage.removeItem(name);
-    },
-  }))
 }));
 
 /**
@@ -258,8 +232,7 @@ function getAgentById(id: string, personalAgents: Agent[], presetAgents: Agent[]
   return personalAgents.find(agent => agent.id === id) || presetAgents.find(agent => agent.id === id);
 }
 
-export const useAgent = create(
-  persist<{
+export const useAgent = create<{
     current: Agent;
     availablePresets: Agent[];
     availablePersonal: Agent[];
@@ -346,11 +319,6 @@ export const useAgent = create(
         });
       },
     }),
-    {
-      name: 'quants-agent-storage',
-      storage: createJSONStorage(() => localStorage),
-    },
-  ),
 );
 
 /**
