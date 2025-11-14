@@ -155,7 +155,7 @@ export async function startServer() {
 
   app.use('/api', apiRouter);
   
-  const clientDistPath = path.resolve(__dirname, '..', 'client');
+  const clientDistPath = path.resolve(__dirname, '..', '..', 'client');
   console.log(`[Server] Serving static files from: ${clientDistPath}`);
   
   if (!fs.existsSync(path.join(clientDistPath, 'index.html'))) {
@@ -164,8 +164,8 @@ export async function startServer() {
   
   app.use(express.static(clientDistPath));
   
-  // FIX: Explicitly type middleware handlers to fix overload resolution issues.
-  app.get('*', (req: Request, res: Response) => {
+  // FIX: Use fully qualified Express types to resolve overload errors and type conflicts.
+  app.get('*', (req: express.Request, res: express.Response) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);
