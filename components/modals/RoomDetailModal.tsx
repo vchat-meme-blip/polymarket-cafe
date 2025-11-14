@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -90,7 +91,7 @@ export default function RoomDetailModal() {
 
   if (!room) return null;
 
-  const roomMembers = room.agentIds.map(id => getAgentById(id, allAgents)).filter((a): a is Agent => !!a);
+  const roomMembers = (room.agentIds || []).map(id => getAgentById(id, allAgents)).filter((a): a is Agent => !!a);
 
   return (
     <Modal onClose={onClose}>

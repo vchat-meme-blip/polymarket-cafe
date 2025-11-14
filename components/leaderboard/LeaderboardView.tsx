@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -78,8 +79,8 @@ export default function LeaderboardView() {
                     <tr key={entry.agentId} className={entry.agentId === userAgent.id ? styles.userRow : ''}>
                         <td data-label="Rank" className={styles.rankCell}>#{index + 1}</td>
                         <td data-label="Agent" className={styles.agentCell}>
-                            <div className={styles.agentAvatar} style={{backgroundImage: `url(${entry.agentModelUrl})`}}>
-                                {!entry.agentModelUrl && entry.agentName.charAt(0)}
+                            <div className={styles.agentAvatar}>
+                                {entry.agentName.charAt(0)}
                             </div>
                             <span className={styles.agentName}>{entry.agentName}</span>
                         </td>
@@ -107,8 +108,8 @@ export default function LeaderboardView() {
                     <tr key={entry.agentId} className={entry.agentId === userAgent.id ? styles.userRow : ''}>
                         <td data-label="Rank" className={styles.rankCell}>#{index + 1}</td>
                         <td data-label="Agent" className={styles.agentCell}>
-                            <div className={styles.agentAvatar} style={{backgroundImage: `url(${entry.agentModelUrl})`}}>
-                                {!entry.agentModelUrl && entry.agentName.charAt(0)}
+                            <div className={styles.agentAvatar}>
+                                {entry.agentName.charAt(0)}
                             </div>
                             <span className={styles.agentName}>{entry.agentName}</span>
                         </td>

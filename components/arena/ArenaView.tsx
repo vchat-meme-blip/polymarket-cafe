@@ -50,7 +50,7 @@ export default function IntelExchangeView() {
         } else if (focusedRoomId && storefronts.some(r => r.id === focusedRoomId)) {
             return; // Already focused on a valid room
         } else {
-            const firstActiveStorefront = storefronts.find(r => r.agentIds.length > 0);
+            const firstActiveStorefront = storefronts.find(r => r.agentIds && r.agentIds.length > 0);
             if (firstActiveStorefront) {
                 setFocusedRoomId(firstActiveStorefront.id);
             } else if (storefronts.length > 0) {
@@ -73,7 +73,7 @@ export default function IntelExchangeView() {
     }, [storefronts, focusedRoomId]);
 
     const handleVisitRandom = () => {
-        const activeStorefronts = storefronts.filter(r => r.agentIds.length > 0 && r.id !== focusedRoomId);
+        const activeStorefronts = storefronts.filter(r => r.agentIds && r.agentIds.length > 0 && r.id !== focusedRoomId);
         if (activeStorefronts.length > 0) {
             const randomRoom = activeStorefronts[Math.floor(Math.random() * activeStorefronts.length)];
             setFocusedRoomId(randomRoom.id);

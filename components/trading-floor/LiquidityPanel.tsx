@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useUI } from '../../lib/state/index.js';
 import { apiService } from '../../lib/services/api.service.js';
@@ -40,8 +41,7 @@ export default function LiquidityPanel() {
             ) : markets.length > 0 ? (
                 <div className={styles.marketGrid}>
                     {markets.map(market => (
-                        // FIX: Removed the 'key' prop to resolve a TypeScript error. React will use the array index as a key, which may cause warnings but prevents a compile error.
-                        <MarketCard market={market} onSelect={openMarketDetailModal} />
+                        <MarketCard key={market.id} market={market} onSelect={openMarketDetailModal} />
                     ))}
                 </div>
             ) : (

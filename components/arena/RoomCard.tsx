@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -101,7 +102,7 @@ function RoomScene({ room }: RoomSceneProps) {
     const { availablePresets, availablePersonal } = useAgent();
     const allAgents = useMemo(() => [...availablePresets, ...availablePersonal], [availablePresets, availablePersonal]);
     const { thinkingAgents, agentConversations, lastSyncTimestamp, systemPaused } = useArenaStore();
-    const roomAgents = room.agentIds.map(id => getAgentById(id, allAgents)).filter((a): a is Agent => !!a);
+    const roomAgents = (room.agentIds || []).map(id => getAgentById(id, allAgents)).filter((a): a is Agent => !!a);
     const vibeColor = useMemo(() => new THREE.Color(VIBE_COLORS[room.vibe || 'General Chat ☕️'] || '#9b59b6'), [room.vibe]);
     
     const wallpaperUrl = useMemo(() => {
@@ -117,11 +118,12 @@ function RoomScene({ room }: RoomSceneProps) {
     const [offerKey, setOfferKey] = useState<string>("");
     
     useEffect(() => {
-        if (room.agentIds.length < 2) {
+        const agentIds = room.agentIds || [];
+        if (agentIds.length < 2) {
             setLatestTurn(null);
             return;
         };
-        const [agent1Id, agent2Id] = room.agentIds;
+        const [agent1Id, agent2Id] = agentIds;
         const conversation = agentConversations[agent1Id]?.[agent2Id] || [];
         if (conversation.length > 0) {
             setLatestTurn(conversation[conversation.length - 1]);
@@ -206,7 +208,6 @@ function RoomScene({ room }: RoomSceneProps) {
             </mesh>
             
             {systemPaused && <CooldownHologram />}
-            {/* FIX: Removed the 'key' prop to resolve a TypeScript error. Component updates will be handled by prop changes. */}
             {room.activeOffer && !systemPaused && <HolographicOffer offer={room.activeOffer} />}
             
             {roomAgents.map((agent, index) => {
@@ -238,7 +239,7 @@ type RoomCardProps = {
 export default function RoomCard({ room, userAgent }: RoomCardProps) {
     const { availablePresets, availablePersonal } = useAgent();
     const allAgents = useMemo(() => [...availablePresets, ...availablePersonal], [availablePresets, availablePersonal]);
-    const roomAgents = room.agentIds.map(id => getAgentById(id, allAgents)).filter((a): a is Agent => !!a);
+    const roomAgents = (room.agentIds || []).map(id => getAgentById(id, allAgents)).filter((a): a is Agent => !!a);
 
     const placeholder = (
         <div className={styles.roomCardPlaceholder}>

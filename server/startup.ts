@@ -2,13 +2,14 @@
 
 import './load-env.js';
 import http from 'http';
-// FIX: Add explicit types for Express request handlers to resolve overload errors.
-import express, { Request, Response, NextFunction } from 'express';
+// FIX: Use a simple import for express and qualified types like express.Request to avoid type conflicts.
+import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
 import path from 'node:path';
 import { fileURLToPath } from 'url';
+// FIX: Import Worker directly to ensure type resolution in global declaration.
 import { Worker } from 'worker_threads';
 import mongoose from 'mongoose';
 import { ObjectId } from 'mongodb';
@@ -25,12 +26,12 @@ import { usersCollection } from './db.js';
 declare global {
   namespace Express {
     interface Request {
-      arenaWorker?: import('worker_threads').Worker;
-      autonomyWorker?: import('worker_threads').Worker;
-      dashboardWorker?: import('worker_threads').Worker;
-      marketWatcherWorker?: import('worker_threads').Worker;
-      resolutionWorker?: import('worker_threads').Worker;
-      monitoringWorker?: import('worker_threads').Worker;
+      arenaWorker?: Worker;
+      autonomyWorker?: Worker;
+      dashboardWorker?: Worker;
+      marketWatcherWorker?: Worker;
+      resolutionWorker?: Worker;
+      monitoringWorker?: Worker;
     }
   }
 }
@@ -141,9 +142,8 @@ export async function startServer() {
     }, tickInterval));
   });
 
-  // FIX: Attach all workers to requests with a single middleware to resolve type errors.
-  // FIX: Explicitly type middleware handlers to fix overload resolution issues.
-  app.use((req: Request, res: Response, next: NextFunction) => {
+  // FIX: Using fully qualified express types to resolve type overloads and conflicts.
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     req.arenaWorker = arenaWorker;
     req.autonomyWorker = autonomyWorker;
     req.dashboardWorker = dashboardWorker;
@@ -164,7 +164,7 @@ export async function startServer() {
   
   app.use(express.static(clientDistPath));
   
-  // FIX: Use fully qualified Express types to resolve overload errors and type conflicts.
+  // FIX: Using fully qualified express types to resolve type overloads and conflicts.
   app.get('*', (req: express.Request, res: express.Response) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {

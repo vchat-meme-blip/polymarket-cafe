@@ -6,7 +6,8 @@ import { MarketIntel } from '../../lib/types/index.js';
 import c from 'classnames';
 
 export default function MarketCard({ market, onSelect }: { market: MarketIntel, onSelect: (market: MarketIntel) => void }) {
-    const isBinary = market.outcomes.length === 2 && market.outcomes.some(o => o.name === 'Yes') && market.outcomes.some(o => o.name === 'No');
+    const safeOutcomes = market.outcomes || [];
+    const isBinary = safeOutcomes.length === 2 && safeOutcomes.some(o => o.name === 'Yes') && safeOutcomes.some(o => o.name === 'No');
     const { bookmarkedMarketIds, toggleBookmark } = useUser();
     const isBookmarked = bookmarkedMarketIds?.includes(market.id);
 
@@ -40,7 +41,7 @@ export default function MarketCard({ market, onSelect }: { market: MarketIntel, 
                     </div>
                 ) : (
                     <div className={styles.categoricalOutcomes}>
-                        {market.outcomes.map(outcome => (
+                        {safeOutcomes.map(outcome => (
                             <div key={outcome.name} className={styles.outcomeRow}>
                                 <span className={styles.outcomeName}>{outcome.name}</span>
                                 <span className={styles.outcomePrice}>{Math.round(outcome.price * 100)}¢</span>

@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -64,7 +65,7 @@ class TradeService {
                 await bettingIntelCollection.updateOne({ _id: originalIntel._id }, { $inc: { 'pnlGenerated.amount': price } }, { session });
 
                 newAsset = { ...savedDoc, id: savedDoc._id.toString() } as unknown as BettingIntel;
-                trade = { fromId: sellerAgentId, toId: buyerAgentId, type: 'intel', price, market, intelId, timestamp: Date.now(), roomId };
+                trade = { fromId: sellerId as any, toId: buyerId as any, type: 'intel', price, market, intelId, timestamp: Date.now(), roomId };
 
             } else if (type === 'watchlist') {
                 if (!watchlistId) throw new Error("Watchlist ID is required for this trade type.");
@@ -90,7 +91,7 @@ class TradeService {
                 );
 
                 newAsset = newWatchlistForBuyer;
-                trade = { fromId: sellerAgentId, toId: buyerAgentId, type: 'watchlist', price, watchlistId, watchlistName, timestamp: Date.now(), roomId };
+                trade = { fromId: sellerId as any, toId: buyerId as any, type: 'watchlist', price, watchlistId, watchlistName, timestamp: Date.now(), roomId };
 
             } else {
                 throw new Error("Invalid trade type.");
@@ -100,7 +101,7 @@ class TradeService {
             await Promise.all([
                 agentsCollection.updateOne({ _id: sellerId }, { $inc: { boxBalance: price, intelPnl: price } }, { session }),
                 agentsCollection.updateOne({ _id: buyerId }, { $inc: { boxBalance: -price, intelPnl: -price } }, { session }),
-                tradeHistoryCollection.insertOne(trade as any, { session }),
+                tradeHistoryCollection.insertOne({ ...trade, roomId: new ObjectId(roomId) } as any, { session }),
                 roomsCollection.updateOne({ id: roomId }, { $inc: { volumeSold: price } }, { session }),
             ]);
 
