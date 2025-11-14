@@ -17,7 +17,22 @@ export default function IntelDossierModal() {
     const intel: BettingIntel = showIntelDossierModal;
 
     const handleDiscuss = () => {
-        setChatPrompt(`Let's talk about the intel on "${intel.market}". What's your take on it?`);
+        const prompt = `Let's analyze this piece of intel from my Intel Bank.
+
+--- INTEL DOSSIER ---
+Asset ID: ${intel.id}
+Market: "${intel.market}"
+Acquired At: ${new Date(intel.createdAt).toLocaleString()}
+Source: ${intel.sourceDescription}
+Acquisition Cost: ${intel.pricePaid ? `${intel.pricePaid} BOX` : 'N/A'}
+PNL Generated: $${intel.pnlGenerated?.amount?.toFixed(2) || '0.00'}
+
+**Full Content:**
+${intel.content}
+---
+
+Based on this complete dossier, what is your analysis? What are the key takeaways, potential risks, and opportunities?`;
+        setChatPrompt(prompt);
         closeIntelDossier();
         setView('dashboard');
     };

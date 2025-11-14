@@ -1,4 +1,3 @@
-
 # Quants: Functionality & Architecture
 
 This document outlines the core technical concepts and logic flows that power the Quants SocialFi platform. It is intended as a guide for future development and to provide a clear understanding of the system's production-ready architecture.
@@ -30,9 +29,10 @@ The application is a full-stack, real-time platform consisting of a React SPA cl
 -   **Main Server Thread:** Acts as a lightweight coordinator. Its sole responsibilities are handling HTTP API requests, managing WebSocket connections, and passing messages to and from the worker threads.
 -   **Worker Threads:** The core decision-making logic runs as persistent processes in dedicated worker threads.
     -   `arena.worker.ts`: Manages the `ArenaDirector`, handling all agent conversations, movements, and interactions within the Café.
-    -   `autonomy.worker.ts`: Manages the `AutonomyDirector`, handling 24/7 background intel discovery and analysis.
+    -   `autonomy.worker.ts`: Manages the `AutonomyDirector`, handling 24/7 background intel discovery and analysis for active agents.
     -   `market-watcher.worker.ts`: Manages the `MarketWatcherDirector`, which constantly scans for new markets.
     -   `resolution.worker.ts`: Manages the `ResolutionDirector`, which settles completed bets.
+    -   `monitoring.worker.ts`: Manages the `MonitoringDirector`, executing agents' continuous monitoring tasks.
 
 ---
 
@@ -53,10 +53,21 @@ The autonomous behavior of the agents is orchestrated by several key **server-si
 -   **Responsibility:** Continuously polls the Polymarket API to find new "Breaking" markets.
 -   **Logic:** When a new market is discovered, it saves it to the `new_markets_cache` collection and emits a `newMarketFound` WebSocket event to all connected clients, triggering a toast notification.
 
+#### `resolution.director.ts` (The Bookkeeper)
+-   **Responsibility:** Periodically scans all `pending` bets in the database, checks their corresponding real-world markets for resolution, calculates PNL, and updates agent and intel performance stats.
+
+#### `monitoring.director.ts` (The Watcher)
+-   **Responsibility:** Executes all active `continuous_monitoring` tasks assigned to agents, such as tracking market odds or whale wallet activity, and logs new data snapshots.
+
 ### AI Conversation & Tool-Use Strategy
--   **Structured Actions:** To improve reliability, critical agent actions are now driven by a formal `tool_calls` process.
+-   **Structured Actions & Thought Process:** To improve reliability and transparency, agent actions are now driven by a formal `tool_calls` process guided by a **"THINK, PLAN, ACT"** directive. When given a complex query, the agent first outlines its `thought` process, explaining its reasoning and the sequence of tools it will use. This plan is displayed to the user in a collapsible UI element before the tools are executed.
+-   **Parallel Tool Execution:** The AI is instructed to call all necessary tools in parallel to gather information efficiently before synthesizing a final answer.
 -   **Key Tools:**
-    -   `propose_bet`: When an agent decides to suggest a bet, it uses this tool. This provides a structured JSON object containing the market ID, outcome, analysis, etc. This is sent to the client as part of the message, where a `useToolHandler` hook detects it and populates the Bet Slip UI.
-    -   `get_new_markets`: Allows the agent to query the server's `new_markets_cache` directly, making it aware of the latest market opportunities.
-    -   `search_markets`: Allows the agent to search for markets based on keywords or categories.
--   **Server-Side Execution:** The `ai.service.ts` on the server constructs the prompts, includes the available tools, and processes the AI's response. If the AI calls a tool, the service executes it (e.g., querying the database for `get_new_markets`) and sends the results back to the AI in a second call to get a final, user-facing text response.
+    -   `propose_bet`: When an agent decides to suggest a bet, it uses this tool to create a structured Bet Slip for the user's review.
+    -   `search_markets`: Allows the agent to search for markets based on keywords, categories, and sort order (e.g., most recent).
+    -   `get_market_details`: Fetches detailed real-time data for a specific market.
+    -   **`research_web`:** A powerful tool using the **Firecrawl API** to perform live, deep-dive web research on any topic.
+    -   **`get_market_comments`:** Analyzes public sentiment by reading comments on a specific Polymarket market.
+    -   **`get_trader_positions`:** Researches the recent activity of top traders (the "Mag 7").
+    -   **`get_my_tasks`:** Allows the agent to review its own assigned tasks and report on progress.
+    -   **`get_intel_by_id`:** Retrieves a specific piece of intel from the agent's memory.

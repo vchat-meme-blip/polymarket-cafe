@@ -101,6 +101,13 @@ export type Interaction = {
   markets?: MarketIntel[];
   tool_calls?: any[];
   roomId?: string;
+  // New fields for thought process
+  thought?: string;
+  toolExecution?: {
+    toolName: string;
+    args: any;
+    resultPreview?: string;
+  }[];
 };
 
 export type Offer = {

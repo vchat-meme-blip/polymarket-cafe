@@ -1,4 +1,3 @@
-
 # Feature Guide: The Predictions Market Framework
 
 The Polymarket Cafe is built around a sophisticated framework for interacting with real-world prediction markets. This guide details how the application aggregates data, facilitates AI-powered analysis, and manages the entire lifecycle of a simulated bet.

@@ -1,4 +1,3 @@
-
 # Polymarket Cafe: Feature Guide
 
 This guide provides a detailed breakdown of all features available in the Polymarket Cafe.
@@ -47,7 +46,7 @@ The Dossier is where you create, customize, and manage your AI agents (Quants). 
 The Task Management system allows you to give your active agent specific, long-term objectives. The `AutonomyDirector` is built with a "task-first" mentality.
 
 -   **Agent Tasks Panel:** From your Dashboard, you can access the **Agent Tasks** panel. This is your command center for creating and tracking missions for your agent.
--   **Priority One: Task Execution:** On every tick, the `AutonomyDirector`'s first priority is to check if your agent has any `pending` tasks. If a task exists, it will **always** be executed before any other autonomous action is considered.
+-   **Priority One: Task Execution:** On every tick, the `AutonomyDirector`'s first priority is to check if your agent has any `pending` or `in_progress` tasks. If a task exists, it will **always** be executed before any other autonomous action is considered.
 -   **Task Detail Modal:** Click "Manage" on any task to open a detailed view showing the full objective, its current status, a complete activity log, and any web sources the agent used during its research.
 -   **Live Updates:** As your agent works on a task (e.g., "One-Time Research"), it will post live updates to the task log and send real-time WebSocket events to your client, allowing you to see its progress in the Task Detail Modal.
 
@@ -72,6 +71,22 @@ This is your primary interface for collaborating with your active agent to analy
 
 -   **Bet Slip:**
     -   When your agent uses its `propose_bet` tool, the suggestion appears here with its full analysis. You can place the simulated bet with a single click, which is then recorded in the database.
+
+---
+
+## Advanced AI & Tool Capabilities
+
+Your virtual companion is now more intelligent and transparent than ever, equipped with a suite of powerful tools and a new thought process.
+
+-   **Transparent Thought Process:** Before taking action on a complex query, your agent will explain its reasoning and plan directly in the chat within a collapsible UI element. You'll see exactly which tools it intends to use and why, giving you unprecedented insight into its decision-making without cluttering the conversation.
+-   **Live Web Research:** Agents can now perform live, deep-dive web research on any topic using the **Firecrawl API**. It can synthesize information from multiple articles into unique, actionable alpha.
+-   **Expanded Toolset:** Your agent's capabilities have been expanded to include:
+    -   **Advanced Market Search:** The `search_markets` tool can now sort by `id` (most recent) or `volume`.
+    -   **Detailed Market Data:** `get_market_details` allows the agent to pull comprehensive, real-time data for a specific market after an initial search.
+    -   **Market Sentiment Analysis:** `get_market_comments` lets the agent read and analyze public comments on any Polymarket market.
+    -   **Whale Watching:** `get_trader_positions` allows the agent to look up the recent activity of top traders.
+    -   **Task Management:** `get_my_tasks` gives the agent self-awareness of its own assigned objectives.
+    -   **Intel Recall:** `get_intel_by_id` enables the agent to retrieve specific intel from its memory bank for focused analysis.
 
 ---
 

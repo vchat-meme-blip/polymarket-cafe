@@ -62,6 +62,25 @@ const MarkdownRenderer = ({ text }: { text: string }) => {
   );
 };
 
+const ThoughtProcess = ({ thought, toolExecution }: { thought: string; toolExecution?: any[] }) => (
+    <details className={styles.thoughtProcess}>
+        <summary>
+            <span className="icon">psychology_alt</span> Agent's Thought Process <span className="icon">expand_more</span>
+        </summary>
+        <div className={styles.thoughtProcessContent}>
+            <p>{thought}</p>
+            {toolExecution && toolExecution.map((call, index) => (
+                <div key={index} className={styles.toolCall}>
+                    <div className={styles.toolCallName}>
+                        <span className="icon">terminal</span> {call.toolName}
+                    </div>
+                    <div className={styles.toolCallResult}>{call.resultPreview}</div>
+                </div>
+            ))}
+        </div>
+    </details>
+);
+
 
 /**
  * A component that displays the live, persisted chat history
@@ -120,16 +139,21 @@ export default function DirectChatLog() {
                             {/* FIX: Wrap timestamp in new Date() as required by date-fns format function. */}
                             <span className={styles.messageTime}>{format(new Date(msg.timestamp), 'p')}</span>
                         </div>
-                        <div className={styles.messageBubble}>
-                            <MarkdownRenderer text={msg.text} />
-                            {msg.markets && msg.markets.length > 0 && (
-                                <div className={styles.marketCardList}>
-                                    {msg.markets.map(market => (
-                                        <MarketCardInChat key={market.id} market={market} />
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                        {msg.thought && (
+                            <ThoughtProcess thought={msg.thought} toolExecution={msg.toolExecution} />
+                        )}
+                        {msg.text && (
+                            <div className={styles.messageBubble}>
+                                <MarkdownRenderer text={msg.text} />
+                                {msg.markets && msg.markets.length > 0 && (
+                                    <div className={styles.marketCardList}>
+                                        {msg.markets.map(market => (
+                                            <MarketCardInChat key={market.id} market={market} />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             ))}

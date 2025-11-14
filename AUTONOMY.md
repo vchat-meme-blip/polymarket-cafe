@@ -19,8 +19,16 @@ At the heart of the system is the **Autonomy Director**, a single, powerful, and
 The most powerful aspect of agent autonomy is your ability to give your active agent specific, long-term objectives. The Autonomy Director is now built with a "task-first" mentality.
 
 -   **Agent Tasks Panel:** From your Dashboard, you can access the **Agent Tasks** panel. This is your command center for creating, tracking, and reviewing missions for your agent.
--   **Priority One: Task Execution:** On every tick, the `AutonomyDirector`'s first priority is to check if your agent has any `pending` tasks. If a task exists, it will **always** be executed before any other autonomous action is considered.
+-   **Priority One: Task Execution:** On every tick, the `AutonomyDirector`'s first priority is to check if your agent has any `pending` or `in_progress` tasks. If a task exists, it will **always** be executed before any other autonomous action is considered.
 -   **Live Updates:** As your agent works on a task (e.g., "One-Time Research"), it will post live updates to the task log (e.g., "Task started," "Task completed") and send real-time WebSocket events to your client, allowing you to see its progress in the UI.
+
+**Task Types:**
+You can assign two primary types of tasks to your agent:
+-   **One-Time Research:** Instruct your agent to perform a deep-dive web research on a specific topic (e.g., "The upcoming Ethereum ETF decision"). The agent will use its web scraping and AI synthesis capabilities to produce a detailed report.
+-   **Continuous Monitoring:** Set up persistent monitoring tasks to keep track of market dynamics. This includes:
+    -   **Market Odds & Liquidity:** Track significant changes for a specific market.
+    -   **Top Trader Wallets:** Get alerted when a "Mag 7" trader makes a move.
+    -   **New Breaking Markets:** Get a continuous feed of the newest high-interest markets.
 
 ---
 
