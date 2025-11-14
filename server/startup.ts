@@ -2,8 +2,8 @@
 
 import './load-env.js';
 import http from 'http';
-// FIX: Use a simple import for express and qualified types like express.Request to avoid type conflicts.
-import express from 'express';
+// FIX: Explicitly import Express types to avoid overload resolution errors.
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -76,7 +76,8 @@ export async function startServer() {
             key = apiKeyManager.getKey();
         } 
         else if (agentId) {
-            const user = await usersCollection.findOne({ currentAgentId: new ObjectId(agentId) });
+            const agentObjectId = mongoose.Types.ObjectId.isValid(agentId) ? new ObjectId(agentId) : null;
+            const user = agentObjectId ? await usersCollection.findOne({ currentAgentId: agentObjectId }) : null;
             key = user?.userApiKey || apiKeyManager.getKey();
         } 
         else {
@@ -142,8 +143,8 @@ export async function startServer() {
     }, tickInterval));
   });
 
-  // FIX: Using fully qualified express types to resolve type overloads and conflicts.
-  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // FIX: Explicitly import and use Express types to resolve overload errors and apply Request type augmentation.
+  app.use((req: Request, res: Response, next: NextFunction) => {
     req.arenaWorker = arenaWorker;
     req.autonomyWorker = autonomyWorker;
     req.dashboardWorker = dashboardWorker;
@@ -164,8 +165,8 @@ export async function startServer() {
   
   app.use(express.static(clientDistPath));
   
-  // FIX: Using fully qualified express types to resolve type overloads and conflicts.
-  app.get('*', (req: express.Request, res: express.Response) => {
+  // FIX: Use imported Request and Response types to fix method not found errors.
+  app.get('*', (req: Request, res: Response) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) {
         console.error(`[ERROR] Failed to serve index.html: ${err.message}`);

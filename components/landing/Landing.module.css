@@ -112,6 +112,32 @@
   max-width: 600px;
   margin-top: 1rem;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.featureList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+    font-size: clamp(0.9rem, 2vw, 1.1rem);
+    color: rgba(255, 255, 255, 0.85);
+    text-align: left;
+}
+
+.featureList li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.featureList .icon {
+    font-size: 1.2em;
+    color: var(--brand-cyan);
 }
 
 .landingForm {

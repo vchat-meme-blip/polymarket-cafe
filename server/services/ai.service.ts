@@ -25,9 +25,24 @@ const agentTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
                 type: 'object',
                 properties: {
                     query: { type: 'string', description: 'The search query, e.g., "Trump".' },
-                    category: { type: 'string', description: 'A specific category to filter by, e.g., "Sports".' }
+                    category: { type: 'string', description: 'A specific category to filter by, e.g., "Sports".' },
+                    order: { type: 'string', description: "Sort order. Use 'id' for most recent, 'volume' for highest volume.", enum: ['id', 'volume'] },
                 },
                 required: ['query'],
+            },
+        },
+    },
+     {
+        type: 'function',
+        function: {
+            name: 'get_market_details',
+            description: "Get detailed, real-time information (including exact odds, volume, liquidity) for a specific market using its full ID.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    market_id: { type: 'string', description: "The full market ID, e.g., 'polymarket-514079'." },
+                },
+                required: ['market_id'],
             },
         },
     },
@@ -53,25 +68,66 @@ const agentTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     {
         type: 'function',
         function: {
-            name: 'get_new_markets',
-            description: "Retrieves a list of the most recently discovered 'Breaking' markets that the system has found.",
-            parameters: { type: 'object', properties: {} }
-        }
+            name: 'research_web',
+            description: 'Perform a live web search for real-time information on any topic, such as news, financial data, or events.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'The search query for the web search.' },
+                },
+                required: ['query'],
+            },
+        },
     },
     {
         type: 'function',
         function: {
-            name: 'bookmark_and_monitor_market',
-            description: "Bookmarks a market for the user and assigns the agent to monitor it for significant changes.",
+            name: 'get_market_comments',
+            description: "Analyze public sentiment by reading the latest comments on a specific Polymarket market.",
             parameters: {
                 type: 'object',
                 properties: {
-                    marketId: { type: 'string', description: 'The unique ID of the market to bookmark and monitor.' },
-                    marketTitle: { type: 'string', description: 'The title of the market.' },
+                    market_id: { type: 'string', description: "The Polymarket market ID, which is the numeric part of the full ID (e.g., '514079' from 'polymarket-514079')." },
                 },
-                required: ['marketId', 'marketTitle'],
+                required: ['market_id'],
             },
-        }
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'get_trader_positions',
+            description: "Research the portfolio of top traders to see their recent activity. Use their full wallet address.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    trader_address: { type: 'string', description: "The full wallet address (e.g., '0x...') of the trader to look up." },
+                },
+                required: ['trader_address'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'get_my_tasks',
+            description: "Review your own list of currently assigned tasks and their status to inform your user.",
+            parameters: { type: 'object', properties: {} }
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'get_intel_by_id',
+            description: "Retrieve a specific piece of intel from your memory bank using its unique ID.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    intel_id: { type: 'string', description: "The unique ID of the intel asset to retrieve." },
+                },
+                required: ['intel_id'],
+            },
+        },
     },
     {
         type: 'function',
@@ -171,35 +227,66 @@ class AiService {
 
       const responseMessage = response.choices[0].message;
       const toolCalls = responseMessage.tool_calls;
+      
+      const thoughtMatch = (responseMessage.content || '').match(/^Thought:(.*)/ms);
+      const thought = thoughtMatch ? thoughtMatch[1].trim() : "I will answer this directly.";
+      const responseTextWithoutThought = thought ? (responseMessage.content || '').replace(/^Thought:[\s\S]*/ms, '').trim() : responseMessage.content;
 
       if (toolCalls) {
         messages.push(responseMessage); 
+        const toolExecutionResults = [];
 
         for (const toolCall of toolCalls) {
           if (toolCall.type !== 'function') continue;
           const functionName = toolCall.function.name;
           const functionArgs = JSON.parse(toolCall.function.arguments);
           let functionResponse;
+          let resultPreview;
 
           if (functionName === 'search_markets') {
-            const { markets } = await polymarketService.searchMarkets(functionArgs.query, functionArgs.category);
-            functionResponse = { markets: markets.slice(0, 5) };
-          } else if (functionName === 'get_new_markets') {
-            const newMarkets = await newMarketsCacheCollection.find({}).sort({ detectedAt: -1 }).limit(10).toArray();
-            // FIX: Cast 'm' to 'any' to access properties not defined on the base 'Document' type.
-            functionResponse = { new_markets: newMarkets.map(m => ({ title: (m as any).title, url: (m as any).marketUrl })) };
-          } else if (functionName === 'calculate_payout') {
-            const profit = (functionArgs.amount / functionArgs.price) - functionArgs.amount;
-            functionResponse = { profit: profit.toFixed(2) };
+            const { markets } = await polymarketService.searchMarkets(functionArgs.query, functionArgs.category, 1, 5, functionArgs.order);
+            functionResponse = { markets };
+            resultPreview = `Found ${markets.length} markets related to "${functionArgs.query}".`;
+          } else if (functionName === 'get_market_details') {
+            const market = await polymarketService.getMarketDetails(functionArgs.market_id);
+            functionResponse = { market };
+            resultPreview = market ? `Fetched details for "${market.title}".` : `Market ${functionArgs.market_id} not found.`;
+          } else if (functionName === 'get_market_comments') {
+            const comments = await polymarketService.getMarketComments(functionArgs.market_id.replace('polymarket-', ''), 'Market');
+            functionResponse = { comments: comments.slice(0, 5).map(c => ({ user: c.profile.pseudonym, comment: c.body })) };
+            resultPreview = `Found ${comments.length} comments.`;
+          } else if (functionName === 'get_trader_positions') {
+            const positions = await polymarketService.getWalletPositions(functionArgs.trader_address);
+            functionResponse = { positions: positions.slice(0, 5).map(p => ({ market: p.title, outcome: p.outcome, size: p.size })) };
+            resultPreview = `Found ${positions.length} positions for trader.`;
+          } else if (functionName === 'get_my_tasks') {
+            const agentWithTasks = await agentsCollection.findOne({ _id: agent._id });
+            const tasks = (agentWithTasks as any).tasks || [];
+            functionResponse = { tasks: tasks.map((t: AgentTask) => ({ id: t.id, objective: t.objective, status: t.status })) };
+            resultPreview = `Found ${tasks.length} tasks.`;
+          } else if (functionName === 'get_intel_by_id') {
+            const intel = await bettingIntelCollection.findOne({ _id: new Types.ObjectId(functionArgs.intel_id) });
+            functionResponse = { intel };
+            resultPreview = intel ? `Retrieved intel on "${intel.market}".` : `Intel with ID ${functionArgs.intel_id} not found.`;
+          } else if (functionName === 'research_web') {
+            if (!firecrawlService.isConfigured()) {
+                functionResponse = { error: 'Web research tool is not available.' };
+                resultPreview = 'Error: Web research tool is not configured on the server.';
+            } else {
+                const results = await firecrawlService.search(functionArgs.query);
+                functionResponse = { results: results.map(r => ({ title: r.title, url: r.url, summary: r.markdown.slice(0, 200) + '...' })) };
+                resultPreview = `Found ${results.length} web results for "${functionArgs.query}".`;
+            }
           } else {
-             return {
-                agentId: agent.id,
-                agentName: agent.name,
-                text: responseMessage.content || '',
-                timestamp: Date.now(),
-                tool_calls: toolCalls,
-             };
+             functionResponse = { status: 'Tool call noted and will be handled by the client.' };
+             resultPreview = `Action: ${functionName}`;
           }
+          
+          toolExecutionResults.push({
+            toolName: functionName,
+            args: functionArgs,
+            resultPreview
+          });
           
           messages.push({
             tool_call_id: toolCall.id,
@@ -209,7 +296,7 @@ class AiService {
         }
         
         const createSecondCompletion = () => openai.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
           messages: messages,
         });
         const secondResponse = await this.retry(createSecondCompletion);
@@ -219,12 +306,20 @@ class AiService {
             agentName: agent.name,
             text: secondResponse.choices[0].message.content || '...',
             timestamp: Date.now(),
+            thought: thought,
+            toolExecution: toolExecutionResults,
+            tool_calls: toolCalls,
         };
 
       }
 
-      const responseText = responseMessage.content?.trim() ?? '...';
-      return { agentId: agent.id, agentName: agent.name, text: responseText, timestamp: Date.now() };
+      return { 
+          agentId: agent.id, 
+          agentName: agent.name, 
+          text: responseTextWithoutThought || '...', 
+          timestamp: Date.now(),
+          thought: thought 
+        };
 
     } catch (error) {
       console.error(`[AiService] OpenAI completion failed for direct message with ${agent.name}:`, error);
@@ -561,8 +656,6 @@ ${researchContext}
           kalshiService.searchMarkets(query),
           bettingIntelCollection.find({ ownerAgentId: new Types.ObjectId(agentId) }).toArray()
       ]);
-
-      // FIX: Correctly access 'markets' property from polymarketResults and concatenate with kalshiResults array.
       const markets: MarketIntel[] = [...polymarketResults.markets, ...kalshiResults];
 
       const systemPrompt = `
@@ -597,12 +690,10 @@ ${researchContext}
       const completion = await this.retry(createCompletion);
       
       const toolCall = completion.choices[0].message.tool_calls?.[0];
-      // FIX: Add a type guard to ensure toolCall is a function call before accessing its 'function' property.
       if (!toolCall || toolCall.type !== 'function' || toolCall.function.name !== 'propose_bet') {
         throw new Error("AI did not propose a bet using the required tool.");
       }
 
-      // FIX: Safely access 'function' property after the type guard.
       const betArgs = JSON.parse(toolCall.function.arguments);
       
       return {

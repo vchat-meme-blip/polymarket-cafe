@@ -31,7 +31,6 @@ function mapMarket(market: any, event: any): MarketIntel | null {
         console.error(`[PolymarketService] Failed to parse outcomes for market ${market.id}:`, e);
     }
     
-    // Fallback for older binary structure if parsing fails but prices are available
     if (parsedOutcomes.length === 0 && market.outcomePrices) {
         try {
             const outcomePrices = JSON.parse(market.outcomePrices);
@@ -42,7 +41,6 @@ function mapMarket(market: any, event: any): MarketIntel | null {
                 { name: 'No', price: isNaN(noPrice) ? 0.5 : noPrice },
             ];
         } catch (e) {
-             // Fallback if prices are not parsable
              parsedOutcomes = [ { name: 'Yes', price: 0.5 }, { name: 'No', price: 0.5 }];
         }
     }
@@ -83,7 +81,6 @@ class PolymarketService {
         params,
         timeout: 10000 // 10 second timeout
       });
-      console.log(`[PolymarketService] API call to ${endpoint} with params ${JSON.stringify(params)} successful.`);
       return data;
     } catch (error) {
        if (axios.isAxiosError(error)) {
@@ -95,27 +92,25 @@ class PolymarketService {
     }
   }
   
-  async searchMarkets(query: string, category?: string, page: number = 1, limit: number = 40): Promise<{ markets: MarketIntel[], hasMore: boolean }> {
+  async searchMarkets(query: string, category?: string, page: number = 1, limit: number = 40, order?: 'volume' | 'id'): Promise<{ markets: MarketIntel[], hasMore: boolean }> {
     const effectiveQuery = query || (category && !['All'].includes(category) ? category : '');
 
-    // If no search query, use the /events endpoint for browsing
     if (!effectiveQuery) {
         const params: any = {
-            order: 'volume', // Default sort for browsing
+            order: order || 'volume',
             ascending: false,
             closed: false,
             limit: limit,
-            offset: (page - 1) * limit
+            offset: (page - 1) * limit,
+            category: category && category !== 'All' ? category : undefined,
         };
-
-        if (category === 'Breaking') {
-            params.order = 'id'; // Sort by newest for "Breaking"
+        if (order === 'id') {
+          params.order = 'creation_date';
         }
 
         const data = await this.fetchFromApi(GAMMA_API, 'events', params);
 
         if (!data || !Array.isArray(data)) {
-            console.warn(`[PolymarketService] Received invalid data from /events endpoint for browsing.`);
             return { markets: [], hasMore: false };
         }
 
@@ -127,22 +122,24 @@ class PolymarketService {
         return { markets, hasMore };
     }
 
-    // If there IS a search query, use public-search
     const params: any = {
         page: page,
         types: 'market',
-        order: 'desc',
         q: effectiveQuery,
         limit: limit
     };
     
+    if (order === 'id') {
+        params.sort = 'id';
+    } else if (order === 'volume') {
+        params.sort = 'volume';
+    }
+    
     const data = await this.fetchFromApi(GAMMA_API, 'public-search', params);
 
     if (!data?.events) {
-        console.warn(`[PolymarketService] API call to public-search failed: Request failed with status code 422 (Status: 422) { type: 'validation error', error: 'query argument "q": empty' }`)
         return { markets: [], hasMore: false };
     }
-
 
     const markets: MarketIntel[] = data.events.flatMap((event: any) => 
         (event.markets || []).map((market: any) => mapMarket(market, event))
@@ -151,19 +148,24 @@ class PolymarketService {
     return { markets, hasMore: data.pagination?.hasMore ?? false };
   }
 
+  async getMarketDetails(marketId: string): Promise<MarketIntel | null> {
+    const numericId = marketId.replace('polymarket-', '');
+    const data = await this.fetchFromApi(GAMMA_API, `markets/${numericId}`, {});
+    if (!data) return null;
+    return mapMarket(data, data.event || {});
+  }
+
   async getLiveMarkets(limit = 50, category?: string, page: number = 1): Promise<{ markets: MarketIntel[], hasMore: boolean }> {
     return this.searchMarkets('', category, page, limit);
   }
 
   async getLiquidityOpportunities(limit = 20): Promise<MarketIntel[]> {
     const data = await this.fetchFromApi(GAMMA_API, 'markets', {
-        // CORRECTED PARAMETER TYPE: Explicitly use string 'false'
         closed: 'false',
         limit: 200, 
     });
 
     if (!data || !Array.isArray(data)) {
-        console.warn('[PolymarketService] Invalid or empty response from /markets for liquidity opportunities.');
         return [];
     }
     
@@ -187,10 +189,9 @@ class PolymarketService {
     return mappedMarkets.slice(0, limit);
   }
 
-  async getMarketComments(entityId: string, entityType: 'Event' | 'Market' = 'Event'): Promise<any[]> {
-    const numericId = parseInt(entityId, 10);
+  async getMarketComments(entityId: string, entityType: 'Event' | 'Market' = 'Market'): Promise<any[]> {
+    const numericId = parseInt(entityId.replace('polymarket-', ''), 10);
     if (isNaN(numericId)) {
-        // Support for non-numeric event IDs (slugs)
         if (entityType === 'Event') {
             const data = await this.fetchFromApi(GAMMA_API, 'comments', {
                 event_slug: entityId,
@@ -200,7 +201,6 @@ class PolymarketService {
             });
             return data || [];
         }
-        console.warn(`[PolymarketService] Invalid numeric entity ID for comments: ${entityId}`);
         return [];
     }
 

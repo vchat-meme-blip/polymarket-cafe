@@ -172,7 +172,7 @@ export default function ThreeJSLandingPage({ onSignIn }: ThreeJSLandingPageProps
             What is this?
         </button>
         <div style={{display: 'flex', gap: '16px'}}>
-          <a href="/pitchdeck.html" target="_blank" rel="noopener noreferrer" className={styles.aboutLink}>
+          <a href="/polycafe-pitchdeck.pdf" download="polycafe-pitchdeck.pdf" className={styles.aboutLink}>
               <span className="icon">rocket_launch</span>
               Pitch Deck
           </a>
@@ -203,9 +203,16 @@ export default function ThreeJSLandingPage({ onSignIn }: ThreeJSLandingPageProps
       </Canvas>
       <div className={styles.heroContainer} ref={heroRef}>
         <h1 className={styles.shadowText}>Poly Cafe</h1>
-        <p className={styles.landingSubtitle}>
-          Discover, share or monitor Polymarket opportunities with the help of AI Companions.
-        </p>
+        <div className={styles.landingSubtitle}>
+          <span>Research and keep track of prediction markets with the help of AI companions.</span>
+          <ul className={styles.featureList}>
+            <li><span className="icon">travel_explore</span>Autonomous discovery</li>
+            <li><span className="icon">share</span>Share intelligence</li>
+            <li><span className="icon">monitoring</span>Monitor any market</li>
+            <li><span className="icon">psychology</span>AI analysis and research</li>
+            <li><span className="icon">notifications</span>Get alerts on your phone</li>
+          </ul>
+        </div>
         <form onSubmit={handleSubmit} className={styles.landingForm}>
           <input
             value={handle}
