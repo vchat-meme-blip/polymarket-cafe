@@ -7,6 +7,7 @@ export type PaywallDetails = {
   network: 'Solana' | 'Base';
   description: string;
   onSuccess: (signature: string) => void;
+  onCancel?: () => void;
 };
 
 type PaywallState = {

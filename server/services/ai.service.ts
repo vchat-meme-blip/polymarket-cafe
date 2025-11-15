@@ -8,6 +8,7 @@ const { Types } = mongoose;
 
 import { Agent, Interaction, MarketIntel, Room, TradeRecord, BettingIntel, User, AgentTask } from '../../lib/types/index.js';
 import { apiKeyProvider } from './apiKey.provider.js';
+import { creditService } from './credit.service.js';
 import { agentsCollection, bettingIntelCollection, notificationsCollection, usersCollection, newMarketsCacheCollection } from '../db.js';
 import { polymarketService } from './polymarket.service.js';
 import { kalshiService } from './kalshi.service.js';
@@ -168,13 +169,49 @@ class AiService {
     }
   }
 
+  // FIX: Implement the missing `brainstormPersonality` method in the `AiService` class to handle requests from the frontend for generating AI agent personalities.
+  async brainstormPersonality(keywords: string): Promise<{ personality: string }> {
+    let apiKey: string | null = null;
+    try {
+      apiKey = await apiKeyProvider.getKeyForAgent('system-brainstorm');
+      if (!apiKey) {
+        throw new Error("AI service is currently busy. Please try again later.");
+      }
+      const openai = new OpenAI({ apiKey });
+
+      const prompt = `Brainstorm a detailed, first-person personality for an AI agent in a SocialFi simulation called "PolyAI Betting Arena". The agent's personality should be based on these keywords: "${keywords}". The description should be under 80 words.`;
+      
+      const createCompletion = () => openai.chat.completions.create({
+          model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+      });
+      const completion = await this.retry(createCompletion);
+      const personality = completion.choices[0].message.content?.trim() ?? "I am an AI agent.";
+      return { personality };
+    } catch (error) {
+      console.error(`[AiService] Brainstorm failed for keywords "${keywords}":`, error);
+      if (error instanceof OpenAI.APIError && error.status === 429 && apiKey) {
+          apiKeyProvider.reportRateLimit(apiKey, 60);
+      }
+      throw new Error("Failed to brainstorm personality.");
+    }
+  }
+
   async getDirectMessageResponse(
     agent: Agent,
     user: User,
     message: string,
-    history: Interaction[],
-    apiKey: string
+    history: Interaction[]
   ): Promise<Interaction> {
+    const MINIMUM_CREDITS = 10;
+    if ((user.credits ?? 0) < MINIMUM_CREDITS) {
+        throw new Error("You have insufficient credits to chat with your agent. Please purchase more in your profile settings.");
+    }
+    
+    const apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
+    if (!apiKey) {
+      throw new Error("I'm having some trouble connecting right now. All our AI providers are busy. Let's talk later.");
+    }
     const openai = new OpenAI({ apiKey });
 
     const agentIntelBank = await bettingIntelCollection.find({ ownerHandle: agent.ownerHandle }).toArray();
@@ -224,6 +261,10 @@ class AiService {
       });
       
       const response = await this.retry(createCompletion);
+      const usage = response.usage;
+      if (usage && user.handle) {
+          await creditService.debitForUsage(user.handle, agent.id, usage, 'Direct Message');
+      }
 
       const responseMessage = response.choices[0].message;
       const toolCalls = responseMessage.tool_calls;
@@ -300,6 +341,11 @@ class AiService {
           messages: messages,
         });
         const secondResponse = await this.retry(createSecondCompletion);
+        
+        const secondUsage = secondResponse.usage;
+        if (secondUsage && user.handle) {
+            await creditService.debitForUsage(user.handle, agent.id, secondUsage, 'Tool Follow-up');
+        }
 
         return {
             agentId: agent.id,
@@ -326,11 +372,7 @@ class AiService {
       if (error instanceof OpenAI.APIError && error.status === 429) {
         apiKeyProvider.reportRateLimit(apiKey, 60);
       }
-      return {
-        agentId: agent.id, agentName: agent.name,
-        text: "I'm having some trouble connecting right now. Let's talk later.",
-        timestamp: Date.now(),
-      };
+      throw new Error("I'm having some trouble connecting right now. Let's talk later.");
     }
   }
     
@@ -473,127 +515,6 @@ class AiService {
     }
   }
 
-  async conductResearchOnMarket(agent: Agent, market: MarketIntel): Promise<Partial<BettingIntel> | null> {
-    if (!firecrawlService.isConfigured()) {
-      console.warn(`[AiService] Research skipped for ${agent.name}: Firecrawl service not configured.`);
-      return null;
-    }
-
-    let apiKey: string | null = null;
-    try {
-      apiKey = await apiKeyProvider.getKeyForAgent('system-research');
-      if (!apiKey) {
-        console.error(`[AiService] No system API key for autonomous research.`);
-        return null;
-      }
-      const openai = new OpenAI({ apiKey });
-
-      const queryGenPrompt = `You are an expert financial analyst. Generate a concise, effective search query to find the most relevant, recent information about the following prediction market. The query should be suitable for a web search engine.
-
-Market: "${market.title}"
-Description: "${market.description}"
-
-Return ONLY the search query.`;
-      
-      const createQueryCompletion = () => openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        messages: [{ role: 'user', content: queryGenPrompt }],
-      });
-      const queryGenCompletion = await this.retry(createQueryCompletion);
-      const searchQuery = queryGenCompletion.choices[0].message.content?.trim();
-      if (!searchQuery) {
-        console.warn(`[AiService] Could not generate search query for market: ${market.title}`);
-        return null;
-      }
-      console.log(`[AiService] Generated search query for "${market.title}": "${searchQuery}"`);
-
-      const searchResults = await firecrawlService.search(searchQuery);
-      const scrapedData = searchResults.filter(r => r.markdown && r.url);
-
-      if (scrapedData.length === 0) {
-        console.log(`[AiService] Firecrawl returned no scraped content for query: "${searchQuery}"`);
-        return null;
-      }
-      
-      const researchContext = scrapedData.map(result => `
-## Source: ${result.url}
-${result.markdown}
-      `).join('\n\n---\n\n');
-
-      const summaryPrompt = `You are ${agent.name}, an expert prediction market analyst with this personality: "${agent.personality}".
-Analyze the provided research material from multiple web sources regarding the market: "${market.title}".
-
-Synthesize all the information into a concise, actionable piece of "alpha" or a contrarian insight. Your response should be a single, insightful paragraph. Do not mention the sources in your summary. Focus on the conclusion you draw from the data.
-
-Research Material:
-${researchContext}
-      `;
-      
-      const createSummaryCompletion = () => openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        messages: [{ role: 'user', content: summaryPrompt }],
-      });
-      const summaryCompletion = await this.retry(createSummaryCompletion);
-      
-      const intelContent = summaryCompletion.choices[0].message.content?.trim();
-      if (!intelContent) {
-        console.warn(`[AiService] Could not generate summary for market: ${market.title}`);
-        return null;
-      }
-
-      return {
-        content: intelContent,
-        sourceUrls: scrapedData.map(r => r.url),
-        rawResearchData: scrapedData.map(r => ({ url: r.url, markdown: r.markdown })),
-        sourceDescription: 'Autonomous Web Research'
-      };
-
-    } catch (error) {
-      console.error(`[AiService] Full research process failed for market "${market.title}":`, error);
-       if (error instanceof OpenAI.APIError && error.status === 429 && apiKey) {
-            apiKeyProvider.reportRateLimit(apiKey, 60);
-        }
-      return null;
-    }
-  }
-
-  async generateIntelForMarket(agent: Agent, market: MarketIntel): Promise<string | null> {
-    let apiKey: string | null = null;
-    try {
-      apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
-      if (!apiKey) {
-        console.error(`[AiService] No API key for agent ${agent.name} for intel generation.`);
-        return null;
-      }
-      const openai = new OpenAI({ apiKey });
-
-      const systemPrompt = `You are ${agent.name}, an expert prediction market analyst with this personality: "${agent.personality}".`;
-      const userPrompt = `Analyze the following prediction market and provide a concise, actionable piece of "alpha" or a contrarian insight. Your response should be a single, insightful sentence.
-      
-      Market: "${market.title}"
-      Yes Odds: ${Math.round(market.odds.yes * 100)}¢
-      No Odds: ${Math.round(market.odds.no * 100)}¢
-      Platform: ${market.platform}
-      `;
-
-      const createCompletion = () => openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-      });
-      const completion = await this.retry(createCompletion);
-      return completion.choices[0].message.content?.trim() ?? null;
-    } catch (error) {
-      console.error(`[AiService] OpenAI completion failed for intel generation on "${market.title}":`, error);
-       if (error instanceof OpenAI.APIError && error.status === 429 && apiKey) {
-            apiKeyProvider.reportRateLimit(apiKey, 30);
-        }
-      return null;
-    }
-  }
-  
   async analyzeMarket(agent: Agent, market: MarketIntel, comments?: any[]): Promise<string> {
     let apiKey: string | null = null;
     try {
@@ -750,92 +671,6 @@ ${researchContext}
             apiKeyProvider.reportRateLimit(apiKey, 60);
         }
       return "Failed to generate summary due to an internal error.";
-    }
-  }
-
-  async generateProactiveEngagementMessage(agent: Agent, intel: BettingIntel): Promise<string | null> {
-    let apiKey: string | null = null;
-    try {
-        apiKey = await apiKeyProvider.getKeyForAgent(agent.id);
-        if (!apiKey) return null;
-
-        const openai = new OpenAI({ apiKey });
-        const prompt = `You are ${agent.name}, an AI agent with this personality: "${agent.personality}".
-    You recently found this piece of intel: "${intel.content}" regarding the market "${intel.market}".
-    
-    Formulate a short, engaging question or thought to send to your user based on this intel.
-    Your message should be conversational and proactive, as if you're a real partner. Keep it to a single sentence.
-    
-    Example: "Just a thought on that ETH market: have you considered the impact of the recent staking numbers?"
-    `;
-
-        const createCompletion = () => openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [{ role: 'user', content: prompt }],
-        });
-        const completion = await this.retry(createCompletion);
-        return completion.choices[0].message.content?.trim() ?? null;
-    } catch (error) {
-        console.error(`[AiService] Failed to generate proactive engagement message for ${agent.name}:`, error);
-        if (error instanceof OpenAI.APIError && error.status === 429 && apiKey) {
-            apiKeyProvider.reportRateLimit(apiKey, 60);
-        }
-        return null;
-    }
-  }
-
-   async researchTopic(agent: Agent, topic: string): Promise<{ summary: string; sources: { title: string; url: string; }[] } | null> {
-    if (!firecrawlService.isConfigured()) {
-      console.warn(`[AiService] Research skipped for ${agent.name}: Firecrawl service not configured.`);
-      return { summary: "Research could not be performed because the web scraping service is not configured on the server.", sources: [] };
-    }
-
-    const apiKey = await apiKeyProvider.getKeyForAgent('system-research');
-    if (!apiKey) {
-      console.error(`[AiService] No system API key available for research task on topic: "${topic}".`);
-      return { summary: "Research could not be performed because no server API keys are available at the moment.", sources: [] };
-    }
-    const openai = new OpenAI({ apiKey });
-
-    try {
-      const searchResults = await firecrawlService.search(topic);
-      const scrapedData = searchResults.filter(r => r.markdown && r.url);
-
-      if (scrapedData.length === 0) {
-        return { summary: `I couldn't find any relevant web results for "${topic}".`, sources: [] };
-      }
-      
-      const researchContext = scrapedData.map(result => `## Source: ${result.url}\n${result.markdown}`).join('\n\n---\n\n');
-
-      const summaryPrompt = `You are ${agent.name}, an expert analyst. Your personality: "${agent.personality}".
-Analyze the provided research material about "${topic}".
-Synthesize all the information into a concise, actionable summary. Your response should be a well-structured report.
-
-Research Material:
-${researchContext.slice(0, 15000)}
-      `;
-      
-      const summaryCompletion = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        messages: [{ role: 'user', content: summaryPrompt }],
-      });
-      
-      const summary = summaryCompletion.choices[0].message.content?.trim();
-      if (!summary) {
-        return { summary: 'The AI failed to generate a summary from the research material.', sources: scrapedData.map(r => ({ title: r.title || 'Untitled', url: r.url })) };
-      }
-
-      return {
-        summary,
-        sources: scrapedData.map(r => ({ title: r.title || 'Untitled', url: r.url })),
-      };
-
-    } catch (error) {
-      console.error(`[AiService] Research process failed for topic "${topic}":`, error);
-      if (error instanceof OpenAI.APIError && error.status === 429 && apiKey) {
-           apiKeyProvider.reportRateLimit(apiKey, 60);
-      }
-      return { summary: `An error occurred during the research process: ${error instanceof Error ? error.message : 'Unknown error'}.`, sources: [] };
     }
   }
 }

@@ -10,7 +10,9 @@ import type {
   DailySummary as SharedDailySummary,
   Notification as SharedNotification,
   Transaction as SharedTransaction,
-  TradeRecord as SharedTradeRecord
+  TradeRecord as SharedTradeRecord,
+  // FIX: Add `CreditUsageLogDocument` and `CreditUsageLog` type definitions and exports to align the data model with their usage in services like `db.ts` and resolve missing type errors.
+  CreditUsageLog as SharedCreditUsageLog
 } from './shared.js';
 
 // Helper type to convert string IDs to ObjectId in a type
@@ -125,6 +127,13 @@ export interface TradeRecordDocument extends Omit<SharedTradeRecord, 'fromId' | 
   toShared(): SharedTradeRecord;
 }
 
+// FIX: Add `CreditUsageLogDocument` and `CreditUsageLog` type definitions and exports to align the data model with their usage in services like `db.ts` and resolve missing type errors.
+export interface CreditUsageLogDocument extends Omit<SharedCreditUsageLog, '_id' | 'timestamp'> {
+  _id: ObjectId;
+  timestamp: Date;
+  toShared(): SharedCreditUsageLog;
+}
+
 // Helper functions to convert between MongoDB and shared types
 export function toSharedUser(doc: UserDocument): SharedUser {
   return {
@@ -177,5 +186,6 @@ export type {
   SharedDailySummary as DailySummary,
   SharedNotification as Notification,
   SharedTransaction as Transaction,
-  SharedTradeRecord as TradeRecord
+  SharedTradeRecord as TradeRecord,
+  SharedCreditUsageLog as CreditUsageLog
 };

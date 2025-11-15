@@ -18,6 +18,7 @@ export type {
   NotificationDocument,
   TransactionDocument,
   TradeRecordDocument,
+  CreditUsageLogDocument,
   
   // Base types (re-exported from shared with MongoDB _id)
   User,
@@ -29,7 +30,8 @@ export type {
   DailySummary,
   Notification,
   Transaction,
-  TradeRecord
+  TradeRecord,
+  CreditUsageLog
 } from './mongodb.js';
 
 // Export conversion functions separately since they're values, not types

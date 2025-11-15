@@ -2,24 +2,31 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Modal from '../Modal';
-import { useUI } from '../../lib/state/index.js';
+// FIX: Aliased ProfileTab type to avoid name collision with the ProfileTab component.
+import { useUI, type ProfileTab as ProfileTabType } from '../../lib/state/index.js';
 import c from 'classnames';
 import ProfileTab from './ProfileTab';
 import WalletTab from './WalletTab';
 import SecurityTab from './SecurityTab';
 import NotificationsTab from './NotificationsTab';
+import BillingTab from './BillingTab';
 import styles from '../modals/Modals.module.css';
 
-type Tab = 'profile' | 'wallet' | 'security' | 'notifications';
-
 export default function ProfileView() {
-  const { setShowProfileView } = useUI();
-  const [activeTab, setActiveTab] = useState<Tab>('profile');
+  const { setShowProfileView, profileInitialTab } = useUI();
+  // FIX: Use the aliased type ProfileTabType to resolve duplicate identifier error.
+  const [activeTab, setActiveTab] = useState<ProfileTabType>(profileInitialTab || 'profile');
+
+  useEffect(() => {
+    if (profileInitialTab) {
+      setActiveTab(profileInitialTab);
+    }
+  }, [profileInitialTab]);
 
   const onClose = () => {
-    setShowProfileView(false);
+    setShowProfileView(false, null);
   };
 
   return (
@@ -34,6 +41,12 @@ export default function ProfileView() {
             onClick={() => setActiveTab('profile')}
           >
             Profile
+          </button>
+          <button
+            className={c(styles.tabButton, { [styles.active]: activeTab === 'billing' })}
+            onClick={() => setActiveTab('billing')}
+          >
+            Billing
           </button>
           <button
             className={c(styles.tabButton, { [styles.active]: activeTab === 'wallet' })}
@@ -56,6 +69,7 @@ export default function ProfileView() {
         </div>
         <div className={styles.modalContent}>
           {activeTab === 'profile' && <ProfileTab onSave={onClose} />}
+          {activeTab === 'billing' && <BillingTab />}
           {activeTab === 'wallet' && <WalletTab />}
           {activeTab === 'security' && <SecurityTab />}
           {activeTab === 'notifications' && <NotificationsTab onSave={onClose} />}

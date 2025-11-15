@@ -13,6 +13,8 @@ import type {
   BettingIntel,
   DailySummary,
   Notification,
+  // FIX: Add missing imports for `CreditUsageLog` and `CreditUsageLogDocument` to resolve type errors when referencing these collections.
+  CreditUsageLog,
   // MongoDB document types
   AgentDocument,
   RoomDocument,
@@ -23,6 +25,7 @@ import type {
   BettingIntelDocument,
   DailySummaryDocument,
   NotificationDocument,
+  CreditUsageLogDocument,
   // Utility types
   WithMongoId,
   // Conversion functions
@@ -59,6 +62,7 @@ export let dailySummariesCollection: Collection<DailySummaryDocument>;
 export let notificationsCollection: Collection<NotificationDocument>;
 export let agentInteractionsCollection: Collection<Interaction>;
 export let newMarketsCacheCollection: Collection<Document>;
+export let creditUsageLogsCollection: Collection<CreditUsageLogDocument>;
 
 
 // Helper function to convert MongoDB document to plain object
@@ -105,6 +109,10 @@ const connectDB = async () => {
     notificationsCollection = mongoose.connection.collection<NotificationDocument>('notifications');
     agentInteractionsCollection = mongoose.connection.collection<Interaction>('agent_interactions');
     newMarketsCacheCollection = mongoose.connection.collection<Document>('new_markets_cache');
+    creditUsageLogsCollection = mongoose.connection.collection<CreditUsageLogDocument>('credit_usage_logs');
+
+    // Add 'credits' field to users collection if it doesn't exist
+    await usersCollection.updateMany({ credits: { $exists: false } }, { $set: { credits: 1000 } });
 
 
     // Create indexes
@@ -115,6 +123,7 @@ const connectDB = async () => {
       roomsCollection.createIndex({ id: 1 }, { unique: true }),
       agentInteractionsCollection.createIndex({ roomId: 1, timestamp: -1 }),
       newMarketsCacheCollection.createIndex({ detectedAt: -1 }),
+      creditUsageLogsCollection.createIndex({ ownerHandle: 1, timestamp: -1 }),
     ]);
 
     // Clear rooms on startup in development for a clean slate

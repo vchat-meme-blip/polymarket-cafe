@@ -17,6 +17,13 @@ const PaywallModal = () => {
         return null;
     }
 
+    const handleClose = () => {
+        if (details.onCancel) {
+            details.onCancel();
+        }
+        closePaywall();
+    };
+
     const handleConfirmPayment = async () => {
         if (!publicKey || !details) return;
         setIsPaying(true);
@@ -43,15 +50,18 @@ const PaywallModal = () => {
         } catch (error) {
             console.error("Payment failed", error);
             alert("Payment failed. Please ensure you have enough USDC and try again.");
+            if (details.onCancel) {
+                details.onCancel();
+            }
         } finally {
             setIsPaying(false);
         }
     };
 
     return (
-        <div className={styles.modalShroud} onClick={closePaywall}>
+        <div className={styles.modalShroud} onClick={handleClose}>
             <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-                 <button onClick={closePaywall} className={styles.modalClose}>
+                 <button onClick={handleClose} className={styles.modalClose}>
                     <span className="icon">close</span>
                 </button>
                 <div className={styles.modalContentPane}>
@@ -63,7 +73,7 @@ const PaywallModal = () => {
                         <p><strong>Recipient:</strong> {details.payTo.slice(0, 4)}...{details.payTo.slice(-4)}</p>
                     </div>
                     <div className={styles.modalFooter}>
-                        <button className="button secondary" onClick={closePaywall}>Cancel</button>
+                        <button className="button secondary" onClick={handleClose}>Cancel</button>
                         <button className="button primary" onClick={handleConfirmPayment} disabled={!publicKey || isPaying}>
                             {isPaying ? 'Processing...' : 'Pay with Wallet'}
                         </button>

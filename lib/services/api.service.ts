@@ -8,6 +8,7 @@ import { useAgent, useUser } from '../state/index.js';
 import { useArenaStore } from '../state/arena.js';
 import { useAutonomyStore } from '../state/autonomy.js';
 import { useWalletStore } from '../state/wallet.js';
+import { usePaywallStore } from '../state/paywall.js';
 
 class ApiService {
   public async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -22,6 +23,34 @@ class ApiService {
 
     try {
       const response = await fetch(url, { ...options, headers });
+      
+      if (response.status === 402) {
+        const paywallDetails = await response.json();
+        return new Promise<T>((resolve, reject) => {
+          usePaywallStore.getState().openPaywall({
+            ...paywallDetails,
+            onSuccess: async (signature: string) => {
+              try {
+                const retryResponse = await fetch(url, {
+                  ...options,
+                  headers: { ...headers, 'X-Transaction-Signature': signature },
+                });
+                if (!retryResponse.ok) {
+                    const errorBody = await retryResponse.json().catch(() => ({ message: 'An unknown error occurred after payment.' }));
+                    throw new Error(errorBody.message || `Request failed after payment with status ${retryResponse.status}`);
+                }
+                resolve(await retryResponse.json());
+              } catch (retryError) {
+                reject(retryError);
+              }
+            },
+            onCancel: () => {
+              reject(new Error('Payment was canceled by the user.'));
+            }
+          });
+        });
+      }
+      
       if (!response.ok) {
         const errorData: unknown = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
         const errorMessage = (typeof errorData === 'object' && errorData !== null && 'message' in errorData && typeof (errorData as any).message === 'string')

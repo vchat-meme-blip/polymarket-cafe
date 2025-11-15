@@ -104,6 +104,7 @@ export function useLiveApi({
 
   // Effect to initialize and update the parallel text chat session using OpenAI
   useEffect(() => {
+    // FIX: Add a check for user.userApiKey as it is an optional property on the User type. This resolves the TypeScript error indicating the property does not exist.
     const openai = new OpenAI({ 
         apiKey: user.userApiKey || process.env.GEMINI_API_KEY || '', // Fallback for server key
         dangerouslyAllowBrowser: true 

@@ -25,7 +25,6 @@ export type User = {
   handle: string;
   hasCompletedOnboarding: boolean;
   lastSeen: number | null;
-  userApiKey: string | null;
   solanaWalletAddress: string | null;
   receivingWalletAddress?: string;
   createdAt: number;
@@ -36,6 +35,8 @@ export type User = {
   notificationSettings: NotificationSettings;
   bookmarkedMarketIds?: string[];
   isAutonomyEnabled?: boolean;
+  credits: number;
+  userApiKey?: string | null;
 };
 
 export type AgentMode = 'Safe' | 'Degen' | 'Mag7';
@@ -68,7 +69,6 @@ export type Agent = {
   templateId?: string;
   copiedFromId?: string;
   tasks?: AgentTask[];
-  // FIX: Add missing `boxBalance` property.
   boxBalance: number;
 };
 
@@ -152,7 +152,7 @@ export type DailySummary = {
     id?: string;
 };
 
-export type TransactionType = 'send' | 'receive' | 'claim' | 'stipend' | 'escrow' | 'room_purchase';
+export type TransactionType = 'send' | 'receive' | 'claim' | 'stipend' | 'escrow' | 'room_purchase' | 'credit_purchase';
 
 export type Transaction = {
   id: string;
@@ -160,6 +160,7 @@ export type Transaction = {
   type: TransactionType;
   amount: number;
   description: string;
+  ownerHandle?: string;
 };
 
 export type MarketIntel = {
@@ -216,7 +217,6 @@ export type BettingIntel = {
     ownerHandle?: string;
     sourceUrls?: string[];
     rawResearchData?: { url: string; markdown: string; }[];
-    // FIX: Add missing optional `bountyId` property.
     bountyId?: string;
 }
 
@@ -306,4 +306,17 @@ export type ActivityLogEntry = {
   type: 'cafe' | 'research' | 'trade' | 'engagement' | 'system';
   message: string;
   triggeredNotification?: boolean;
+};
+
+export type CreditUsageLog = {
+    _id?: string;
+    ownerHandle: string;
+    agentId: string;
+    timestamp: number;
+    description: string;
+    cost: number;
+    tokens: {
+        input: number;
+        output: number;
+    };
 };

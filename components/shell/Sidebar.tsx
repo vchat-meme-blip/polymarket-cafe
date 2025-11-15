@@ -4,7 +4,6 @@
 */
 import { useUI, useUser } from '../../lib/state/index.js';
 import c from 'classnames';
-import { useState } from 'react';
 import styles from './Shell.module.css';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -28,7 +27,7 @@ const ConnectWalletButton = () => {
  */
 export default function Sidebar() {
   const { view, setView, setIsSignedIn, setShowProfileView, isMobileNavOpen } = useUI();
-  const { _setHandle } = useUser();
+  const { credits, _setHandle } = useUser();
 
   function handleSignOut() {
     _setHandle(''); // Clear the persisted handle directly
@@ -88,6 +87,10 @@ export default function Sidebar() {
         </button>
       </div>
       <div className={styles.sidebarBottom}>
+        <button className={styles.walletBalance} onClick={() => setShowProfileView(true, 'billing')}>
+          <span className="icon">toll</span>
+          <span>{(credits ?? 0).toLocaleString()}</span>
+        </button>
         <ConnectWalletButton />
         <button
           className={styles.sidebarButton}

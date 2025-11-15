@@ -27,7 +27,6 @@ const initialUserState: User = {
   handle: '',
   hasCompletedOnboarding: false,
   lastSeen: null,
-  userApiKey: null,
   solanaWalletAddress: null,
   createdAt: 0,
   updatedAt: 0,
@@ -43,6 +42,8 @@ const initialUserState: User = {
   },
   bookmarkedMarketIds: [],
   isAutonomyEnabled: true,
+  credits: 0,
+  userApiKey: null,
 };
 
 export const useUser = create<
@@ -50,7 +51,6 @@ export const useUser = create<
     signIn: (handle: string, isNewUser?: boolean) => Promise<void>;
     connectWallet: (address: string) => Promise<{ success: boolean, address?: string }>;
     disconnectWallet: () => Promise<{ success: boolean }>;
-    setUserApiKey: (key: string) => Promise<void>;
     setName: (name: string) => void;
     setInfo: (info: string) => void;
     updateNotificationSettings: (settings: { phone?: string; notificationSettings?: NotificationSettings }) => Promise<void>;
@@ -92,8 +92,8 @@ export const useUser = create<
               ...user,
               name: user.name || '',
               hasCompletedOnboarding: user.hasCompletedOnboarding || false,
-              userApiKey: user.userApiKey || null,
-              solanaWalletAddress: user.solanaWalletAddress || null
+              solanaWalletAddress: user.solanaWalletAddress || null,
+              credits: user.credits || 0,
             };
             
             console.log(`[Auth] Updating local user state for ${handleWithAt}`);
@@ -145,9 +145,6 @@ export const useUser = create<
       console.error('Failed to disconnect wallet:', error);
       return { success: false };
     }
-  },
-  
-  setUserApiKey: async (key: string) => {
   },
 
   updateNotificationSettings: async (settings) => {
@@ -370,13 +367,15 @@ export type BetSlipProposal = {
 };
 
 type DossierTab = 'profile' | 'intel' | 'operations' | 'activity';
+export type ProfileTab = 'profile' | 'billing' | 'wallet' | 'security' | 'notifications';
 
 
 export const useUI = create<{
   isMobileNavOpen: boolean;
   toggleMobileNav: () => void;
   showProfileView: boolean;
-  setShowProfileView: (show: boolean) => void;
+  profileInitialTab: ProfileTab | null;
+  setShowProfileView: (show: boolean, initialTab?: ProfileTab | null) => void;
   agentDossierId: string | null;
   isCreatingAgentInDossier: boolean;
   dossierInitialTab: DossierTab | null;
@@ -457,7 +456,8 @@ export const useUI = create<{
   isMobileNavOpen: true,
   toggleMobileNav: () => set(state => ({ isMobileNavOpen: !state.isMobileNavOpen })),
   showProfileView: false,
-  setShowProfileView: (show: boolean) => set({ showProfileView: show }),
+  profileInitialTab: null,
+  setShowProfileView: (show: boolean, initialTab: ProfileTab | null = null) => set({ showProfileView: show, profileInitialTab: initialTab }),
   agentDossierId: null,
   isCreatingAgentInDossier: false,
   dossierInitialTab: null,

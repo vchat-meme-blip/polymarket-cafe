@@ -9,6 +9,7 @@
     padding: 20px;
     background: var(--Neutral-10);
     border-radius: 12px;
+    border: 1px solid var(--Neutral-20);
 }
 .balanceDisplay .balanceLabel {
     font-size: 14px;
@@ -140,17 +141,11 @@
     word-break: break-all;
     margin-bottom: 12px;
 }
-.apiKeyForm {
-    display: flex;
-    gap: 12px;
-}
-.apiKeyForm input {
-    flex-grow: 1;
-}
 
 .stepHint {
     font-size: 14px;
     color: var(--Neutral-60);
+    margin: 8px 0;
 }
 
 .profileFooter {
@@ -240,4 +235,73 @@
 
 .toggleSwitch input:checked + label:before {
     transform: translateX(20px);
+}
+
+/* --- NEW: Billing Tab --- */
+.billingTabContent {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+.billingTabContent h4 {
+    font-size: 18px;
+    text-align: center;
+    color: var(--Neutral-90);
+    margin: 0;
+}
+.creditPackages {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+}
+.creditPackage {
+    background: var(--Neutral-10);
+    border: 1px solid var(--Neutral-20);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
+}
+.packageIcon {
+    font-size: 36px;
+    color: var(--brand-yellow);
+}
+.packageDetails {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.packageCredits {
+    font-size: 20px;
+    font-weight: bold;
+}
+.packagePrice {
+    color: var(--Neutral-60);
+}
+.creditPackage .button {
+    width: 100%;
+    justify-content: center;
+}
+.txHistory {
+    margin-top: 16px;
+}
+.lowCreditWarning {
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--brand-orange);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px;
+    background-color: rgba(230, 126, 34, 0.1);
+    border-radius: 8px;
+}
+.lowCreditWarning .icon {
+    font-size: 20px;
 }

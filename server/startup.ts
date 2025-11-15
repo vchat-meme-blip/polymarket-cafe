@@ -12,7 +12,8 @@ import { fileURLToPath } from 'url';
 // FIX: Import Worker directly to ensure type resolution in global declaration.
 import { Worker } from 'worker_threads';
 import mongoose from 'mongoose';
-import { ObjectId } from 'mongodb';
+// FIX: Import WithId from mongodb to resolve type error.
+import { ObjectId, WithId } from 'mongodb';
 
 import connectDB, { seedDatabase } from './db.js';
 // FIX: Use named import for the router to fix module resolution errors.
@@ -77,7 +78,8 @@ export async function startServer() {
         } 
         else if (agentId) {
             const agentObjectId = mongoose.Types.ObjectId.isValid(agentId) ? new ObjectId(agentId) : null;
-            const user = agentObjectId ? await usersCollection.findOne({ currentAgentId: agentObjectId }) : null;
+            // FIX: Correctly type the `user` object after fetching from the database to include the optional `userApiKey` property, resolving a TypeScript error related to the missing property.
+            const user = agentObjectId ? await usersCollection.findOne({ currentAgentId: agentObjectId }) as (WithId<import('../lib/types').UserDocument> & { userApiKey?: string | null }) | null : null;
             key = user?.userApiKey || apiKeyManager.getKey();
         } 
         else {

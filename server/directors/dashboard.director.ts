@@ -60,14 +60,17 @@ export class DashboardAgentDirector {
                     handle: userDoc.handle,
                     hasCompletedOnboarding: userDoc.hasCompletedOnboarding || false,
                     lastSeen: userDoc.lastSeen || null,
-                    userApiKey: userDoc.userApiKey || null,
+                    // FIX: Add `userApiKey` to the constructed `User` object, resolving TypeScript errors where the property was used without being defined on the type.
+                    userApiKey: (userDoc as any).userApiKey || null,
                     solanaWalletAddress: userDoc.solanaWalletAddress || null,
                     createdAt: this.parseDate(userDoc.createdAt),
                     updatedAt: this.parseDate(userDoc.updatedAt),
                     currentAgentId: userDoc.currentAgentId?.toString(),
                     ownedRoomId: userDoc.ownedRoomId?.toString(),
                     phone: userDoc.phone,
-                    notificationSettings: userDoc.notificationSettings
+                    notificationSettings: userDoc.notificationSettings,
+                    isAutonomyEnabled: userDoc.isAutonomyEnabled,
+                    credits: userDoc.credits
                 };
                 await this.processAgentAutonomy(user);
             }
@@ -182,7 +185,7 @@ export class DashboardAgentDirector {
         }
     }
 
-    private async generateProactiveMessage(agent: Agent, prompt: string, userApiKey: string | null): Promise<string | null> {
+    private async generateProactiveMessage(agent: Agent, prompt: string, userApiKey: string | null | undefined): Promise<string | null> {
         try {
             const apiKey = userApiKey || (process.env.OPENAI_API_KEYS || '').split(',')[0] || process.env.GEMINI_API_KEY;
             if (!apiKey) return null;

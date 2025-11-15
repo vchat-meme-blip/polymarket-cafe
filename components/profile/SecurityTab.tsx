@@ -11,16 +11,13 @@ import styles from './Profile.module.css';
 export default function SecurityTab() {
   const { setIsSignedIn } = useUI();
   const {
-    userApiKey,
     receivingWalletAddress,
-    setUserApiKey,
     updateUserSettings,
     _setHandle,
   } = useUser();
   
   const { publicKey } = useWallet();
   
-  const [apiKeyInput, setApiKeyInput] = useState(userApiKey || '');
   const [walletInput, setWalletInput] = useState(receivingWalletAddress || '');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -51,10 +48,7 @@ export default function SecurityTab() {
     e.preventDefault();
     setIsSaving(true);
     try {
-        await Promise.all([
-            setUserApiKey(apiKeyInput.trim()),
-            updateUserSettings({ receivingWalletAddress: walletInput.trim() })
-        ]);
+        await updateUserSettings({ receivingWalletAddress: walletInput.trim() });
         alert('Settings saved!');
     } catch (error) {
         alert('Failed to save settings.');
@@ -70,7 +64,7 @@ export default function SecurityTab() {
           <h4>Wallet Connection</h4>
           <p className={styles.stepHint} style={{ marginBottom: '12px' }}>
             Connect your Solana wallet to serve as your unique user ID and for
-            future on-chain interactions.
+            on-chain payments.
           </p>
           <div className={styles.walletButtonContainer}>
             <WalletMultiButton />
@@ -85,28 +79,13 @@ export default function SecurityTab() {
         <div className={styles.securitySection}>
             <h4>Receiving Wallet</h4>
             <p className={styles.stepHint} style={{ marginBottom: '12px' }}>
-            Set the public address where you'll receive payments from your storefront sales (e.g., your Base USDC address).
+            Set the public address where you'll receive payments from your storefront sales (e.g., your Solana USDC address).
             </p>
             <input
                 type="text"
                 value={walletInput}
                 onChange={e => setWalletInput(e.target.value)}
                 placeholder="Enter your receiving wallet address"
-                disabled={isSaving}
-            />
-        </div>
-
-        <div className={styles.securitySection}>
-            <h4>OpenAI API Key</h4>
-            <p className={styles.stepHint} style={{ marginBottom: '12px' }}>
-            Save your own OpenAI API key to be used for your personal agent chats.
-            Your key will be stored securely on our server.
-            </p>
-            <input
-                type="password"
-                value={apiKeyInput}
-                onChange={e => setApiKeyInput(e.target.value)}
-                placeholder="Enter your Gemini API Key"
                 disabled={isSaving}
             />
         </div>

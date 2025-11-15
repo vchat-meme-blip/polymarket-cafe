@@ -1,7 +1,6 @@
-
 import { Router } from 'express';
 import mongoose, { Collection } from 'mongoose';
-import { TradeRecord, BettingIntel, MarketWatchlist } from '../../lib/types/shared.js';
+import { TradeRecord, BettingIntel, MarketWatchlist, CreditUsageLog } from '../../lib/types/shared.js';
 import { 
   usersCollection, 
   agentsCollection,
@@ -15,6 +14,7 @@ import {
   activityLogCollection,
   agentInteractionsCollection,
   newMarketsCacheCollection,
+  creditUsageLogsCollection,
 } from '../db.js';
 import { aiService } from '../services/ai.service.js';
 import { elevenLabsService } from '../services/elevenlabs.service.js';
@@ -22,6 +22,8 @@ import { cafeMusicService } from '../services/cafeMusic.service.js';
 import { polymarketService } from '../services/polymarket.service.js';
 import { kalshiService } from '../services/kalshi.service.js';
 import { leaderboardService } from '../services/leaderboard.service.js';
+import { creditService } from '../services/credit.service.js';
+import { solanaService } from '../services/solana.service.js';
 import { Agent, User, Interaction, Room, MarketIntel, AgentMode, Bet, AgentTask, toSharedUser, Transaction } from '../../lib/types/index.js';
 import { createSystemInstructions } from '../../lib/prompts.js';
 import { ObjectId, WithId } from 'mongodb';
@@ -30,17 +32,18 @@ import { Readable } from 'stream';
 import { startOfToday, formatISO } from 'date-fns';
 import { seedDatabase } from '../db.js';
 import { UserDocument, TransactionDocument } from '../../lib/types/mongodb.js';
+import { Worker } from 'worker_threads';
 
 // Add global declaration to extend Express.Request with worker properties.
 declare global {
   namespace Express {
     interface Request {
-      arenaWorker?: import('worker_threads').Worker;
-      autonomyWorker?: import('worker_threads').Worker;
-      dashboardWorker?: import('worker_threads').Worker;
-      marketWatcherWorker?: import('worker_threads').Worker;
-      resolutionWorker?: import('worker_threads').Worker;
-      monitoringWorker?: import('worker_threads').Worker;
+      arenaWorker?: Worker;
+      autonomyWorker?: Worker;
+      dashboardWorker?: Worker;
+      marketWatcherWorker?: Worker;
+      resolutionWorker?: Worker;
+      monitoringWorker?: Worker;
     }
   }
 }
@@ -98,7 +101,7 @@ router.get('/bootstrap/:handle', async (req, res) => {
     const userDoc = await usersCollection.findOne({ handle });
     if (!userDoc) return res.status(404).json({ message: 'User not found' });
 
-    const userObject = { ...userDoc };
+    const userObject: Partial<UserDocument> = { ...userDoc };
 
     // Self-healing: Check if the user's owned room still exists.
     if (userObject.ownedRoomId) {
@@ -106,9 +109,9 @@ router.get('/bootstrap/:handle', async (req, res) => {
         if (!roomExists) {
             console.warn(`[Bootstrap] Stale ownedRoomId (${userObject.ownedRoomId}) found for user ${handle}. Clearing.`);
             // Update the DB to fix the inconsistency
-            await usersCollection.updateOne({ _id: userObject._id }, { $set: { ownedRoomId: null } });
-            // Set property to null on the mutable copy we're about to send to the client
-            (userObject as any).ownedRoomId = null;
+            await usersCollection.updateOne({ _id: userObject._id }, { $unset: { ownedRoomId: 1 } });
+            // Set property to undefined on the mutable copy we're about to send to the client
+            userObject.ownedRoomId = undefined;
         }
     }
     const user = userObject;
@@ -189,13 +192,12 @@ router.post('/users/register', async (req, res) => {
     const existing = await usersCollection.findOne({ handle });
     if (existing) return res.status(409).json({ message: 'Handle already taken' });
 
-    const newUser: User = {
+    const newUser: Omit<User, '_id'> = {
       handle,
       name: '',
       info: '',
       hasCompletedOnboarding: false,
       lastSeen: Date.now(),
-      userApiKey: null,
       solanaWalletAddress: null,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -210,6 +212,7 @@ router.post('/users/register', async (req, res) => {
         autonomyResearch: true,
       },
       isAutonomyEnabled: true,
+      credits: 1000, // Starting credits
     };
 
     const result = await usersCollection.insertOne(newUser as any);
@@ -276,7 +279,7 @@ router.put('/users/settings', async (req, res) => {
     const settings = req.body;
     if (!userHandle) return res.status(401).json({ message: "Unauthorized" });
 
-    const allowedUpdates = ['receivingWalletAddress', 'userApiKey', 'isAutonomyEnabled'] as const;
+    const allowedUpdates = ['receivingWalletAddress', 'isAutonomyEnabled'] as const;
     const finalUpdates: Partial<Pick<User, typeof allowedUpdates[number]>> = {};
     for (const key of allowedUpdates) {
         if (settings[key] !== undefined) {
@@ -633,18 +636,8 @@ router.delete('/agents/:agentId/tasks/:taskId', async (req, res) => {
 // --- Agent Actions & AI ---
 router.post('/ai/brainstorm-personality', async (req, res) => {
   try {
-    const apiKey = (process.env.OPENAI_API_KEYS || '').split(',')[0] || process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("Server AI API key is not configured.");
-    
-    const openai = new OpenAI({ apiKey });
-    const prompt = `Brainstorm a detailed, first-person personality for an AI agent in a SocialFi simulation called "Quants Café". The agent's personality should be based on these keywords: "${req.body.keywords}". The description must be under 80 words.`;
-    
-    const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-    });
-
-    res.json({ personality: completion.choices[0].message.content?.trim() ?? '' });
+    const { personality } = await aiService.brainstormPersonality(req.body.keywords);
+    res.json({ personality });
   } catch (e: any) {
     console.error('[API] Brainstorm error:', e);
     res.status(500).json({ message: e.message });
@@ -677,12 +670,7 @@ router.post('/ai/direct-message', async (req, res) => {
             return res.status(404).json({ message: 'User or agent not found' });
         }
         
-        const apiKey = user.userApiKey || (process.env.OPENAI_API_KEYS || '').split(',')[0] || process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            return res.status(403).json({ message: 'No API key available. Please configure your user API key in Settings.' });
-        }
-
-        const agentMessage = await aiService.getDirectMessageResponse(agent as any, user as any, message, history, apiKey);
+        const agentMessage = await aiService.getDirectMessageResponse(agent as any, user as any, message, history);
         
         // Persist conversation
         const participants = [agent.id, 'user'].sort();
@@ -701,9 +689,9 @@ router.post('/ai/direct-message', async (req, res) => {
         
         res.json({ agentMessage });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('[API] Direct message error:', error);
-        res.status(500).json({ message: 'Error communicating with AI model' });
+        res.status(500).json({ message: error.message || 'Error communicating with AI model' });
     }
 });
 
@@ -1011,5 +999,96 @@ router.get('/music/cafe/:roomId', async (req, res) => {
         res.status(500).json({ error: 'Failed to generate music.' });
     }
 });
+
+// --- NEW Credit System Endpoints ---
+router.post('/credits/purchase', async (req, res) => {
+    const { userHandle } = res.locals;
+    if (!userHandle) return res.status(401).json({ message: 'Unauthorized' });
+
+    const signature = req.header('X-Transaction-Signature');
+    const { amount, credits } = req.body;
+
+    if (!signature) {
+        const projectWalletAddress = process.env.PROJECT_SOLANA_WALLET_ADDRESS;
+        if (!projectWalletAddress) {
+            return res.status(500).json({ message: 'Payment processor not configured.' });
+        }
+        return res.status(402).json({
+            url: '/api/credits/purchase',
+            price: String(amount),
+            payTo: projectWalletAddress,
+            network: 'Solana',
+            description: `Purchase of ${credits.toLocaleString()} credits`,
+        });
+    }
+
+    try {
+        const { success, error } = await solanaService.verifyUsdcTransfer(signature, amount);
+        if (!success) {
+            return res.status(400).json({ message: `Transaction verification failed: ${error}` });
+        }
+
+        const newCredits = await creditService.credit(userHandle, credits, `Purchase of ${credits.toLocaleString()} credits`);
+        res.status(200).json({ newCredits });
+    } catch (error) {
+        console.error(`[API] Error purchasing credits for ${userHandle}:`, error);
+        res.status(500).json({ message: 'Failed to process purchase.' });
+    }
+});
+
+router.get('/credits/history', async (req, res) => {
+    const { userHandle } = res.locals;
+    if (!userHandle) return res.status(401).json({ message: 'Unauthorized' });
+    
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = 20;
+
+    try {
+        const logs = await creditUsageLogsCollection
+            .find({ ownerHandle: userHandle })
+            .sort({ timestamp: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .toArray();
+
+        const total = await creditUsageLogsCollection.countDocuments({ ownerHandle: userHandle });
+        
+        res.status(200).json({
+            logs,
+            hasMore: page * limit < total,
+        });
+    } catch (error) {
+        console.error(`[API] Error fetching credit history for ${userHandle}:`, error);
+        res.status(500).json({ message: 'Failed to fetch credit history.' });
+    }
+});
+
+router.get('/admin/usage', async (req, res) => {
+    const adminKey = req.header('X-Admin-Key');
+    if (adminKey !== process.env.OPENAI_ADMIN_KEY) {
+        return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    try {
+        const sevenDaysAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
+        const url = `https://api.openai.com/v1/organization/usage/completions?start_time=${sevenDaysAgo}`;
+        
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${process.env.OPENAI_ADMIN_KEY}` }
+        });
+
+        if (!response.ok) {
+            throw new Error(`OpenAI API responded with status ${response.status}`);
+        }
+
+        const data = await response.json();
+        res.status(200).json(data);
+
+    } catch (error) {
+        console.error('[API] Error fetching admin usage:', error);
+        res.status(500).json({ message: 'Failed to fetch usage data.' });
+    }
+});
+
 
 export { router };
