@@ -97,16 +97,13 @@ class PolymarketService {
 
     if (!effectiveQuery) {
         const params: any = {
-            order: order || 'volume',
+            order: order === 'id' ? 'creation_date' : order || 'volume',
             ascending: false,
             closed: false,
             limit: limit,
             offset: (page - 1) * limit,
             category: category && category !== 'All' ? category : undefined,
         };
-        if (order === 'id') {
-          params.order = 'creation_date';
-        }
 
         const data = await this.fetchFromApi(GAMMA_API, 'events', params);
 

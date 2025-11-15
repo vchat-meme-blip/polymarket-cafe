@@ -169,7 +169,6 @@ class AiService {
     }
   }
 
-  // FIX: Implement the missing `brainstormPersonality` method in the `AiService` class to handle requests from the frontend for generating AI agent personalities.
   async brainstormPersonality(keywords: string): Promise<{ personality: string }> {
     let apiKey: string | null = null;
     try {
@@ -236,7 +235,7 @@ class AiService {
                 content: turn.text || null,
                 tool_calls: formattedToolCalls,
             };
-        } else if (turn.agentId === 'tool') {
+        } else if ((turn as any).role === 'tool') { // Handling tool responses from history
              return {
                 role: 'tool',
                 tool_call_id: (turn as any).tool_call_id,
@@ -301,7 +300,7 @@ class AiService {
             functionResponse = { positions: positions.slice(0, 5).map(p => ({ market: p.title, outcome: p.outcome, size: p.size })) };
             resultPreview = `Found ${positions.length} positions for trader.`;
           } else if (functionName === 'get_my_tasks') {
-            const agentWithTasks = await agentsCollection.findOne({ _id: agent._id });
+            const agentWithTasks = await agentsCollection.findOne({ _id: new Types.ObjectId(agent.id) });
             const tasks = (agentWithTasks as any).tasks || [];
             functionResponse = { tasks: tasks.map((t: AgentTask) => ({ id: t.id, objective: t.objective, status: t.status })) };
             resultPreview = `Found ${tasks.length} tasks.`;
@@ -369,7 +368,7 @@ class AiService {
 
     } catch (error) {
       console.error(`[AiService] OpenAI completion failed for direct message with ${agent.name}:`, error);
-      if (error instanceof OpenAI.APIError && error.status === 429) {
+      if (error instanceof OpenAI.APIError && error.status === 429 && apiKey) {
         apiKeyProvider.reportRateLimit(apiKey, 60);
       }
       throw new Error("I'm having some trouble connecting right now. Let's talk later.");
@@ -577,6 +576,7 @@ class AiService {
           kalshiService.searchMarkets(query),
           bettingIntelCollection.find({ ownerAgentId: new Types.ObjectId(agentId) }).toArray()
       ]);
+      // FIX: kalshiResults is an array, not an object with a .markets property
       const markets: MarketIntel[] = [...polymarketResults.markets, ...kalshiResults];
 
       const systemPrompt = `

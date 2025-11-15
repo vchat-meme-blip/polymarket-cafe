@@ -1,4 +1,3 @@
-
 /// <reference types="node" />
 
 import mongoose, { Collection, Document } from 'mongoose';
@@ -13,7 +12,6 @@ import type {
   BettingIntel,
   DailySummary,
   Notification,
-  // FIX: Add missing imports for `CreditUsageLog` and `CreditUsageLogDocument` to resolve type errors when referencing these collections.
   CreditUsageLog,
   // MongoDB document types
   AgentDocument,
