@@ -79,7 +79,7 @@ export async function startServer() {
         else if (agentId) {
             const agentObjectId = mongoose.Types.ObjectId.isValid(agentId) ? new ObjectId(agentId) : null;
             // FIX: Correctly type the `user` object after fetching from the database to include the optional `userApiKey` property, resolving a TypeScript error related to the missing property.
-            const user = agentObjectId ? await usersCollection.findOne({ currentAgentId: agentObjectId }) as (WithId<import('../lib/types').UserDocument> & { userApiKey?: string | null }) | null : null;
+            const user = agentObjectId ? await usersCollection.findOne({ currentAgentId: agentObjectId }) as (WithId<import('../lib/types/index.js').UserDocument> & { userApiKey?: string | null }) | null : null;
             key = user?.userApiKey || apiKeyManager.getKey();
         } 
         else {
